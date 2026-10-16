@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenChatFunnel v2.0 — CRM Conversacional, Kanban Drag & Drop, Broadcast & MCP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .kanban-col-dragover {
+      border-color: #6366f1 !important;
+      background-color: rgba(99, 102, 241, 0.08) !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Top Header -->
+  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-[1680px] mx-auto px-4 h-16 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-filter-circle-dollar text-white text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base tracking-tight text-white">OpenChatFunnel</h1>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              v2.0 Pro Suite
+            </span>
+            <span id="ws-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> WS Live
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 hidden sm:block">Omnichannel • Handoff Humano • Kanban Drag & Drop • Agenda & Anti-Vácuo • Broadcast</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-1 bg-slate-950/90 p-1 rounded-xl border border-slate-800 overflow-x-auto">
+        <button onclick="switchTab('inbox')" id="tab-btn-inbox" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition bg-indigo-600 text-white whitespace-nowrap">
+          <i class="fa-solid fa-comments"></i> Inbox & Handoff
+        </button>
+        <button onclick="switchTab('kanban')" id="tab-btn-kanban" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
+          <i class="fa-solid fa-table-columns"></i> Kanban (Drag & Drop)
+        </button>
+        <button onclick="switchTab('agenda')" id="tab-btn-agenda" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
+          <i class="fa-solid fa-calendar-check"></i> Agenda & Anti-Vácuo
+        </button>
+        <button onclick="switchTab('broadcast')" id="tab-btn-broadcast" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
+          <i class="fa-solid fa-bullhorn"></i> Broadcast
+        </button>
+        <button onclick="switchTab('kb')" id="tab-btn-kb" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
+          <i class="fa-solid fa-book-open-reader"></i> Base KB
+        </button>
+        <button onclick="switchTab('workflows')" id="tab-btn-workflows" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
+          <i class="fa-solid fa-bolt"></i> Workflows & Webhook
+        </button>
+        <button onclick="switchTab('mcp')" id="tab-btn-mcp" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
+          <i class="fa-solid fa-plug-circle-bolt"></i> MCP (6 Tools)
+        </button>
+      </nav>
+
+      <!-- KPI Bar -->
+      <div class="hidden 2xl:flex items-center gap-2.5 text-xs">
+        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-lg">
+          <span class="text-slate-400">🔥 Quentes:</span>
+          <span id="kpi-hot" class="font-bold text-amber-400 ml-1">0</span>
+        </div>
+        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-lg">
+          <span class="text-slate-400">Pipeline:</span>
+          <span id="kpi-open-val" class="font-bold text-indigo-400 ml-1">R$ 0</span>
+        </div>
+        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-lg">
+          <span class="text-slate-400">Ganhos:</span>
+          <span id="kpi-won-val" class="font-bold text-emerald-400 ml-1">R$ 0</span>
+        </div>
+        <button onclick="openNewContactModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+          <i class="fa-solid fa-user-plus"></i> Novo Lead
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1680px] w-full mx-auto px-4 py-4 flex flex-col">
+
+    <!-- ========================================================= -->
+    <!-- TAB 1: INBOX OMNICHANNEL, HANDOFF HUMANO & NOTAS INTERNAS -->
+    <!-- ========================================================= -->
+    <section id="tab-inbox" class="tab-panel flex-1 grid grid-cols-12 gap-4 min-h-[calc(100vh-7.5rem)]">
+      <!-- Coluna Esquerda: Fila Única Omnichannel -->
+      <div class="col-span-12 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-inbox text-indigo-400"></i> Fila Omnichannel
+            </h2>
+            <p class="text-[11px] text-slate-400">Triagem Automática & Handoff Humano</p>
+          </div>
+          <button onclick="openNewContactModal()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg font-semibold">
+            <i class="fa-solid fa-plus"></i> Lead
+          </button>
+        </div>
+
+        <!-- Filtro de Canal -->
+        <div class="p-2 border-b border-slate-800 flex gap-1 bg-slate-950/50 text-[11px]">
+          <button onclick="filterContacts('')" id="ch-all" class="ch-filter flex-1 py-1 rounded bg-indigo-600 text-white font-medium">Todos</button>
+          <button onclick="filterContacts('whatsapp')" id="ch-whatsapp" class="ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white">
+            <i class="fa-brands fa-whatsapp text-emerald-400"></i> Whats
+          </button>
+          <button onclick="filterContacts('instagram')" id="ch-instagram" class="ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white">
+            <i class="fa-brands fa-instagram text-pink-400"></i> Insta
+          </button>
+          <button onclick="filterContacts('web')" id="ch-web" class="ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white">
+            <i class="fa-solid fa-globe text-sky-400"></i> Web
+          </button>
+        </div>
+
+        <!-- Filtro de Fila de Atendimento (Bot vs Humano) -->
+        <div class="px-2 py-1.5 border-b border-slate-800 flex gap-1 bg-slate-900 text-[10px]">
+          <button onclick="filterAttendance('')" id="att-all" class="att-filter flex-1 py-1 rounded bg-slate-800 text-white font-semibold">Todas Filas</button>
+          <button onclick="filterAttendance('bot')" id="att-bot" class="att-filter flex-1 py-1 rounded text-slate-400 hover:text-white">🤖 Auto</button>
+          <button onclick="filterAttendance('waiting')" id="att-waiting" class="att-filter flex-1 py-1 rounded text-amber-400 hover:text-white">⏳ Espera</button>
+          <button onclick="filterAttendance('human')" id="att-human" class="att-filter flex-1 py-1 rounded text-emerald-400 hover:text-white">🎧 Humano</button>
+        </div>
+
+        <div id="contacts-list" class="flex-1 overflow-y-auto divide-y divide-slate-800/60"></div>
+      </div>
+
+      <!-- Coluna Central: Chat + Handoff + Sussurro Interno + Respostas Rápidas -->
+      <div class="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden relative">
+        <!-- Header do Chat Ativo -->
+        <div class="p-3 border-b border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-3">
+            <div id="chat-avatar" class="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center font-bold text-indigo-300">
+              ?
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="chat-contact-name" class="font-bold text-sm text-white">Selecione um contato</h3>
+                <span id="chat-channel-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300"></span>
+                <span id="chat-temp-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30"></span>
+              </div>
+              <p id="chat-stage-banner" class="text-xs text-slate-400">Estágio no Funil: —</p>
+            </div>
+          </div>
+
+          <!-- Botões de Handoff Humano e Debouncer -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="toggleHumanHandoff()" id="btn-handoff"
+              class="text-xs px-3 py-1.5 rounded-xl font-semibold border transition flex items-center gap-1.5 bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30">
+              <i class="fa-solid fa-headset"></i> <span id="btn-handoff-label">Assumir Atendimento</span>
+            </button>
+
+            <label class="flex items-center gap-1.5 text-xs bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl cursor-pointer">
+              <input type="checkbox" id="toggle-debouncer" class="accent-indigo-500 rounded" />
+              <span class="text-slate-300 font-medium">Debouncer 2s</span>
+            </label>
+
+            <button onclick="simulateBurstMessages()" title="Envia 3 mensagens picadas concorrentes para demonstrar a fusão pelo MessageDebouncer"
+              class="text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl font-medium transition flex items-center gap-1">
+              <i class="fa-solid fa-layer-group"></i> 3 Msgs Picadas
+            </button>
+          </div>
+        </div>
+
+        <!-- Toast de Evento -->
+        <div id="chat-event-toast" class="hidden bg-indigo-950/90 border-b border-indigo-500/30 px-4 py-2 text-xs text-indigo-200 flex items-center justify-between">
+          <span id="chat-event-text"></span>
+          <button onclick="document.getElementById('chat-event-toast').classList.add('hidden')" class="text-indigo-400 hover:text-white">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Histórico de Mensagens -->
+        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-950/50"></div>
+
+        <!-- Popup de Respostas Rápidas (/atalhos) -->
+        <div id="quick-replies-popup" class="hidden absolute bottom-28 left-4 right-4 bg-slate-900 border border-indigo-500/50 rounded-2xl shadow-2xl p-3 z-20 max-h-60 overflow-y-auto">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+            <span class="text-xs font-bold text-indigo-300"><i class="fa-solid fa-bolt mr-1"></i> Respostas Rápidas (Templates com Variáveis)</span>
+            <button onclick="toggleQuickRepliesPopup(false)" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div id="quick-replies-items" class="space-y-1.5"></div>
+        </div>
+
+        <!-- Barra de Simulação de Intenções, Áudio e Anexos -->
+        <div class="px-3 py-2 bg-slate-900 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-1.5">
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="text-[10px] text-slate-400 mr-1">Simular Cliente:</span>
+            <button onclick="quickCustomerPrompt('Olá! Quais são os preços e planos? Quero receber uma proposta para 8 vendedores na empresa Vórtex.')"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg border border-slate-700">
+              💰 Pedir Proposta
+            </button>
+            <button onclick="quickCustomerPrompt('Quero agendar reunião de demonstração para amanhã!')"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg border border-slate-700">
+              📅 Agendar Call
+            </button>
+            <button onclick="quickCustomerPrompt('Quero falar com atendente humano agora, por favor.')"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 px-2 py-1 rounded-lg border border-slate-700">
+              🎧 Pedir Humano
+            </button>
+            <button onclick="quickCustomerPrompt('Perfeito, aceito a proposta! Vamos fechar o plano Enterprise hoje.')"
+              class="text-[11px] bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 px-2 py-1 rounded-lg border border-emerald-700/50">
+              🤝 Vamos Fechar!
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <button onclick="simulateAudioMessage()" title="Simular envio de nota de voz / áudio pelo WhatsApp"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-300 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-microphone"></i> Áudio
+            </button>
+            <button onclick="sendProposalDocument()" title="Enviar PDF de Proposta Comercial no chat"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-indigo-300 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-file-pdf"></i> PDF Proposta
+            </button>
+          </div>
+        </div>
+
+        <!-- Input de Envio + Modo Nota Interna (Sussurro) + Atalhos / -->
+        <div class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
+          <select id="chat-sender-mode" onchange="updateSenderModeStyle()" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="contact">👤 Como Lead (Cliente)</option>
+            <option value="human">🎧 Atendente Humano</option>
+            <option value="internal">🔒 Nota Interna (Sussurro Equipe)</option>
+          </select>
+
+          <button onclick="toggleQuickRepliesPopup()" title="Abrir Respostas Rápidas (/atalhos)"
+            class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold">
+            / Atalhos
+          </button>
+
+          <input id="chat-input" type="text" placeholder="Digite a mensagem ou '/' para respostas rápidas..."
+            oninput="handleChatInputKey(this.value)"
+            onkeydown="if(event.key==='Enter') sendChatMessage()"
+            class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+
+          <button onclick="sendChatMessage()" id="btn-send-msg" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i> Enviar
+          </button>
+        </div>
+      </div>
+
+      <!-- Coluna Direita: CRM Inspector, Temperatura, Responsável & Telemetria -->
+      <div class="col-span-12 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3.5 overflow-y-auto">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Raio-X do Lead</h3>
+            <div class="flex gap-1">
+              <button onclick="setLeadTemp('hot')" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30">🔥 Quente</button>
+              <button onclick="setLeadTemp('warm')" class="text-[10px] px-2 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30">🌤️ Morno</button>
+              <button onclick="setLeadTemp('cold')" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">❄️ Frio</button>
+            </div>
+          </div>
+          <div id="inspector-card" class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+            <p class="text-slate-500">Selecione um contato para inspecionar.</p>
+          </div>
+        </div>
+
+        <!-- Atribuição de Responsável -->
+        <div>
+          <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Atendente Responsável</label>
+          <div class="flex gap-1.5 mt-1">
+            <select id="inspector-assignee" onchange="changeContactAssignee(this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white">
+              <option value="Agente IA">🤖 Agente Automático</option>
+              <option value="Lucas (Closer)">🎧 Lucas (Closer)</option>
+              <option value="Fernanda (CS)">🎧 Fernanda (CS)</option>
+              <option value="Marcos (SDR)">🎧 Marcos (SDR)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Etiquetas (Tags) -->
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Etiquetas (Tags)</h4>
+          <div id="inspector-tags" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <div class="flex gap-1.5">
+            <input id="new-tag-input" type="text" placeholder="Nova tag (ex: vip)"
+              onkeydown="if(event.key==='Enter') addTagToCurrentContact()"
+              class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+            <button onclick="addTagToCurrentContact()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-700">
+              + Tag
+            </button>
+          </div>
+        </div>
+
+        <!-- Campos Customizados Extraídos -->
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            <i class="fa-solid fa-database text-indigo-400 mr-1"></i> Campos Customizados (CRM)
+          </h4>
+          <div id="inspector-custom-fields" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs space-y-1.5"></div>
+        </div>
+
+        <!-- Telemetria -->
+        <div class="flex-1">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            <i class="fa-solid fa-gauge-high text-emerald-400 mr-1"></i> Telemetria de Eventos
+          </h4>
+          <pre id="engine-telemetry" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-emerald-300 font-mono overflow-x-auto max-h-48 whitespace-pre-wrap">Aguardando interação...</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 2: FUNIL KANBAN COM DRAG & DROP E MÚLTIPLOS FUNIS     -->
+    <!-- ========================================================= -->
+    <section id="tab-kanban" class="tab-panel hidden flex-1 flex flex-col gap-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+        <div class="flex items-center gap-3">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-table-columns text-indigo-400"></i> Pipeline Kanban Interativo (Drag & Drop)
+            </h2>
+            <p class="text-xs text-slate-400">Arraste e solte os cards entre as colunas ou alterne entre os múltiplos funis da operação.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">Funil Ativo:</span>
+          <select id="kanban-pipeline-select" onchange="loadKanban(this.value)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white">
+          </select>
+          <button onclick="promptCreatePipeline()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Novo Funil
+          </button>
+          <button onclick="loadKanban(currentPipelineId)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="kanban-board" class="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 overflow-x-auto pb-2"></div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 3: AGENDA DE REUNIÕES & MOTOR ANTI-VÁCUO (FOLLOW-UP)  -->
+    <!-- ========================================================= -->
+    <section id="tab-agenda" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
+      <!-- Agendamento de Reuniões -->
+      <div class="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-calendar-check text-emerald-400"></i> Agenda de Demonstrações & Calls
+            </h3>
+            <p class="text-xs text-slate-400">Compromissos criados pelo chat ou agendados manualmente pelos vendedores.</p>
+          </div>
+        </div>
+
+        <!-- Formulário Novo Agendamento -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+          <select id="appt-contact" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white"></select>
+          <input id="appt-title" type="text" placeholder="Título (ex: Demo Plano Enterprise)" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white" />
+          <input id="appt-date" type="datetime-local" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white" />
+          <button onclick="createManualAppointment()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg px-3 py-2 transition">
+            <i class="fa-solid fa-calendar-plus mr-1"></i> Agendar Reunião
+          </button>
+        </div>
+
+        <div id="appointments-list" class="flex-1 space-y-2.5 overflow-y-auto"></div>
+      </div>
+
+      <!-- Fila Anti-Vácuo (Recuperação de Follow-up) -->
+      <div class="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-bell text-amber-400"></i> Radar Anti-Vácuo (Follow-up Automático)
+            </h3>
+            <p class="text-xs text-slate-400">Oportunidades abertas aguardando retorno do lead no WhatsApp/Instagram.</p>
+          </div>
+          <button onclick="triggerFollowupBatch()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i> Disparar Follow-up em Todos
+          </button>
+        </div>
+
+        <div id="followups-list" class="flex-1 space-y-2.5 overflow-y-auto"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 4: BROADCAST (DISPAROS ATIVOS EM MASSA SEGMENTADOS)   -->
+    <!-- ========================================================= -->
+    <section id="tab-broadcast" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
+      <div class="col-span-12 lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3.5 h-fit">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-bullhorn text-indigo-400"></i> Nova Campanha de Broadcast
+        </h3>
+        <p class="text-xs text-slate-400">Segmente leads por Canal ou Tag e envie mensagens personalizadas com variáveis <code class="text-emerald-300">{{nome}}</code> e <code class="text-emerald-300">{{empresa}}</code>.</p>
+
+        <div>
+          <label class="text-[11px] text-slate-400">Nome da Campanha</label>
+          <input id="bc-name" type="text" value="Campanha Fechamento de Mês - Condição Especial"
+            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="text-[11px] text-slate-400">Filtrar Canal</label>
+            <select id="bc-channel" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+              <option value="all">Todos os Canais</option>
+              <option value="whatsapp">Apenas WhatsApp</option>
+              <option value="instagram">Apenas Instagram</option>
+              <option value="web">Apenas Web</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] text-slate-400">Filtrar por Tag (Opcional)</label>
+            <input id="bc-tag" type="text" placeholder="Ex: interesse-comercial"
+              class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-slate-400">Template da Mensagem</label>
+          <textarea id="bc-template" rows="4"
+            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white">Olá {{nome}}! Tudo bem? Liberamos uma condição exclusiva para a {{empresa}} ativar o Plano Pro com isenção de setup hoje. Vamos conversar?</textarea>
+        </div>
+
+        <button onclick="sendBroadcastCampaign()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-rocket"></i> Disparar Campanha Agora
+        </button>
+      </div>
+
+      <div class="col-span-12 lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
+        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Histórico de Campanhas Disparadas
+        </h3>
+        <div id="broadcasts-list" class="space-y-2.5 overflow-y-auto flex-1"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 5: BASE DE CONHECIMENTO (KNOWLEDGE BASE)              -->
+    <!-- ========================================================= -->
+    <section id="tab-kb" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
+      <div class="col-span-12 lg:col-span-4 space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-magnifying-glass-chart text-indigo-400"></i> Simulador de Consulta KB
+          </h3>
+          <div class="flex gap-2">
+            <input id="kb-search-input" type="text" placeholder="Ex: Quais são os valores dos planos?"
+              onkeydown="if(event.key==='Enter') testKbSearch()"
+              class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+            <button onclick="testKbSearch()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl">
+              Buscar
+            </button>
+          </div>
+          <div id="kb-search-results" class="space-y-2 text-xs"></div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-plus-circle text-emerald-400"></i> Adicionar Conhecimento
+          </h3>
+          <input id="kb-question" type="text" placeholder="Pergunta frequente do cliente..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="kb-category" type="text" placeholder="Categoria (ex: Preços e Planos)"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="kb-tags" type="text" placeholder="Tags separadas por vírgula (ex: desconto, anual, pix)"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <textarea id="kb-answer" rows="3" placeholder="Resposta oficial..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"></textarea>
+          <button onclick="createKbItem()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-xl text-xs transition">
+            Salvar na Base de Conhecimento
+          </button>
+        </div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
+        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-book text-indigo-400"></i> Artigos Ativos na Base
+        </h3>
+        <div id="kb-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 6: AUTOMAÇÕES, ATALHOS & WEBHOOK WHATSAPP             -->
+    <!-- ========================================================= -->
+    <section id="tab-workflows" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
+      <div class="col-span-12 lg:col-span-4 space-y-4">
+        <!-- Criador de Workflow -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-bolt text-amber-400"></i> Nova Regra de Automação
+          </h3>
+          <input id="wf-name" type="text" placeholder="Nome da Regra (ex: Interesse Enterprise)"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <div class="grid grid-cols-2 gap-2">
+            <select id="wf-trigger-type" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+              <option value="keyword">Palavra-chave</option>
+              <option value="stage_change">Mudança de Estágio</option>
+              <option value="tag">Tag Adicionada</option>
+            </select>
+            <input id="wf-trigger-val" type="text" placeholder="Gatilho (ex: enterprise)"
+              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <select id="wf-action-type" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+              <option value="add_tag">Adicionar Tag</option>
+              <option value="send_message">Enviar Mensagem</option>
+              <option value="move_stage">Mover Estágio Kanban</option>
+            </select>
+            <input id="wf-action-val" type="text" placeholder="Valor da ação"
+              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          </div>
+          <button onclick="createWorkflowRule()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-xl text-xs transition">
+            Criar Automação
+          </button>
+        </div>
+
+        <!-- Simulador de Webhook Externo WhatsApp (Evolution API / Z-API / Meta) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-brands fa-whatsapp text-emerald-400"></i> Webhook WhatsApp (<code class="text-[11px] text-emerald-300">/api/webhooks/whatsapp</code>)
+          </h3>
+          <p class="text-xs text-slate-400">Simule um evento vindo da Evolution API / Meta Cloud API. Se o número não existir, o lead e o card no Kanban são criados na hora!</p>
+          <input id="wh-phone" type="text" value="+55 41 99988-7766" placeholder="Telefone do Lead"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="wh-name" type="text" value="Rafael Nogueira (Webhook)" placeholder="Nome do Perfil WhatsApp"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="wh-msg" type="text" value="Olá! Vi o anúncio e quero um orçamento urgente do plano Pro para 5 vendedores."
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+          <button onclick="triggerSimulatedWebhook()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-xl text-xs transition">
+            Disparar Payload de Webhook
+          </button>
+        </div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
+        <div>
+          <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-gears text-indigo-400"></i> Regras Declarativas de Workflow
+          </h3>
+          <div id="workflows-list" class="space-y-2.5"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 7: CATÁLOGO E CONSOLE MCP (MODEL CONTEXT PROTOCOL)    -->
+    <!-- ========================================================= -->
+    <section id="tab-mcp" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
+      <div class="col-span-12 lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-plug-circle-bolt text-emerald-400"></i> Ferramentas MCP Expostas (Claude / Cursor / ChatGPT)
+          </h3>
+          <p class="text-xs text-slate-400">Clique em qualquer ferramenta abaixo para carregar um payload de exemplo no executor ao lado.</p>
+        </div>
+        <div id="mcp-tools-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto"></div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-terminal text-indigo-400"></i> Executor Interativo MCP (<code class="text-xs text-indigo-300">POST /api/mcp/execute</code>)
+        </h3>
+        <div>
+          <label class="text-[11px] text-slate-400">Ferramenta Selecionada</label>
+          <input id="mcp-exec-name" type="text" value="query_knowledge_base"
+            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-emerald-300" />
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-400">Argumentos JSON (<code class="text-slate-300">arguments</code>)</label>
+          <textarea id="mcp-exec-args" rows="6"
+            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200">{"query": "preços e planos", "top_k": 2}</textarea>
+        </div>
+        <button onclick="executeMcpTool()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-play"></i> Invocar Ferramenta MCP Agora
+        </button>
+        <div class="flex-1 flex flex-col">
+          <label class="text-[11px] text-slate-400 mb-1">Resposta do Servidor MCP</label>
+          <pre id="mcp-exec-output" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-emerald-300 overflow-auto max-h-72">Clique em "Invocar Ferramenta MCP Agora"...</pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Novo Contato / Lead -->
+  <div id="modal-contact" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-white">Cadastrar Novo Lead no Funil</h3>
+        <button onclick="closeNewContactModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input id="modal-c-name" type="text" placeholder="Nome completo (ex: Fernanda Lima)"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+      <input id="modal-c-phone" type="text" placeholder="Telefone / WhatsApp (ex: +55 11 98888-7777)"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+      <input id="modal-c-email" type="email" placeholder="E-mail (ex: fernanda@empresa.com.br)"
+        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
+      <select id="modal-c-channel" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+        <option value="whatsapp">WhatsApp</option>
+        <option value="instagram">Instagram Direct</option>
+        <option value="web">Web Chat</option>
+      </select>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeNewContactModal()" class="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300">Cancelar</button>
+        <button onclick="submitNewContact()" class="px-4 py-2 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">Criar Lead</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentContactId = null;
+    let currentContactObj = null;
+    let currentChannelFilter = '';
+    let currentAttendanceFilter = '';
+    let currentPipelineId = null;
+    let allContacts = [];
+    let allStages = [];
+    let quickRepliesCache = [];
+    let draggedDealId = null;
+
+    function channelIcon(channel) {
+      if (channel === 'whatsapp') return '<i class="fa-brands fa-whatsapp text-emerald-400"></i>';
+      if (channel === 'instagram') return '<i class="fa-brands fa-instagram text-pink-400"></i>';
+      return '<i class="fa-solid fa-globe text-sky-400"></i>';
+    }
+
+    function tempBadgeHtml(temp, score) {
+      if (temp === 'hot') return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">🔥 ${score || 85} pts</span>`;
+      if (temp === 'cold') return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">❄️ ${score || 20} pts</span>`;
+      return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">🌤️ ${score || 50} pts</span>`;
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap';
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tab}`);
+      if (activeBtn) {
+        activeBtn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition bg-indigo-600 text-white whitespace-nowrap';
+      }
+
+      if (tab === 'kanban') loadKanban(currentPipelineId);
+      if (tab === 'agenda') loadAgendaAndFollowups();
+      if (tab === 'broadcast') loadBroadcasts();
+      if (tab === 'kb') loadKb();
+      if (tab === 'workflows') loadWorkflows();
+      if (tab === 'mcp') loadMcpTools();
+    }
+
+    // WebSocket Tempo Real
+    function connectWebSocket() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${proto}//${location.host}/ws`);
+      ws.onmessage = async (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          await refreshStats();
+          if (msg.event && currentContactId) {
+            await loadContacts(false);
+          }
+        } catch (e) {}
+      };
+      ws.onclose = () => setTimeout(connectWebSocket, 3000);
+    }
+
+    async function refreshStats() {
+      const res = await fetch('/api/stats');
+      const data = await res.json();
+      const hotEl = document.getElementById('kpi-hot');
+      if (hotEl) hotEl.textContent = data.hot_leads_count;
+      document.getElementById('kpi-open-val').textContent = `R$ ${data.open_pipeline_value.toLocaleString('pt-BR')}`;
+      document.getElementById('kpi-won-val').textContent = `R$ ${data.won_value.toLocaleString('pt-BR')}`;
+    }
+
+    async function loadContacts(selectCurrent = true) {
+      const params = new URLSearchParams();
+      if (currentChannelFilter) params.set('channel', currentChannelFilter);
+      if (currentAttendanceFilter) params.set('attendance_status', currentAttendanceFilter);
+      const res = await fetch(`/api/contacts?${params.toString()}`);
+      allContacts = await res.json();
+
+      const container = document.getElementById('contacts-list');
+      if (!allContacts.length) {
+        container.innerHTML = `<div class="p-6 text-center text-xs text-slate-500">Nenhum contato nesta fila.</div>`;
+        return;
+      }
+
+      if (!currentContactId || !allContacts.some(c => c.id === currentContactId)) {
+        currentContactId = allContacts[0].id;
+      }
+
+      container.innerHTML = allContacts.map(c => {
+        const isSelected = c.id === currentContactId;
+        const stageName = c.stage_name || 'Novo Lead';
+        const attBadge = !c.ai_enabled
+          ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">🎧 ${c.assignee || 'Humano'}</span>`
+          : `<span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">🤖 Auto</span>`;
+
+        return `
+          <div onclick="selectContact('${c.id}')" class="p-3 cursor-pointer transition hover:bg-slate-800/60 ${isSelected ? 'bg-slate-800/90 border-l-4 border-l-indigo-500' : ''}">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-semibold text-xs text-white truncate">${c.name}</span>
+              <div class="flex items-center gap-1.5">
+                ${tempBadgeHtml(c.temperature, c.lead_score)}
+                <span class="text-xs">${channelIcon(c.channel)}</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              ${attBadge}
+              <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 border border-slate-700 text-slate-300">${stageName}</span>
+            </div>
+            ${c.tags && c.tags.length ? `
+              <div class="flex flex-wrap gap-1 mt-1.5">
+                ${c.tags.map(t => `<span class="text-[10px] bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">#${t}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      if (selectCurrent) {
+        await selectContact(currentContactId, false);
+      }
+    }
+
+    function filterContacts(ch) {
+      currentChannelFilter = ch;
+      document.querySelectorAll('.ch-filter').forEach(b => {
+        b.className = 'ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white';
+      });
+      const active = document.getElementById(ch ? `ch-${ch}` : 'ch-all');
+      if (active) active.className = 'ch-filter flex-1 py-1 rounded bg-indigo-600 text-white font-medium';
+      loadContacts();
+    }
+
+    function filterAttendance(status) {
+      currentAttendanceFilter = status;
+      document.querySelectorAll('.att-filter').forEach(b => {
+        b.className = 'att-filter flex-1 py-1 rounded text-slate-400 hover:text-white';
+      });
+      const active = document.getElementById(status ? `att-${status}` : 'att-all');
+      if (active) active.className = 'att-filter flex-1 py-1 rounded bg-slate-800 text-white font-semibold';
+      loadContacts();
+    }
+
+    async function selectContact(contactId, reloadList = true) {
+      currentContactId = contactId;
+      const res = await fetch(`/api/contacts/${contactId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const { contact, deal, stage, messages } = data;
+      currentContactObj = contact;
+
+      document.getElementById('chat-avatar').textContent = contact.name.charAt(0).toUpperCase();
+      document.getElementById('chat-contact-name').textContent = contact.name;
+      document.getElementById('chat-channel-badge').innerHTML = `${channelIcon(contact.channel)} <span class="ml-1 uppercase">${contact.channel}</span>`;
+      document.getElementById('chat-temp-badge').outerHTML = `<span id="chat-temp-badge">${tempBadgeHtml(contact.temperature, contact.lead_score)}</span>`;
+
+      document.getElementById('chat-stage-banner').innerHTML = stage
+        ? `Kanban: <strong class="text-indigo-300">${stage.name}</strong> • Valor: <strong class="text-emerald-400">R$ ${(deal?.value || 0).toLocaleString('pt-BR')}</strong> • Resp: <strong class="text-white">${contact.assignee || 'Agente IA'}</strong>`
+        : 'Sem negócio vinculado';
+
+      // Atualiza botão de Handoff
+      const btnHandoff = document.getElementById('btn-handoff');
+      const lblHandoff = document.getElementById('btn-handoff-label');
+      if (contact.ai_enabled) {
+        btnHandoff.className = 'text-xs px-3 py-1.5 rounded-xl font-semibold border transition flex items-center gap-1.5 bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30';
+        lblHandoff.textContent = 'Assumir (Pausar Auto)';
+      } else {
+        btnHandoff.className = 'text-xs px-3 py-1.5 rounded-xl font-semibold border transition flex items-center gap-1.5 bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30';
+        lblHandoff.textContent = 'Devolver p/ Automático';
+      }
+
+      document.getElementById('inspector-assignee').value = contact.assignee || 'Agente IA';
+
+      const msgBox = document.getElementById('chat-messages');
+      if (!messages.length) {
+        msgBox.innerHTML = `<div class="text-center text-xs text-slate-500 py-12">Nenhuma mensagem ainda.</div>`;
+      } else {
+        msgBox.innerHTML = messages.map(m => {
+          const isCustomer = m.sender === 'contact';
+          const isInternal = m.is_internal || m.sender === 'internal';
+          const isSystem = m.sender === 'system';
+
+          let badge = '<span class="text-[10px] text-emerald-300">🎧 Atendente Humano</span>';
+          if (isCustomer) badge = '<span class="text-[10px] text-slate-400">👤 Cliente</span>';
+          else if (isInternal) badge = '<span class="text-[10px] text-amber-300 font-bold"><i class="fa-solid fa-lock"></i> Nota Interna da Equipe (Sussurro)</span>';
+          else if (isSystem) badge = '<span class="text-[10px] text-amber-300"><i class="fa-solid fa-bolt"></i> Automação Workflow</span>';
+          else if (m.sender === 'agent') badge = '<span class="text-[10px] text-indigo-300"><i class="fa-solid fa-robot"></i> Assistente 24/7</span>';
+
+          let bubbleClass = 'bg-indigo-950/80 border-indigo-500/40 text-indigo-50 ml-auto';
+          if (isCustomer) bubbleClass = 'bg-slate-800 border-slate-700 text-slate-100 mr-auto';
+          else if (isInternal) bubbleClass = 'bg-amber-950/70 border-amber-400/50 text-amber-100 mx-auto w-full border-dashed';
+          else if (isSystem) bubbleClass = 'bg-slate-900 border-amber-500/30 text-amber-200 mx-auto max-w-xl';
+
+          let mediaHtml = '';
+          if (m.media_type === 'audio') {
+            mediaHtml = `
+              <div class="flex items-center gap-2 bg-slate-950/70 p-2 rounded-xl mb-1.5 border border-sky-500/30">
+                <i class="fa-solid fa-circle-play text-sky-400 text-lg"></i>
+                <div class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden"><div class="w-2/3 h-full bg-sky-400"></div></div>
+                <span class="text-[10px] text-sky-300 font-mono">0:14 • Áudio Transcrito</span>
+              </div>
+            `;
+          } else if (m.media_type === 'document') {
+            mediaHtml = `
+              <div class="flex items-center gap-2 bg-slate-950/70 p-2 rounded-xl mb-1.5 border border-indigo-500/30">
+                <i class="fa-solid fa-file-pdf text-rose-400 text-lg"></i>
+                <span class="text-xs font-semibold text-white">Proposta_Comercial_OpenChatFunnel.pdf</span>
+                <span class="text-[10px] text-slate-400 ml-auto">420 KB</span>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="max-w-[85%] rounded-2xl px-3.5 py-2.5 border text-xs leading-relaxed ${bubbleClass}">
+              <div class="flex items-center justify-between gap-4 mb-1">
+                ${badge}
+                <span class="text-[10px] text-slate-500">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
+              </div>
+              ${mediaHtml}
+              <div class="whitespace-pre-line">${m.content}</div>
+            </div>
+          `;
+        }).join('');
+        msgBox.scrollTop = msgBox.scrollHeight;
+      }
+
+      // Inspector Card
+      document.getElementById('inspector-card').innerHTML = `
+        <div class="flex justify-between"><span class="text-slate-400">Telefone:</span><span class="text-white">${contact.phone || '—'}</span></div>
+        <div class="flex justify-between"><span class="text-slate-400">E-mail:</span><span class="text-white">${contact.email || '—'}</span></div>
+        <div class="flex justify-between"><span class="text-slate-400">Fila Atual:</span><span class="font-bold uppercase ${contact.ai_enabled ? 'text-indigo-400' : 'text-emerald-400'}">${contact.attendance_status}</span></div>
+        <div class="flex justify-between"><span class="text-slate-400">Estágio Kanban:</span><span class="font-bold text-indigo-300">${stage ? stage.name : '—'}</span></div>
+        <div class="flex justify-between"><span class="text-slate-400">Score do Lead:</span><span class="font-bold text-amber-300">${contact.lead_score} / 100</span></div>
+      `;
+
+      // Tags
+      const tagsContainer = document.getElementById('inspector-tags');
+      tagsContainer.innerHTML = (contact.tags || []).length
+        ? contact.tags.map(t => `<span class="text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">#${t}</span>`).join('')
+        : `<span class="text-xs text-slate-500">Nenhuma tag atribuída.</span>`;
+
+      // Custom fields
+      const cf = contact.custom_fields || {};
+      const cfKeys = Object.keys(cf);
+      document.getElementById('inspector-custom-fields').innerHTML = cfKeys.length
+        ? cfKeys.map(k => `<div class="flex justify-between"><span class="text-slate-400">${k}:</span><span class="font-semibold text-emerald-300">${cf[k]}</span></div>`).join('')
+        : `<span class="text-slate-500">Sem campos extras capturados.</span>`;
+
+      if (reloadList) {
+        await loadContacts(false);
+      }
+    }
+
+    function updateSenderModeStyle() {
+      const mode = document.getElementById('chat-sender-mode').value;
+      const btn = document.getElementById('btn-send-msg');
+      if (mode === 'internal') {
+        btn.className = 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5';
+        btn.innerHTML = '<i class="fa-solid fa-lock"></i> Salvar Nota';
+      } else {
+        btn.className = 'bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5';
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar';
+      }
+    }
+
+    async function toggleHumanHandoff() {
+      if (!currentContactObj) return;
+      const newAiEnabled = !currentContactObj.ai_enabled;
+      const payload = {
+        ai_enabled: newAiEnabled,
+        attendance_status: newAiEnabled ? 'bot' : 'human',
+        assignee: newAiEnabled ? 'Agente IA' : 'Lucas (Closer)'
+      };
+      const res = await fetch(`/api/contacts/${currentContactId}/handoff`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      showEventToast(newAiEnabled ? '🤖 Assistente automático reativado para este lead.' : '🎧 Você assumiu a conversa! Respostas automáticas pausadas.');
+      await selectContact(currentContactId, true);
+    }
+
+    async function changeContactAssignee(assignee) {
+      if (!currentContactId) return;
+      const isBot = assignee === 'Agente IA';
+      await fetch(`/api/contacts/${currentContactId}/handoff`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          ai_enabled: isBot,
+          attendance_status: isBot ? 'bot' : 'human',
+          assignee
+        })
+      });
+      await selectContact(currentContactId, true);
+    }
+
+    async function setLeadTemp(temperature) {
+      if (!currentContactId) return;
+      await fetch(`/api/contacts/${currentContactId}/temperature`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ temperature })
+      });
+      await selectContact(currentContactId, true);
+      await refreshStats();
+    }
+
+    // Respostas Rápidas (/atalhos)
+    async function loadQuickReplies() {
+      const res = await fetch('/api/quick-replies');
+      quickRepliesCache = await res.json();
+      const box = document.getElementById('quick-replies-items');
+      box.innerHTML = quickRepliesCache.map(qr => `
+        <div onclick="applyQuickReply('${qr.shortcut}')" class="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 cursor-pointer flex items-center justify-between gap-2">
+          <div>
+            <span class="font-mono text-xs font-bold text-emerald-400">${qr.shortcut}</span>
+            <span class="text-xs font-semibold text-white ml-2">${qr.title}</span>
+            <p class="text-[11px] text-slate-400 truncate max-w-lg">${qr.content}</p>
+          </div>
+          <span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-400">${qr.category}</span>
+        </div>
+      `).join('');
+    }
+
+    function toggleQuickRepliesPopup(forceState) {
+      const popup = document.getElementById('quick-replies-popup');
+      const show = typeof forceState === 'boolean' ? forceState : popup.classList.contains('hidden');
+      if (show) {
+        loadQuickReplies();
+        popup.classList.remove('hidden');
+      } else {
+        popup.classList.add('hidden');
+      }
+    }
+
+    function handleChatInputKey(val) {
+      if (val.startsWith('/')) {
+        toggleQuickRepliesPopup(true);
+      } else {
+        toggleQuickRepliesPopup(false);
+      }
+    }
+
+    function applyQuickReply(shortcut) {
+      const qr = quickRepliesCache.find(item => item.shortcut === shortcut);
+      if (!qr) return;
+      document.getElementById('chat-sender-mode').value = 'human';
+      updateSenderModeStyle();
+      document.getElementById('chat-input').value = qr.content;
+      toggleQuickRepliesPopup(false);
+      document.getElementById('chat-input').focus();
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById('chat-input');
+      const content = input.value.trim();
+      if (!content || !currentContactId) return;
+      input.value = '';
+      toggleQuickRepliesPopup(false);
+
+      const senderMode = document.getElementById('chat-sender-mode').value;
+      const useDebouncer = document.getElementById('toggle-debouncer').checked;
+
+      if (senderMode === 'human' || senderMode === 'internal') {
+        const res = await fetch('/api/messages/send', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            contact_id: currentContactId,
+            content,
+            sender: senderMode,
+            is_internal: senderMode === 'internal'
+          })
+        });
+        const data = await res.json();
+        document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+        await selectContact(currentContactId, true);
+        await refreshStats();
+        return;
+      }
+
+      const res = await fetch('/api/messages/incoming', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contact_id: currentContactId, content, use_debouncer: useDebouncer })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+
+      if (data.status === 'buffered') {
+        showEventToast(`⏳ MessageDebouncer ativo: ${data.buffered_fragments} fragmento(s) em buffer (aguardando 2s)...`);
+        setTimeout(async () => {
+          await selectContact(currentContactId, true);
+          await refreshStats();
+        }, 2200);
+      } else {
+        if (data.stage_transition) {
+          showEventToast(`🚀 Funil Kanban Avançou: "${data.stage_transition.from_stage}" ➔ "${data.stage_transition.to_stage}"`);
+        } else if (data.scheduled_appointment) {
+          showEventToast(`📅 Reunião agendada automaticamente para ${data.scheduled_appointment.scheduled_at}!`);
+        }
+        await selectContact(currentContactId, true);
+        await refreshStats();
+      }
+    }
+
+    async function simulateAudioMessage() {
+      if (!currentContactId) return;
+      const res = await fetch('/api/messages/incoming', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contact_id: currentContactId,
+          content: '🎙️ [Transcrição de Áudio]: Oi pessoal! Mandei esse áudio porque preciso de um orçamento para 10 vendedores no plano Pro.',
+          media_type: 'audio'
+        })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      showEventToast('🎙️ Áudio recebido, transcrito e oportunidade avançada no Kanban!');
+      await selectContact(currentContactId, true);
+      await refreshStats();
+    }
+
+    async function sendProposalDocument() {
+      if (!currentContactId) return;
+      await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contact_id: currentContactId,
+          sender: 'human',
+          content: 'Olá {{nome}}! Segue em anexo o PDF completo da nossa proposta comercial para a {{empresa}}.',
+          media_type: 'document'
+        })
+      });
+      await selectContact(currentContactId, true);
+    }
+
+    function quickCustomerPrompt(text) {
+      document.getElementById('chat-sender-mode').value = 'contact';
+      updateSenderModeStyle();
+      document.getElementById('chat-input').value = text;
+      sendChatMessage();
+    }
+
+    async function simulateBurstMessages() {
+      if (!currentContactId) return;
+      const fragments = [
+        "Oi, tudo bem?",
+        "Gostaria de saber os preços e planos",
+        "Preciso de uma proposta urgente para 10 vendedores"
+      ];
+      showEventToast(`⚡ Disparando 3 mensagens picadas concorrentes no MessageDebouncer...`);
+      const res = await fetch('/api/messages/burst', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contact_id: currentContactId, fragments })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      showEventToast(`✅ MessageDebouncer fundiu ${data.fragments_received} mensagens em 1 entrada única!`);
+      await selectContact(currentContactId, true);
+      await refreshStats();
+    }
+
+    function showEventToast(text) {
+      const toast = document.getElementById('chat-event-toast');
+      document.getElementById('chat-event-text').textContent = text;
+      toast.classList.remove('hidden');
+    }
+
+    async function addTagToCurrentContact() {
+      const input = document.getElementById('new-tag-input');
+      const tag = input.value.trim();
+      if (!tag || !currentContactId) return;
+      input.value = '';
+      const res = await fetch(`/api/contacts/${currentContactId}/tags`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ tag })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      await selectContact(currentContactId, true);
+    }
+
+    // ===============================================================
+    // KANBAN COM DRAG & DROP HTML5 NATIVO & MÚLTIPLOS FUNIS
+    // ===============================================================
+    async function loadKanban(pipelineId = null) {
+      const url = pipelineId ? `/api/kanban?pipeline_id=${pipelineId}` : '/api/kanban';
+      const res = await fetch(url);
+      const data = await res.json();
+
+      currentPipelineId = data.pipeline ? data.pipeline.id : null;
+      allStages = data.stages || [];
+
+      const selectEl = document.getElementById('kanban-pipeline-select');
+      if (data.pipelines && selectEl) {
+        selectEl.innerHTML = data.pipelines.map(p =>
+          `<option value="${p.id}" ${p.id === currentPipelineId ? 'selected' : ''}>${p.name}</option>`
+        ).join('');
+      }
+
+      const board = document.getElementById('kanban-board');
+      board.innerHTML = allStages.map(stage => {
+        const headerBadge = stage.is_won
+          ? 'border-emerald-500/40 bg-emerald-950/20'
+          : stage.is_lost
+          ? 'border-rose-500/40 bg-rose-950/20'
+          : 'border-slate-800 bg-slate-900';
+
+        return `
+          <div class="rounded-2xl border ${headerBadge} p-3 flex flex-col min-h-[540px] transition"
+               ondragover="handleDragOver(event)"
+               ondragleave="handleDragLeave(event)"
+               ondrop="handleDropStage(event, '${stage.id}')">
+            <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-800">
+              <div>
+                <h4 class="font-bold text-xs text-white">${stage.name}</h4>
+                <span class="text-[11px] text-slate-400">${stage.deals.length} negócio(s)</span>
+              </div>
+              <span class="text-xs font-bold text-emerald-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                R$ ${stage.total_value.toLocaleString('pt-BR')}
+              </span>
+            </div>
+
+            <div class="space-y-2.5 flex-1">
+              ${stage.deals.map(deal => {
+                const c = deal.contact || {};
+                return `
+                  <div draggable="true"
+                       ondragstart="handleDragStart(event, '${deal.id}')"
+                       class="bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-xl p-3 space-y-2 transition shadow cursor-grab active:cursor-grabbing">
+                    <div class="flex items-start justify-between gap-2">
+                      <span class="font-semibold text-xs text-white leading-snug">${deal.title}</span>
+                      <span class="text-xs">${channelIcon(c.channel || 'whatsapp')}</span>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-slate-400">
+                      <span><i class="fa-regular fa-user mr-1"></i> ${c.name || 'Lead'}</span>
+                      ${tempBadgeHtml(c.temperature, c.lead_score)}
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>🎧 ${c.assignee || 'Agente IA'}</span>
+                      <span class="text-emerald-400 font-bold text-xs">R$ ${deal.value.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-1.5 border-t border-slate-900">
+                      <button onclick="openContactFromKanban('${deal.contact_id}')" class="text-[11px] text-indigo-400 hover:underline">
+                        Abrir Chat →
+                      </button>
+                      <select onchange="moveDealStage('${deal.id}', this.value)" class="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-300">
+                        ${allStages.map(s => `<option value="${s.id}" ${s.id === stage.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+                      </select>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function handleDragStart(ev, dealId) {
+      draggedDealId = dealId;
+      ev.dataTransfer.setData('text/plain', dealId);
+    }
+
+    function handleDragOver(ev) {
+      ev.preventDefault();
+      ev.currentTarget.classList.add('kanban-col-dragover');
+    }
+
+    function handleDragLeave(ev) {
+      ev.currentTarget.classList.remove('kanban-col-dragover');
+    }
+
+    async function handleDropStage(ev, targetStageId) {
+      ev.preventDefault();
+      ev.currentTarget.classList.remove('kanban-col-dragover');
+      const dealId = draggedDealId || ev.dataTransfer.getData('text/plain');
+      if (!dealId) return;
+      await moveDealStage(dealId, targetStageId);
+    }
+
+    async function moveDealStage(dealId, stageId) {
+      await fetch(`/api/deals/${dealId}/stage`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ stage_id: stageId })
+      });
+      await loadKanban(currentPipelineId);
+      await loadContacts(false);
+      await refreshStats();
+    }
+
+    async function promptCreatePipeline() {
+      const name = prompt('Nome do novo Funil / Pipeline:', 'Funil de Renovação & Upsell');
+      if (!name) return;
+      const res = await fetch('/api/pipelines', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          name,
+          description: 'Funil customizado',
+          stages: ['Mapeamento', 'Oferta Enviada', 'Em Negociação', 'Renovado Ganho']
+        })
+      });
+      const created = await res.json();
+      await loadKanban(created.id);
+    }
+
+    function openContactFromKanban(contactId) {
+      currentContactId = contactId;
+      switchTab('inbox');
+      selectContact(contactId, true);
+    }
+
+    // ===============================================================
+    // AGENDA DE REUNIÕES & RADAR ANTI-VÁCUO (FOLLOW-UP)
+    // ===============================================================
+    async function loadAgendaAndFollowups() {
+      const [apptsRes, followupsRes] = await Promise.all([
+        fetch('/api/appointments'),
+        fetch('/api/followups')
+      ]);
+      const appts = await apptsRes.json();
+      const followups = await followupsRes.json();
+
+      // Preenche select de contatos para agendamento
+      const sel = document.getElementById('appt-contact');
+      sel.innerHTML = allContacts.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      const apptBox = document.getElementById('appointments-list');
+      apptBox.innerHTML = appts.length ? appts.map(a => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-white">${a.title}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${a.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' : a.status === 'cancelled' ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'}">${a.status}</span>
+            </div>
+            <p class="text-xs text-slate-400">👤 ${a.contact_name} • 🕒 <strong class="text-slate-200">${a.scheduled_at}</strong> (${a.duration_minutes} min)</p>
+            <p class="text-[11px] text-indigo-400">${a.meeting_link}</p>
+          </div>
+          <div class="flex gap-1.5">
+            <button onclick="updateApptStatus('${a.id}', 'completed')" class="text-[11px] bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-500/30">Concluir</button>
+            <button onclick="updateApptStatus('${a.id}', 'cancelled')" class="text-[11px] bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 px-2.5 py-1 rounded-lg border border-rose-500/30">Cancelar</button>
+          </div>
+        </div>
+      `).join('') : `<div class="text-xs text-slate-500 py-8 text-center">Nenhuma reunião agendada.</div>`;
+
+      const fwBox = document.getElementById('followups-list');
+      fwBox.innerHTML = followups.length ? followups.map(f => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-white">${f.contact.name}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300">${f.stage_name}</span>
+              ${f.waiting_customer_reply ? '<span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300">⏳ No Vácuo</span>' : '<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300">Cliente respondeu</span>'}
+            </div>
+            <p class="text-xs text-slate-400 truncate max-w-md">Última msg: "${f.last_message ? f.last_message.content : 'Sem mensagens'}"</p>
+          </div>
+          <button onclick="triggerSingleFollowup('${f.contact.id}')" class="text-xs bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 font-semibold px-3 py-1.5 rounded-xl border border-amber-500/30 transition">
+            Cobrar Retorno
+          </button>
+        </div>
+      `).join('') : `<div class="text-xs text-slate-500 py-8 text-center">Nenhum lead pendente de follow-up.</div>`;
+    }
+
+    async function createManualAppointment() {
+      const contact_id = document.getElementById('appt-contact').value;
+      const title = document.getElementById('appt-title').value.trim() || 'Demonstração Comercial';
+      const scheduled_at = document.getElementById('appt-date').value || '2026-10-17T15:00';
+      if (!contact_id) return;
+      await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contact_id, title, scheduled_at, duration_minutes: 30 })
+      });
+      document.getElementById('appt-title').value = '';
+      await loadAgendaAndFollowups();
+    }
+
+    async function updateApptStatus(id, status) {
+      await fetch(`/api/appointments/${id}/status`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ status })
+      });
+      await loadAgendaAndFollowups();
+    }
+
+    async function triggerSingleFollowup(contactId) {
+      await fetch('/api/followups/trigger', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contact_id: contactId })
+      });
+      await loadAgendaAndFollowups();
+      await loadContacts(false);
+    }
+
+    async function triggerFollowupBatch() {
+      const res = await fetch('/api/followups/trigger', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      alert(`Follow-up automático enviado para ${data.triggered_count} contato(s)!`);
+      await loadAgendaAndFollowups();
+      await loadContacts(false);
+    }
+
+    // ===============================================================
+    // BROADCAST EM MASSA
+    // ===============================================================
+    async function loadBroadcasts() {
+      const res = await fetch('/api/broadcasts');
+      const items = await res.json();
+      const box = document.getElementById('broadcasts-list');
+      box.innerHTML = items.length ? items.map(b => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-xs text-white">${b.name}</span>
+            <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              ✅ ${b.sent_count} destinatário(s)
+            </span>
+          </div>
+          <div class="text-[11px] text-slate-400">
+            Canal: <strong class="uppercase text-slate-200">${b.channel}</strong> • Tag: <strong class="text-slate-200">${b.target_tag || 'Todas'}</strong>
+          </div>
+          <p class="text-xs text-slate-300 bg-slate-900 p-2.5 rounded-lg">${b.template_content}</p>
+        </div>
+      `).join('') : `<div class="text-xs text-slate-500 py-12 text-center">Nenhuma campanha disparada ainda. Crie e dispare ao lado!</div>`;
+    }
+
+    async function sendBroadcastCampaign() {
+      const name = document.getElementById('bc-name').value.trim();
+      const channel = document.getElementById('bc-channel').value;
+      const target_tag = document.getElementById('bc-tag').value.trim() || null;
+      const template_content = document.getElementById('bc-template').value.trim();
+      if (!name || !template_content) return;
+
+      const res = await fetch('/api/broadcasts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, channel, target_tag, template_content })
+      });
+      const data = await res.json();
+      await loadBroadcasts();
+      await loadContacts(false);
+      await refreshStats();
+      alert(`Campanha disparada com sucesso para ${data.recipients_count} contato(s)!`);
+    }
+
+    // ===============================================================
+    // BASE DE CONHECIMENTO (KB)
+    // ===============================================================
+    async function loadKb() {
+      const res = await fetch('/api/kb');
+      const items = await res.json();
+      const list = document.getElementById('kb-list');
+      list.innerHTML = items.map(item => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between gap-2">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300">${item.category}</span>
+              <button onclick="deleteKbItem('${item.id}')" class="text-slate-500 hover:text-rose-400 text-xs">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+            <h4 class="font-bold text-xs text-white mb-1">${item.question}</h4>
+            <p class="text-xs text-slate-300 leading-relaxed">${item.answer}</p>
+          </div>
+          <div class="flex flex-wrap gap-1 pt-2 border-t border-slate-900">
+            ${(item.tags || []).map(t => `<span class="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded">#${t}</span>`).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function testKbSearch() {
+      const q = document.getElementById('kb-search-input').value.trim();
+      if (!q) return;
+      const res = await fetch(`/api/kb/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      const box = document.getElementById('kb-search-results');
+      if (!data.matches || !data.matches.length) {
+        box.innerHTML = `<div class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300">Nenhuma correspondência encontrada.</div>`;
+        return;
+      }
+      box.innerHTML = data.matches.map(m => `
+        <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
+          <div class="flex justify-between">
+            <span class="font-bold text-emerald-300">${m.question}</span>
+            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Score: ${m.score}</span>
+          </div>
+          <p class="text-slate-200">${m.answer}</p>
+        </div>
+      `).join('');
+    }
+
+    async function createKbItem() {
+      const question = document.getElementById('kb-question').value.trim();
+      const category = document.getElementById('kb-category').value.trim() || 'Geral';
+      const tagsRaw = document.getElementById('kb-tags').value.trim();
+      const answer = document.getElementById('kb-answer').value.trim();
+      if (!question || !answer) return;
+
+      const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+      await fetch('/api/kb', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ question, category, tags, answer })
+      });
+      document.getElementById('kb-question').value = '';
+      document.getElementById('kb-tags').value = '';
+      document.getElementById('kb-answer').value = '';
+      await loadKb();
+      await refreshStats();
+    }
+
+    async function deleteKbItem(id) {
+      await fetch(`/api/kb/${id}`, { method: 'DELETE' });
+      await loadKb();
+      await refreshStats();
+    }
+
+    // ===============================================================
+    // WORKFLOWS & SIMULADOR WEBHOOK WHATSAPP
+    // ===============================================================
+    async function loadWorkflows() {
+      const res = await fetch('/api/workflows');
+      const rules = await res.json();
+      const container = document.getElementById('workflows-list');
+      container.innerHTML = rules.map(r => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-white">${r.name}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${r.active ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}">
+                ${r.active ? 'Ativo' : 'Pausado'}
+              </span>
+            </div>
+            <div class="text-xs text-slate-400">
+              QUANDO <code class="text-amber-300">${r.trigger_type} == "${r.trigger_value}"</code>
+              ➔ ENTÃO ${r.actions.map(a => `<code class="text-indigo-300">${a.type}("${a.value}")</code>`).join(', ')}
+            </div>
+          </div>
+          <button onclick="toggleWorkflow('${r.id}')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800">
+            ${r.active ? 'Pausar' : 'Ativar'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function createWorkflowRule() {
+      const name = document.getElementById('wf-name').value.trim();
+      const trigger_type = document.getElementById('wf-trigger-type').value;
+      const trigger_value = document.getElementById('wf-trigger-val').value.trim();
+      const action_type = document.getElementById('wf-action-type').value;
+      const action_val = document.getElementById('wf-action-val').value.trim();
+      if (!name || !trigger_value || !action_val) return;
+
+      await fetch('/api/workflows', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          name,
+          trigger_type,
+          trigger_value,
+          actions: [{ type: action_type, value: action_val }],
+          active: true
+        })
+      });
+      document.getElementById('wf-name').value = '';
+      document.getElementById('wf-trigger-val').value = '';
+      document.getElementById('wf-action-val').value = '';
+      await loadWorkflows();
+      await refreshStats();
+    }
+
+    async function toggleWorkflow(id) {
+      await fetch(`/api/workflows/${id}/toggle`, { method: 'PATCH' });
+      await loadWorkflows();
+      await refreshStats();
+    }
+
+    async function triggerSimulatedWebhook() {
+      const phone = document.getElementById('wh-phone').value.trim();
+      const name = document.getElementById('wh-name').value.trim();
+      const message = document.getElementById('wh-msg').value.trim();
+      if (!phone || !message) return;
+
+      const res = await fetch('/api/webhooks/whatsapp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ phone, name, message, channel: 'whatsapp' })
+      });
+      const data = await res.json();
+      if (data.contact) {
+        currentContactId = data.contact.id;
+      }
+      switchTab('inbox');
+      await loadContacts(true);
+      await refreshStats();
+      showEventToast(`📲 Webhook WhatsApp processado! Lead "${name || phone}" atualizado no funil.`);
+    }
+
+    // ===============================================================
+    // MCP TOOLS CATALOG & PLAYGROUND
+    // ===============================================================
+    async function loadMcpTools() {
+      const res = await fetch('/api/mcp/tools');
+      const data = await res.json();
+      const container = document.getElementById('mcp-tools-list');
+      container.innerHTML = data.tools.map(t => `
+        <div onclick="selectMcpToolExample('${t.name}')" class="bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-xl p-3.5 cursor-pointer transition space-y-2">
+          <div class="flex items-center justify-between">
+            <code class="text-xs font-bold text-emerald-400">${t.name}</code>
+            <span class="text-[10px] bg-indigo-500/15 text-indigo-300 px-2 py-0.5 rounded">MCP Tool</span>
+          </div>
+          <p class="text-xs text-slate-300">${t.description}</p>
+          <pre class="text-[10px] text-slate-400 bg-slate-900 p-2 rounded-lg overflow-x-auto">${JSON.stringify(t.inputSchema.properties, null, 2)}</pre>
+        </div>
+      `).join('');
+    }
+
+    function selectMcpToolExample(name) {
+      document.getElementById('mcp-exec-name').value = name;
+      const cid = currentContactId || (allContacts[0] && allContacts[0].id) || 'ID_DO_CONTATO';
+      const examples = {
+        create_contact: { name: "Lucas Mendes (Via MCP)", phone: "+55 11 97777-1234", channel: "whatsapp", tags: ["mcp-lead"] },
+        list_contacts: { limit: 10 },
+        move_deal_stage: { contact_id: cid, stage_name: "Proposta Apresentada", value: 997.0 },
+        add_contact_tag: { contact_id: cid, tag: "qualificado-mcp" },
+        query_knowledge_base: { query: "Quais são os preços e planos?", top_k: 2 },
+        send_chat_message: { contact_id: cid, content: "Olá! Mensagem disparada via ferramenta MCP.", sender: "agent" }
+      };
+      document.getElementById('mcp-exec-args').value = JSON.stringify(examples[name] || {}, null, 2);
+    }
+
+    async function executeMcpTool() {
+      const name = document.getElementById('mcp-exec-name').value.trim();
+      let args = {};
+      try {
+        args = JSON.parse(document.getElementById('mcp-exec-args').value || '{}');
+      } catch (err) {
+        document.getElementById('mcp-exec-output').textContent = 'Erro de sintaxe JSON nos argumentos: ' + err.message;
+        return;
+      }
+      const res = await fetch('/api/mcp/execute', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, arguments: args })
+      });
+      const data = await res.json();
+      document.getElementById('mcp-exec-output').textContent = JSON.stringify(data, null, 2);
+      await loadContacts(false);
+      await refreshStats();
+    }
+
+    // ===============================================================
+    // MODAL NOVO CONTATO
+    // ===============================================================
+    function openNewContactModal() {
+      document.getElementById('modal-contact').classList.remove('hidden');
+    }
+    function closeNewContactModal() {
+      document.getElementById('modal-contact').classList.add('hidden');
+    }
+    async function submitNewContact() {
+      const name = document.getElementById('modal-c-name').value.trim();
+      const phone = document.getElementById('modal-c-phone').value.trim();
+      const email = document.getElementById('modal-c-email').value.trim();
+      const channel = document.getElementById('modal-c-channel').value;
+      if (!name) return;
+
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, phone, email, channel, tags: ['novo-lead'] })
+      });
+      const data = await res.json();
+      closeNewContactModal();
+      document.getElementById('modal-c-name').value = '';
+      document.getElementById('modal-c-phone').value = '';
+      document.getElementById('modal-c-email').value = '';
+      if (data.contact) {
+        currentContactId = data.contact.id;
+      }
+      await loadContacts(true);
+      await refreshStats();
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      connectWebSocket();
+      await refreshStats();
+      await loadContacts(true);
+      await loadQuickReplies();
+    });
+  </script>
+</body>
+</html>
