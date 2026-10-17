@@ -120,13 +120,13 @@
 
     <!-- Rodapé da Sidebar -->
     <div class="flex flex-col items-center gap-4">
-      <div class="nav-item flex flex-col items-center gap-1.5 bg-[#365945]/60 px-2.5 py-2 rounded-xl border border-white/10">
+      <div onclick="openWhatsAppModal()" class="nav-item flex flex-col items-center gap-1.5 bg-[#365945]/60 hover:bg-[#365945] px-2.5 py-2 rounded-xl border border-white/10 cursor-pointer transition">
         <div class="flex items-center gap-1.5">
           <i class="fa-brands fa-whatsapp text-emerald-300 text-xs"></i>
           <i class="fa-brands fa-instagram text-white/80 text-xs"></i>
         </div>
         <span class="w-2 h-2 rounded-full bg-emerald-400" id="ws-indicator"></span>
-        <span class="nav-tooltip">Canais Ativos: WhatsApp & Instagram (Online)</span>
+        <span class="nav-tooltip">WhatsApp & Instagram • Clique para Conectar QR Code</span>
       </div>
 
       <div class="nav-item w-10 h-10 rounded-full bg-[#EAF2ED] text-[#243E30] font-bold text-xs flex items-center justify-center border-2 border-white/20 cursor-pointer">
@@ -149,6 +149,31 @@
       </div>
 
       <div class="flex items-center gap-3">
+        <!-- Status & Conexão WhatsApp Real (Evolution API) -->
+        <button
+          onclick="openWhatsAppModal()"
+          id="btn-whatsapp-status"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E3E8E5] bg-[#F6F8F7] hover:bg-[#EAF2ED] text-xs font-semibold text-[#243E30] transition shadow-sm"
+          title="Conectar WhatsApp via QR Code (Evolution API)"
+        >
+          <span class="relative flex h-2.5 w-2.5">
+            <span id="wa-ping-dot" class="hidden animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span id="wa-status-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-zinc-400"></span>
+          </span>
+          <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i>
+          <span id="wa-status-text">Conectar WhatsApp</span>
+        </button>
+
+        <!-- Toggle de Notificações Sonoras (Chime) -->
+        <button
+          onclick="toggleSoundNotification()"
+          id="btn-sound-toggle"
+          class="p-2.5 rounded-lg border border-[#E3E8E5] bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] text-xs font-semibold flex items-center justify-center transition"
+          title="Notificações Sonoras (Chime)"
+        >
+          <i id="sound-icon" class="fa-solid fa-bell text-[#243E30]"></i>
+        </button>
+
         <!-- Busca Rápida -->
         <div class="relative hidden md:block">
           <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-[#63756A] text-xs"></i>
@@ -415,11 +440,39 @@
               </div>
 
               <!-- Barra Exclusiva do Atendente -->
-              <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2">
+              <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2 relative">
+                <!-- Overlay de Gravação de Áudio Ativa (PTT) -->
+                <div id="audio-recording-bar" class="hidden absolute inset-0 bg-white px-4 flex items-center justify-between z-10 border-t border-[#E3E8E5]">
+                  <div class="flex items-center gap-3">
+                    <span class="relative flex h-3 w-3">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                    </span>
+                    <span class="text-xs font-semibold text-red-600 flex items-center gap-2">
+                      <i class="fa-solid fa-microphone text-xs"></i> Gravando mensagem de voz...
+                      <span id="audio-record-timer" class="font-mono text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-200">00:00</span>
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button
+                      onclick="cancelAudioRecording()"
+                      class="px-3 py-1.5 rounded-lg border border-[#E3E8E5] bg-[#F6F8F7] hover:bg-red-50 hover:text-red-600 text-xs text-[#63756A] font-medium transition flex items-center gap-1.5"
+                    >
+                      <i class="fa-solid fa-trash text-[11px]"></i> Cancelar
+                    </button>
+                    <button
+                      onclick="finishAndSendAudioRecording()"
+                      class="px-4 py-1.5 rounded-lg bg-[#243E30] hover:bg-[#365945] text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                    >
+                      <i class="fa-solid fa-paper-plane text-[11px]"></i> Enviar Áudio PTT
+                    </button>
+                  </div>
+                </div>
+
                 <button
                   onclick="toggleQuickRepliesPopup()"
                   title="Inserir resposta rápida (/)"
-                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition"
+                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition shrink-0"
                 >
                   / Atalhos
                 </button>
@@ -427,9 +480,18 @@
                 <button
                   onclick="sendProposalDocument()"
                   title="Enviar PDF de Proposta Comercial"
-                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition"
+                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition shrink-0"
                 >
                   <i class="fa-solid fa-paperclip"></i>
+                </button>
+
+                <button
+                  id="btn-start-record"
+                  onclick="startAudioRecording()"
+                  title="Gravar Áudio de Voz (PTT / Microfone)"
+                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition shrink-0 flex items-center gap-1.5"
+                >
+                  <i class="fa-solid fa-microphone text-xs"></i>
                 </button>
 
                 <input
@@ -443,7 +505,7 @@
 
                 <button
                   onclick="sendAttendanceReply()"
-                  class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5"
+                  class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0"
                 >
                   <span>Responder</span>
                   <i class="fa-solid fa-paper-plane text-[10px]"></i>
@@ -838,6 +900,101 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL: CONEXÃO WHATSAPP REAL (EVOLUTION API v2 / QR CODE)             -->
+  <!-- ===================================================================== -->
+  <div id="modal-whatsapp" class="hidden fixed inset-0 bg-[#1A2B21]/50 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
+            <i class="fa-brands fa-whatsapp text-xl"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#1A2B21]">Conexão Real com WhatsApp</h3>
+            <p class="text-xs text-[#63756A]">Evolution API v2 • Instância Oficial da Empresa</p>
+          </div>
+        </div>
+        <button onclick="closeWhatsAppModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Estado: Desconectado / Aguardando Leitura de QR Code -->
+      <div id="wa-modal-disconnected" class="space-y-4">
+        <div class="bg-[#F6F8F7] p-4 rounded-xl border border-[#E3E8E5] text-xs text-[#1A2B21] space-y-2">
+          <p class="font-bold text-[#243E30] flex items-center gap-1.5">
+            <i class="fa-solid fa-qrcode"></i> Como conectar seu WhatsApp comercial:
+          </p>
+          <ol class="list-decimal list-inside space-y-1 text-[#63756A] pl-1">
+            <li>Abra o WhatsApp no smartphone corporativo</li>
+            <li>Toque em <strong>Aparelhos Conectados</strong> &gt; <strong>Conectar um aparelho</strong></li>
+            <li>Aponte a câmera para o QR Code abaixo para sincronizar</li>
+          </ol>
+        </div>
+
+        <div class="flex flex-col items-center justify-center p-6 bg-[#F6F8F7] rounded-xl border border-dashed border-[#CBD5CF] min-h-[260px]">
+          <div id="wa-qr-container" class="flex flex-col items-center justify-center text-center">
+            <div id="wa-qr-spinner" class="hidden mb-3">
+              <i class="fa-solid fa-circle-notch fa-spin text-2xl text-[#243E30]"></i>
+              <p class="text-xs text-[#63756A] mt-2">Gerando QR Code de pareamento...</p>
+            </div>
+            <img id="wa-qr-image" src="" alt="WhatsApp QR Code" class="hidden w-56 h-56 rounded-lg bg-white p-2 shadow-sm border border-[#E3E8E5]" />
+            <p id="wa-qr-placeholder" class="text-xs text-[#63756A]">
+              Clique no botão abaixo para gerar o QR Code de sincronização.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-[11px] text-[#63756A] flex items-center gap-1">
+            <i class="fa-solid fa-server text-[10px]"></i> Evolution API: localhost:8080
+          </span>
+          <div class="flex gap-2">
+            <button onclick="closeWhatsAppModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21] border border-[#E3E8E5]">
+              Fechar
+            </button>
+            <button onclick="requestWhatsAppQrCode()" id="btn-wa-generate-qr" class="px-4 py-2 rounded-lg text-xs font-semibold bg-[#243E30] hover:bg-[#365945] text-white flex items-center gap-2 shadow-sm">
+              <i class="fa-solid fa-rotate-right text-xs"></i>
+              <span>Gerar / Atualizar QR Code</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado: Conectado com Sucesso -->
+      <div id="wa-modal-connected" class="hidden space-y-4">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center space-y-2">
+          <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-xl shadow-inner">
+            <i class="fa-solid fa-check"></i>
+          </div>
+          <h4 class="font-bold text-sm text-emerald-900">WhatsApp Conectado & Operacional</h4>
+          <p class="text-xs text-emerald-700">Todas as mensagens inbound e áudios gravados no chat estão sincronizados em tempo real.</p>
+        </div>
+
+        <div class="bg-[#F6F8F7] rounded-xl p-3.5 border border-[#E3E8E5] space-y-2 text-xs">
+          <div class="flex justify-between"><span class="text-[#63756A]">Status da Sessão:</span><span class="font-bold text-emerald-700">Online (open)</span></div>
+          <div class="flex justify-between"><span class="text-[#63756A]">Instância:</span><span class="font-mono text-[#1A2B21]">openchatfunnel</span></div>
+          <div class="flex justify-between"><span class="text-[#63756A]">Webhook Integrado:</span><span class="text-[#243E30] font-medium">/api/webhooks/evolution</span></div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <button onclick="checkWhatsAppStatus()" class="px-3.5 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] flex items-center gap-1.5">
+            <i class="fa-solid fa-arrows-rotate text-xs"></i> Atualizar Status
+          </button>
+          <div class="flex gap-2">
+            <button onclick="closeWhatsAppModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21] border border-[#E3E8E5]">
+              Fechar
+            </button>
+            <button onclick="disconnectWhatsApp()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-power-off text-xs"></i> Desconectar Sessão
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- LÓGICA DE INTEGRAÇÃO REST E ESTADO DA APLICAÇÃO                       -->
   <!-- ===================================================================== -->
   <script>
@@ -953,10 +1110,26 @@
           const ind = document.getElementById('ws-indicator');
           if (ind) ind.className = 'w-2 h-2 rounded-full bg-emerald-400';
         };
-        ws.onmessage = async () => {
+        ws.onmessage = async (evt) => {
+          let eventPayload = null;
+          try { eventPayload = JSON.parse(evt.data); } catch(e){}
+          
+          if (eventPayload && eventPayload.event) {
+            const ev = eventPayload.event;
+            const data = eventPayload.data;
+            if (ev === 'whatsapp_status_updated' || ev === 'whatsapp_qr_updated') {
+              updateWhatsAppUI(data);
+            }
+            if (ev === 'message_created' || ev === 'webhook_received') {
+              if (data && (data.sender === 'contact' || data.sender === 'customer' || ev === 'webhook_received')) {
+                playChime();
+              }
+            }
+          }
+
           await refreshStats();
           if (currentTab === 'dashboard') await loadDashboardOverview();
-          if (currentTab === 'inbox' && currentContactId) await loadContacts(false);
+          if (currentTab === 'inbox' && currentContactId) await selectContact(currentContactId, false);
           if (currentTab === 'kanban') await loadKanban(currentPipelineId);
         };
         ws.onclose = () => setTimeout(connectWebSocket, 3500);
@@ -1134,10 +1307,14 @@
 
       let attachmentBlock = '';
       if (m.media_type === 'audio') {
+        const audioSrc = m.media_url || (m.content && m.content.startsWith('data:audio') ? m.content : '');
         attachmentBlock = `
-          <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
-            <i class="fa-solid fa-volume-high text-[#243E30]"></i>
-            <span class="text-[11px] font-medium text-[#1A2B21]">Áudio Transcrito Automaticamente</span>
+          <div class="bg-white/80 p-2.5 rounded-lg mb-2 border border-[#E3E8E5] space-y-1.5">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-microphone text-[#243E30]"></i>
+              <span class="text-[11px] font-semibold text-[#1A2B21]">Mensagem de Voz (PTT)</span>
+            </div>
+            ${audioSrc ? `<audio controls class="w-full h-8 mt-1" src="${audioSrc}"></audio>` : ''}
           </div>
         `;
       } else if (m.media_type === 'document') {
@@ -1907,12 +2084,289 @@
       await loadDashboardOverview();
     }
 
+    // ===============================================================
+    // NOTIFICAÇÕES SONORAS (WEB AUDIO API CHIME)
+    // ===============================================================
+    let soundEnabled = localStorage.getItem('openchatfunnel_sound_enabled') !== 'false';
+
+    function updateSoundIcon() {
+      const icon = document.getElementById('sound-icon');
+      const btn = document.getElementById('btn-sound-toggle');
+      if (!icon || !btn) return;
+      if (soundEnabled) {
+        icon.className = 'fa-solid fa-bell text-[#243E30]';
+        btn.title = 'Notificações Sonoras Ativadas (Clique para desativar som)';
+      } else {
+        icon.className = 'fa-solid fa-bell-slash text-[#63756A]';
+        btn.title = 'Notificações Sonoras Desativadas (Clique para ativar som)';
+      }
+    }
+
+    function toggleSoundNotification() {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('openchatfunnel_sound_enabled', soundEnabled ? 'true' : 'false');
+      updateSoundIcon();
+      if (soundEnabled) playChime();
+    }
+
+    function playChime() {
+      if (!soundEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const now = ctx.currentTime;
+
+        // Duplo tom executivo suave e límpido (587.33 Hz - Re5 -> 880 Hz - La5)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now);
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(0.18, now + 0.03);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.25);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880, now + 0.12);
+        gain2.gain.setValueAtTime(0, now + 0.12);
+        gain2.gain.linearRampToValueAtTime(0.22, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.48);
+      } catch (e) {
+        console.warn('Audio chime warning:', e);
+      }
+    }
+
+    // ===============================================================
+    // GRAVAÇÃO DE ÁUDIO NO CHAT (MICROFONE PTT / MEDIARECORDER)
+    // ===============================================================
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordStartTime = null;
+    let recordTimerInterval = null;
+
+    async function startAudioRecording() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Seu navegador não possui suporte para gravação de microfone.');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' : '');
+
+        mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+        };
+
+        mediaRecorder.start(200);
+        recordStartTime = Date.now();
+
+        document.getElementById('audio-recording-bar').classList.remove('hidden');
+        const timerEl = document.getElementById('audio-record-timer');
+        timerEl.textContent = '00:00';
+        recordTimerInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+          const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+          const secs = String(elapsed % 60).padStart(2, '0');
+          timerEl.textContent = `${mins}:${secs}`;
+        }, 500);
+      } catch (err) {
+        alert('Permissão de microfone negada ou microfone indisponível.');
+        console.error(err);
+      }
+    }
+
+    function cancelAudioRecording() {
+      if (recordTimerInterval) clearInterval(recordTimerInterval);
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      mediaRecorder = null;
+      audioChunks = [];
+      document.getElementById('audio-recording-bar').classList.add('hidden');
+    }
+
+    async function finishAndSendAudioRecording() {
+      if (!mediaRecorder || !currentContactId) {
+        cancelAudioRecording();
+        return;
+      }
+      if (recordTimerInterval) clearInterval(recordTimerInterval);
+
+      mediaRecorder.onstop = async () => {
+        try {
+          const mime = mediaRecorder.mimeType || 'audio/webm';
+          const audioBlob = new Blob(audioChunks, { type: mime });
+
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
+            const base64Audio = reader.result;
+
+            const res = await fetch('/api/whatsapp/send-audio', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                contact_id: currentContactId,
+                audio_base64: base64Audio,
+                mime_type: mime,
+                caption: 'Mensagem de voz (PTT)'
+              })
+            });
+            const data = await res.json();
+            document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+            showEventToast('Mensagem de voz enviada com sucesso');
+            await selectContact(currentContactId, true);
+            await refreshStats();
+          };
+        } catch (e) {
+          console.error('Erro ao enviar áudio gravado:', e);
+        } finally {
+          document.getElementById('audio-recording-bar').classList.add('hidden');
+          mediaRecorder = null;
+          audioChunks = [];
+        }
+      };
+
+      mediaRecorder.stop();
+    }
+
+    // ===============================================================
+    // CONEXÃO WHATSAPP REAL (EVOLUTION API v2)
+    // ===============================================================
+    let waStatus = 'offline';
+
+    function openWhatsAppModal() {
+      document.getElementById('modal-whatsapp').classList.remove('hidden');
+      checkWhatsAppStatus();
+    }
+
+    function closeWhatsAppModal() {
+      document.getElementById('modal-whatsapp').classList.add('hidden');
+    }
+
+    async function checkWhatsAppStatus() {
+      try {
+        const res = await fetch('/api/whatsapp/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        updateWhatsAppUI(data);
+      } catch (e) {
+        console.error('Erro ao consultar status do WhatsApp:', e);
+      }
+    }
+
+    function updateWhatsAppUI(data) {
+      waStatus = data.status || 'offline';
+      const isOnline = waStatus === 'open';
+
+      const dot = document.getElementById('wa-status-dot');
+      const ping = document.getElementById('wa-ping-dot');
+      const text = document.getElementById('wa-status-text');
+
+      if (isOnline) {
+        if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500';
+        if (ping) {
+          ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+          ping.classList.remove('hidden');
+        }
+        if (text) text.textContent = 'WhatsApp Conectado';
+      } else if (waStatus === 'connecting') {
+        if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500';
+        if (ping) {
+          ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75';
+          ping.classList.remove('hidden');
+        }
+        if (text) text.textContent = 'WhatsApp Conectando...';
+      } else {
+        if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-zinc-400';
+        if (ping) ping.classList.add('hidden');
+        if (text) text.textContent = 'Conectar WhatsApp';
+      }
+
+      const dis = document.getElementById('wa-modal-disconnected');
+      const con = document.getElementById('wa-modal-connected');
+      if (isOnline) {
+        if (dis) dis.classList.add('hidden');
+        if (con) con.classList.remove('hidden');
+      } else {
+        if (con) con.classList.add('hidden');
+        if (dis) dis.classList.remove('hidden');
+      }
+    }
+
+    async function requestWhatsAppQrCode() {
+      const spinner = document.getElementById('wa-qr-spinner');
+      const img = document.getElementById('wa-qr-image');
+      const placeholder = document.getElementById('wa-qr-placeholder');
+
+      spinner.classList.remove('hidden');
+      placeholder.classList.add('hidden');
+      img.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+        const data = await res.json();
+        spinner.classList.add('hidden');
+
+        if (data.status === 'open') {
+          updateWhatsAppUI(data);
+          showEventToast('WhatsApp conectado com sucesso!');
+          return;
+        }
+
+        if (data.qrcode) {
+          img.src = data.qrcode;
+          img.classList.remove('hidden');
+        } else {
+          placeholder.textContent = data.message || 'Aguardando inicialização da instância na Evolution API...';
+          placeholder.classList.remove('hidden');
+        }
+      } catch (e) {
+        spinner.classList.add('hidden');
+        placeholder.textContent = 'Falha ao conectar ao serviço WhatsApp. Certifique-se de que a Evolution API está em execução no Docker (:8080).';
+        placeholder.classList.remove('hidden');
+      }
+    }
+
+    async function disconnectWhatsApp() {
+      if (!confirm('Deseja realmente desconectar a sessão do WhatsApp?')) return;
+      try {
+        const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+        const data = await res.json();
+        updateWhatsAppUI(data);
+        showEventToast('Sessão do WhatsApp desconectada.');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     // Inicialização
     window.addEventListener('DOMContentLoaded', async () => {
+      updateSoundIcon();
       connectWebSocket();
       await refreshStats();
       await loadContacts(false);
       await loadDashboardOverview();
+      await checkWhatsAppStatus();
     });
   </script>
 </body>

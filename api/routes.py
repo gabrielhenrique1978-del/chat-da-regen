@@ -21,6 +21,7 @@ from core.db import (
 from engine.agent import ConversationalAgent
 from engine.debouncer import MessageDebouncer
 from engine.mcp import MCPServer
+from engine.whatsapp import WhatsAppService
 from engine.workflow import WorkflowEngine
 
 
@@ -175,6 +176,17 @@ class WhatsAppWebhookRequest(BaseModel):
     media_type: str = "text"
 
 
+class WhatsAppSendAudioRequest(BaseModel):
+    contact_id: str
+    audio_base64: str
+
+
+class WhatsAppConfigRequest(BaseModel):
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    instance_name: Optional[str] = None
+
+
 class MCPExecuteRequest(BaseModel):
     name: str
     arguments: Dict[str, Any] = Field(default_factory=dict)
@@ -208,6 +220,7 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
     agent = ConversationalAgent(db, workflow)
     mcp_server = MCPServer(db, agent)
     ws_manager = ConnectionManager()
+    whatsapp_service = WhatsAppService()
 
     def _on_debounced_message(contact_id: str, combined_text: str, meta: Dict[str, Any]) -> Dict[str, Any]:
         return agent.process_incoming_message(
@@ -225,6 +238,7 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
     app.state.mcp = mcp_server
     app.state.debouncer = debouncer
     app.state.ws_manager = ws_manager
+    app.state.whatsapp = whatsapp_service
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
@@ -267,6 +281,8 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
             "broadcasts_count": len(broadcasts),
             "human_queue_count": len(waiting_human),
             "hot_leads_count": len(hot_leads),
+            "whatsapp_connected": whatsapp_service._connected,
+            "whatsapp_phone": whatsapp_service._phone_number,
         }
 
     # -----------------------------------------------------------------
@@ -455,6 +471,15 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
                 media_url=req.media_url,
             )
         )
+
+        # Envio em segundo plano para o WhatsApp real se o canal for WhatsApp
+        if contact.channel == "whatsapp" and not req.is_internal and contact.phone:
+            import asyncio
+            if req.media_type == "audio" and req.media_url:
+                asyncio.create_task(whatsapp_service.send_audio_message(contact.phone, req.media_url))
+            else:
+                asyncio.create_task(whatsapp_service.send_text_message(contact.phone, rendered_content))
+
         payload = {"message": msg.model_dump()}
         await ws_manager.broadcast_event("message_sent", payload)
         return payload
@@ -691,6 +716,123 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
         payload = {"webhook_status": "received", "created_new_contact": created_new, **result}
         await ws_manager.broadcast_event("webhook_received", payload)
         return payload
+
+    # -----------------------------------------------------------------
+    # Conexão Real WhatsApp & Evolution API v2
+    # -----------------------------------------------------------------
+
+    @router.get("/whatsapp/status")
+    async def get_whatsapp_status():
+        """Retorna o status atual da conexão real com o WhatsApp via Evolution API."""
+        return await whatsapp_service.get_connection_status()
+
+    @router.post("/whatsapp/connect")
+    async def connect_whatsapp():
+        """Inicia a criação/conexão da instância e gera o QR Code para leitura."""
+        res = await whatsapp_service.create_or_connect()
+        await ws_manager.broadcast_event("whatsapp_qr_updated", res)
+        return res
+
+    @router.post("/whatsapp/disconnect")
+    async def disconnect_whatsapp():
+        """Desconecta a sessão do WhatsApp."""
+        res = await whatsapp_service.disconnect()
+        await ws_manager.broadcast_event("whatsapp_status_updated", res)
+        return res
+
+    @router.post("/whatsapp/send-audio")
+    async def send_whatsapp_audio(req: WhatsAppSendAudioRequest):
+        """Salva áudio gravado no chat como PTT e dispara para o WhatsApp real."""
+        contact = db.get_contact(req.contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+        audio_uri = (
+            req.audio_base64
+            if req.audio_base64.startswith("data:")
+            else f"data:audio/webm;base64,{req.audio_base64}"
+        )
+        msg = db.create_message(
+            Message(
+                contact_id=req.contact_id,
+                sender="human",
+                channel=contact.channel,
+                content="🎙️ [Nota de Voz Gravada]",
+                media_type="audio",
+                media_url=audio_uri,
+            )
+        )
+
+        if contact.phone:
+            import asyncio
+            asyncio.create_task(whatsapp_service.send_audio_message(contact.phone, req.audio_base64))
+
+        payload = {"message": msg.model_dump()}
+        await ws_manager.broadcast_event("message_sent", payload)
+        return payload
+
+    @router.post("/webhooks/evolution")
+    async def evolution_webhook_receiver(payload: Dict[str, Any]):
+        """
+        Webhook que consome eventos oficiais da Evolution API v2:
+        - messages.upsert: Mensagens reais enviadas pelo cliente no WhatsApp
+        - connection.update: Mudança de status da conexão (open, close, connecting)
+        - qrcode.updated: Atualização do QR Code em tempo real
+        """
+        event = str(payload.get("event") or payload.get("type", "")).upper()
+        data = payload.get("data", {})
+
+        if "MESSAGES" in event and "UPSERT" in event:
+            msg_obj = data.get("message", {}) or data
+            key = data.get("key", {}) or msg_obj.get("key", {})
+            from_me = key.get("fromMe", False)
+
+            if not from_me:
+                remote_jid = str(key.get("remoteJid", ""))
+                clean_phone = remote_jid.split("@")[0]
+                if clean_phone and clean_phone != "status":
+                    push_name = data.get("pushName") or msg_obj.get("pushName") or f"WhatsApp ({clean_phone[-4:]})"
+                    text_content = (
+                        msg_obj.get("conversation")
+                        or msg_obj.get("extendedTextMessage", {}).get("text")
+                        or msg_obj.get("audioMessage", {}).get("caption")
+                        or "Mensagem via WhatsApp"
+                    )
+                    media_type = "audio" if "audioMessage" in msg_obj else "text"
+
+                    contact = db.find_contact_by_phone(clean_phone)
+                    if not contact:
+                        contact = db.create_contact(
+                            Contact(
+                                name=push_name,
+                                phone=f"+{clean_phone}",
+                                channel="whatsapp",
+                                tags=["whatsapp-real"],
+                            ),
+                            create_default_deal=True,
+                        )
+
+                    result = agent.process_incoming_message(
+                        contact_id=contact.id,
+                        content=text_content,
+                        channel="whatsapp",
+                        media_type=media_type,
+                    )
+                    await ws_manager.broadcast_event("message_processed", result)
+                    return {"status": "processed", "contact_id": contact.id}
+
+        elif "CONNECTION" in event and "UPDATE" in event:
+            state = data.get("state", "disconnected")
+            whatsapp_service.set_connection_state_from_webhook(state)
+            await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state})
+
+        elif "QRCODE" in event:
+            qrcode = data.get("qrcode", {}).get("base64") or data.get("base64")
+            if qrcode:
+                whatsapp_service._last_qrcode = qrcode
+                await ws_manager.broadcast_event("whatsapp_qr_updated", {"qrcode": qrcode})
+
+        return {"status": "event_acknowledged"}
 
     # -----------------------------------------------------------------
     # Base de Conhecimento (Knowledge Base)

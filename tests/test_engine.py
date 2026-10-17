@@ -312,3 +312,69 @@ def test_6_handoff_internal_notes_appointments_broadcast_and_webhook():
     fw_resp = client.post("/api/followups/trigger", json={"contact_id": cid})
     assert fw_resp.status_code == 200
     assert fw_resp.json()["triggered_count"] == 1
+
+
+def test_7_whatsapp_real_connector_and_evolution_webhook():
+    """
+    Valida a integração com Evolution API:
+    - Verificação de status do conector WhatsApp (/api/whatsapp/status)
+    - Envio de áudio gravado PTT (/api/whatsapp/send-audio)
+    - Recepção e processamento de webhook oficial da Evolution API (MESSAGES_UPSERT)
+    """
+    app = create_app(db_path=":memory:", seed_demo=False)
+    client = TestClient(app)
+
+    # 1. Consulta status inicial
+    status_resp = client.get("/api/whatsapp/status")
+    assert status_resp.status_code == 200
+    status_data = status_resp.json()
+    assert "instance" in status_data
+    assert "connected" in status_data
+
+    # 2. Conexão / QR Code
+    connect_resp = client.post("/api/whatsapp/connect")
+    assert connect_resp.status_code == 200
+    assert "instance" in connect_resp.json()
+
+    # 3. Cria contato para teste de áudio
+    contact_resp = client.post(
+        "/api/contacts",
+        json={"name": "Cliente Áudio", "phone": "+55 11 99999-1234", "channel": "whatsapp"},
+    )
+    assert contact_resp.status_code == 200
+    cid = contact_resp.json()["contact"]["id"]
+
+    # 4. Envio de áudio PTT
+    audio_resp = client.post(
+        "/api/whatsapp/send-audio",
+        json={"contact_id": cid, "audio_base64": "GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwE="},
+    )
+    assert audio_resp.status_code == 200
+    assert audio_resp.json()["message"]["media_type"] == "audio"
+    assert "data:audio/webm;base64," in audio_resp.json()["message"]["media_url"]
+
+    # 5. Webhook Evolution API recebendo mensagem do WhatsApp real
+    evo_webhook_payload = {
+        "event": "messages.upsert",
+        "instance": "openchatfunnel",
+        "data": {
+            "key": {
+                "remoteJid": "5511988887777@s.whatsapp.net",
+                "fromMe": False,
+                "id": "MSG123456",
+            },
+            "pushName": "Julio Consultoria",
+            "message": {
+                "conversation": "Olá! Gostaria de receber uma proposta do plano Pro para a empresa Ômega.",
+            },
+        },
+    }
+    webhook_resp = client.post("/api/webhooks/evolution", json=evo_webhook_payload)
+    assert webhook_resp.status_code == 200
+    assert webhook_resp.json()["status"] == "processed"
+
+    # Verifica que o contato foi criado e a oportunidade avançada para Proposta Apresentada
+    contacts_list = client.get("/api/contacts").json()
+    julio = next((c for c in contacts_list if "Julio Consultoria" in c["name"]), None)
+    assert julio is not None
+    assert julio["stage_name"] == "Proposta Apresentada"
