@@ -1,752 +1,1006 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenChatFunnel v2.0 — CRM Conversacional, Kanban Drag & Drop, Broadcast & MCP</title>
+  <title>OpenChatFunnel — Plataforma Executiva de CRM Conversacional & MCP</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
+          },
+          colors: {
+            moss: {
+              primary: '#243E30',
+              hover: '#365945',
+              subtle: '#EAF2ED',
+              surface: '#F6F8F7',
+              border: '#E3E8E5',
+              ink: '#1A2B21',
+              muted: '#63756A'
+            }
+          }
+        }
+      }
+    };
+  </script>
   <style>
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    .kanban-col-dragover {
-      border-color: #6366f1 !important;
-      background-color: rgba(99, 102, 241, 0.08) !important;
+    body {
+      background-color: #F6F8F7;
+      color: #1A2B21;
+      font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
     }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #F6F8F7; }
+    ::-webkit-scrollbar-thumb { background: #CBD5CF; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9FB0A6; }
+
+    .kanban-col-dragover {
+      border-color: #243E30 !important;
+      background-color: #EAF2ED !important;
+    }
+
+    /* Tooltip para a Sidebar Vertical Esguia */
+    .nav-item { position: relative; }
+    .nav-tooltip {
+      position: absolute;
+      left: calc(100% + 12px);
+      top: 50%;
+      transform: translateY(-50%);
+      background-color: #1A2B21;
+      color: #FFFFFF;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      box-shadow: 0 4px 12px rgba(26, 43, 33, 0.15);
+      z-index: 50;
+    }
+    .nav-item:hover .nav-tooltip { opacity: 1; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+<body class="h-screen w-screen overflow-hidden flex bg-[#F6F8F7] text-[#1A2B21] antialiased select-none sm:select-auto">
 
-  <!-- Top Header -->
-  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-[1680px] mx-auto px-4 h-16 flex items-center justify-between gap-2">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <i class="fa-solid fa-filter-circle-dollar text-white text-lg"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="font-bold text-base tracking-tight text-white">OpenChatFunnel</h1>
-            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              v2.0 Pro Suite
-            </span>
-            <span id="ws-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> WS Live
-            </span>
-          </div>
-          <p class="text-[11px] text-slate-400 hidden sm:block">Omnichannel • Handoff Humano • Kanban Drag & Drop • Agenda & Anti-Vácuo • Broadcast</p>
-        </div>
-      </div>
+  <!-- ===================================================================== -->
+  <!-- 1. BARRA LATERAL ESQUERDA (SIDEBAR VERTICAL ESGUIA — #243E30)         -->
+  <!-- ===================================================================== -->
+  <aside class="w-20 bg-[#243E30] text-white flex flex-col items-center justify-between py-6 shrink-0 z-40 shadow-sm">
+    <!-- Topo: Logotipo Minimalista -->
+    <div class="flex flex-col items-center gap-6 w-full">
+      <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-xl bg-[#365945] hover:bg-[#416B53] flex items-center justify-center transition shadow-inner border border-white/10" title="OpenChatFunnel">
+        <i class="fa-solid fa-filter-circle-dollar text-white text-lg"></i>
+      </button>
 
-      <!-- Navigation Tabs -->
-      <nav class="flex items-center gap-1 bg-slate-950/90 p-1 rounded-xl border border-slate-800 overflow-x-auto">
-        <button onclick="switchTab('inbox')" id="tab-btn-inbox" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition bg-indigo-600 text-white whitespace-nowrap">
-          <i class="fa-solid fa-comments"></i> Inbox & Handoff
+      <div class="w-8 h-[1px] bg-white/15"></div>
+
+      <!-- Ícones de Navegação Vertical com Tooltips -->
+      <nav class="flex flex-col items-center gap-2.5 w-full px-3">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition bg-[#365945] text-white shadow-sm">
+          <i class="fa-solid fa-chart-pie text-[17px]"></i>
+          <span class="nav-tooltip">📊 Dashboard & Métricas</span>
         </button>
-        <button onclick="switchTab('kanban')" id="tab-btn-kanban" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
-          <i class="fa-solid fa-table-columns"></i> Kanban (Drag & Drop)
+
+        <button onclick="switchTab('inbox')" id="nav-inbox" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-regular fa-comments text-[18px]"></i>
+          <span class="nav-tooltip">💬 Inbox & Chat</span>
         </button>
-        <button onclick="switchTab('agenda')" id="tab-btn-agenda" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
-          <i class="fa-solid fa-calendar-check"></i> Agenda & Anti-Vácuo
+
+        <button onclick="switchTab('kanban')" id="nav-kanban" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-solid fa-table-columns text-[17px]"></i>
+          <span class="nav-tooltip">📋 Funil Kanban</span>
         </button>
-        <button onclick="switchTab('broadcast')" id="tab-btn-broadcast" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
-          <i class="fa-solid fa-bullhorn"></i> Broadcast
+
+        <button onclick="switchTab('kb')" id="nav-kb" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-solid fa-brain text-[17px]"></i>
+          <span class="nav-tooltip">🧠 Base de Conhecimento</span>
         </button>
-        <button onclick="switchTab('kb')" id="tab-btn-kb" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
-          <i class="fa-solid fa-book-open-reader"></i> Base KB
+
+        <button onclick="switchTab('workflows')" id="nav-workflows" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-solid fa-bolt text-[17px]"></i>
+          <span class="nav-tooltip">⚡ Automações & Broadcast</span>
         </button>
-        <button onclick="switchTab('workflows')" id="tab-btn-workflows" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
-          <i class="fa-solid fa-bolt"></i> Workflows & Webhook
-        </button>
-        <button onclick="switchTab('mcp')" id="tab-btn-mcp" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap">
-          <i class="fa-solid fa-plug-circle-bolt"></i> MCP (6 Tools)
+
+        <button onclick="switchTab('mcp')" id="nav-mcp" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-solid fa-robot text-[17px]"></i>
+          <span class="nav-tooltip">🤖 MCP Tools</span>
         </button>
       </nav>
+    </div>
 
-      <!-- KPI Bar -->
-      <div class="hidden 2xl:flex items-center gap-2.5 text-xs">
-        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-lg">
-          <span class="text-slate-400">🔥 Quentes:</span>
-          <span id="kpi-hot" class="font-bold text-amber-400 ml-1">0</span>
+    <!-- Rodapé da Sidebar: Status da Conexão (WhatsApp/Instagram) e Perfil -->
+    <div class="flex flex-col items-center gap-4">
+      <div class="nav-item flex flex-col items-center gap-1.5 bg-[#365945]/60 px-2.5 py-2 rounded-xl border border-white/10">
+        <div class="flex items-center gap-1.5">
+          <i class="fa-brands fa-whatsapp text-emerald-300 text-xs"></i>
+          <i class="fa-brands fa-instagram text-white/80 text-xs"></i>
         </div>
-        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-lg">
-          <span class="text-slate-400">Pipeline:</span>
-          <span id="kpi-open-val" class="font-bold text-indigo-400 ml-1">R$ 0</span>
-        </div>
-        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-lg">
-          <span class="text-slate-400">Ganhos:</span>
-          <span id="kpi-won-val" class="font-bold text-emerald-400 ml-1">R$ 0</span>
-        </div>
-        <button onclick="openNewContactModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
-          <i class="fa-solid fa-user-plus"></i> Novo Lead
-        </button>
+        <span class="w-2 h-2 rounded-full bg-emerald-400" id="ws-indicator"></span>
+        <span class="nav-tooltip">Canais Ativos: WhatsApp & Instagram (Online)</span>
+      </div>
+
+      <div class="nav-item w-10 h-10 rounded-full bg-[#EAF2ED] text-[#243E30] font-bold text-xs flex items-center justify-center border-2 border-white/20 cursor-pointer">
+        GH
+        <span class="nav-tooltip">Perfil Executivo • Conectado</span>
       </div>
     </div>
-  </header>
+  </aside>
 
-  <!-- Main Workspace -->
-  <main class="flex-1 max-w-[1680px] w-full mx-auto px-4 py-4 flex flex-col">
+  <!-- ===================================================================== -->
+  <!-- 2. ÁREA PRINCIPAL (CONTENT WORKSPACE — #F6F8F7)                       -->
+  <!-- ===================================================================== -->
+  <div class="flex-1 flex flex-col h-full overflow-hidden">
 
-    <!-- ========================================================= -->
-    <!-- TAB 1: INBOX OMNICHANNEL, HANDOFF HUMANO & NOTAS INTERNAS -->
-    <!-- ========================================================= -->
-    <section id="tab-inbox" class="tab-panel flex-1 grid grid-cols-12 gap-4 min-h-[calc(100vh-7.5rem)]">
-      <!-- Coluna Esquerda: Fila Única Omnichannel -->
-      <div class="col-span-12 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden">
-        <div class="p-3 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-inbox text-indigo-400"></i> Fila Omnichannel
-            </h2>
-            <p class="text-[11px] text-slate-400">Triagem Automática & Handoff Humano</p>
-          </div>
-          <button onclick="openNewContactModal()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-lg font-semibold">
-            <i class="fa-solid fa-plus"></i> Lead
-          </button>
-        </div>
-
-        <!-- Filtro de Canal -->
-        <div class="p-2 border-b border-slate-800 flex gap-1 bg-slate-950/50 text-[11px]">
-          <button onclick="filterContacts('')" id="ch-all" class="ch-filter flex-1 py-1 rounded bg-indigo-600 text-white font-medium">Todos</button>
-          <button onclick="filterContacts('whatsapp')" id="ch-whatsapp" class="ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white">
-            <i class="fa-brands fa-whatsapp text-emerald-400"></i> Whats
-          </button>
-          <button onclick="filterContacts('instagram')" id="ch-instagram" class="ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white">
-            <i class="fa-brands fa-instagram text-pink-400"></i> Insta
-          </button>
-          <button onclick="filterContacts('web')" id="ch-web" class="ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white">
-            <i class="fa-solid fa-globe text-sky-400"></i> Web
-          </button>
-        </div>
-
-        <!-- Filtro de Fila de Atendimento (Bot vs Humano) -->
-        <div class="px-2 py-1.5 border-b border-slate-800 flex gap-1 bg-slate-900 text-[10px]">
-          <button onclick="filterAttendance('')" id="att-all" class="att-filter flex-1 py-1 rounded bg-slate-800 text-white font-semibold">Todas Filas</button>
-          <button onclick="filterAttendance('bot')" id="att-bot" class="att-filter flex-1 py-1 rounded text-slate-400 hover:text-white">🤖 Auto</button>
-          <button onclick="filterAttendance('waiting')" id="att-waiting" class="att-filter flex-1 py-1 rounded text-amber-400 hover:text-white">⏳ Espera</button>
-          <button onclick="filterAttendance('human')" id="att-human" class="att-filter flex-1 py-1 rounded text-emerald-400 hover:text-white">🎧 Humano</button>
-        </div>
-
-        <div id="contacts-list" class="flex-1 overflow-y-auto divide-y divide-slate-800/60"></div>
+    <!-- Cabeçalho Superior Limpo (#FFFFFF com borda #E3E8E5) -->
+    <header class="h-16 bg-white border-b border-[#E3E8E5] px-8 flex items-center justify-between shrink-0">
+      <div>
+        <h1 id="header-title" class="text-lg font-bold text-[#1A2B21] tracking-tight">Visão Geral & Métricas</h1>
+        <p id="header-subtitle" class="text-xs text-[#63756A]">Acompanhamento executivo de atendimento, pipeline comercial e inteligência</p>
       </div>
 
-      <!-- Coluna Central: Chat + Handoff + Sussurro Interno + Respostas Rápidas -->
-      <div class="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden relative">
-        <!-- Header do Chat Ativo -->
-        <div class="p-3 border-b border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-3">
+        <!-- Busca Rápida -->
+        <div class="relative hidden md:block">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-[#63756A] text-xs"></i>
+          <input
+            id="global-search"
+            type="text"
+            placeholder="Buscar contato, tag ou negócio..."
+            oninput="handleGlobalSearch(this.value)"
+            class="w-64 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg pl-9 pr-3.5 py-2 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
+          />
+        </div>
+
+        <!-- Botão de Ação Discreto -->
+        <button
+          onclick="openNewContactModal()"
+          class="bg-[#243E30] hover:bg-[#365945] text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition flex items-center gap-2 shadow-sm"
+        >
+          <i class="fa-solid fa-plus text-[11px]"></i>
+          <span>Novo Lead</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Container de Conteúdo Modular -->
+    <main class="flex-1 overflow-y-auto p-8 space-y-6">
+
+      <!-- ================================================================= -->
+      <!-- FAIXA DE CARDS DE MÉTRICAS SUPERIORES (ESTILO EXECUTIVO)          -->
+      <!-- ================================================================= -->
+      <section id="metrics-strip" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Card 1 -->
+        <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
+          <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Contatos Ativos</span>
+            <i class="fa-regular fa-address-book text-xs text-white/75"></i>
+          </div>
+          <div class="p-5 flex items-baseline justify-between">
+            <div>
+              <div id="kpi-contacts" class="text-3xl font-bold text-[#1A2B21] tracking-tight">0</div>
+              <p class="text-xs text-[#63756A] mt-1">Fila única omnichannel</p>
+            </div>
+            <span id="kpi-hot-badge" class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#EAF2ED] text-[#243E30]">
+              0 quentes
+            </span>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
+          <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Pipeline em Aberto</span>
+            <i class="fa-solid fa-chart-line text-xs text-white/75"></i>
+          </div>
+          <div class="p-5 flex items-baseline justify-between">
+            <div>
+              <div id="kpi-open-val" class="text-3xl font-bold text-[#1A2B21] tracking-tight">R$ 0</div>
+              <p class="text-xs text-[#63756A] mt-1"><span id="kpi-open-count">0</span> oportunidades em negociação</p>
+            </div>
+            <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#EAF2ED] text-[#243E30]">
+              Kanban
+            </span>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
+          <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Receita Fechada (Ganho)</span>
+            <i class="fa-solid fa-check-double text-xs text-white/75"></i>
+          </div>
+          <div class="p-5 flex items-baseline justify-between">
+            <div>
+              <div id="kpi-won-val" class="text-3xl font-bold text-[#1A2B21] tracking-tight">R$ 0</div>
+              <p class="text-xs text-[#63756A] mt-1"><span id="kpi-won-count">0</span> negócios concluídos</p>
+            </div>
+            <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#EAF2ED] text-[#243E30]">
+              100% Meta
+            </span>
+          </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
+          <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Inteligência & Automação</span>
+            <i class="fa-solid fa-bolt text-xs text-white/75"></i>
+          </div>
+          <div class="p-5 flex items-baseline justify-between">
+            <div>
+              <div id="kpi-messages" class="text-3xl font-bold text-[#1A2B21] tracking-tight">0</div>
+              <p class="text-xs text-[#63756A] mt-1">Mensagens processadas • <span id="kpi-kb-count">0</span> artigos KB</p>
+            </div>
+            <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#EAF2ED] text-[#243E30]">
+              6 MCP Tools
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 1: DASHBOARD EXECUTIVO (VISÃO GERAL, AGENDA & FOLLOW-UP)     -->
+      <!-- ================================================================= -->
+      <section id="view-dashboard" class="view-section space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Resumo do Funil Comercial -->
+          <div class="lg:col-span-7 bg-white rounded-xl border border-[#E3E8E5] p-6 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-5">
+                <div>
+                  <h2 class="text-sm font-bold text-[#1A2B21]">Distribuição do Funil Comercial</h2>
+                  <p class="text-xs text-[#63756A]">Progressão automática guiada por intenção de compra no chat</p>
+                </div>
+                <button onclick="switchTab('kanban')" class="text-xs font-semibold text-[#243E30] hover:text-[#365945] flex items-center gap-1.5">
+                  Abrir Kanban Completo <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+              </div>
+              <div id="dashboard-funnel-bars" class="space-y-3.5"></div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-[#E3E8E5] flex items-center justify-between text-xs text-[#63756A]">
+              <span>Anti-fragmentação ativa: <strong class="text-[#1A2B21]">MessageDebouncer (2.0s)</strong></span>
+              <button onclick="switchTab('inbox')" class="font-semibold text-[#243E30] hover:underline">Ir para Inbox →</button>
+            </div>
+          </div>
+
+          <!-- Radar Anti-Vácuo & Próximas Reuniões -->
+          <div class="lg:col-span-5 bg-white rounded-xl border border-[#E3E8E5] p-6 flex flex-col justify-between space-y-4">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="text-sm font-bold text-[#1A2B21]">Acompanhamento Comercial (Follow-up)</h2>
+                  <p class="text-xs text-[#63756A]">Leads com propostas abertas aguardando retorno</p>
+                </div>
+                <button onclick="triggerFollowupBatch()" class="bg-[#243E30] hover:bg-[#365945] text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg transition">
+                  Disparar Follow-up
+                </button>
+              </div>
+              <div id="dashboard-followups" class="space-y-2.5 max-h-56 overflow-y-auto"></div>
+            </div>
+
+            <div class="pt-4 border-t border-[#E3E8E5]">
+              <div class="flex items-center justify-between mb-2.5">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-[#63756A]">Reuniões & Demonstrações Agendadas</h3>
+                <button onclick="openNewAppointmentModal()" class="text-xs font-semibold text-[#243E30] hover:underline">+ Agendar</button>
+              </div>
+              <div id="dashboard-appointments" class="space-y-2 max-h-40 overflow-y-auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 2: INBOX & CHAT OMNICHANNEL                                  -->
+      <!-- ================================================================= -->
+      <section id="view-inbox" class="view-section hidden">
+        <div class="grid grid-cols-12 gap-5 h-[calc(100vh-15.5rem)] min-h-[540px]">
+
+          <!-- Lista de Leads à Esquerda -->
+          <div class="col-span-12 lg:col-span-3 bg-white rounded-xl border border-[#E3E8E5] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-[#E3E8E5] flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-bold text-[#1A2B21]">Conversas</h2>
+                <p class="text-[11px] text-[#63756A]">WhatsApp, Instagram & Web</p>
+              </div>
+              <div class="flex gap-1 bg-[#F6F8F7] p-1 rounded-lg border border-[#E3E8E5] text-[11px]">
+                <button onclick="filterContacts('')" id="ch-all" class="ch-filter px-2 py-1 rounded bg-[#243E30] text-white font-medium">Todos</button>
+                <button onclick="filterContacts('whatsapp')" id="ch-whatsapp" class="ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]" title="WhatsApp">
+                  <i class="fa-brands fa-whatsapp"></i>
+                </button>
+                <button onclick="filterContacts('instagram')" id="ch-instagram" class="ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]" title="Instagram">
+                  <i class="fa-brands fa-instagram"></i>
+                </button>
+                <button onclick="filterContacts('web')" id="ch-web" class="ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]" title="Web">
+                  <i class="fa-solid fa-globe"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="contacts-list" class="flex-1 overflow-y-auto divide-y divide-[#E3E8E5]"></div>
+          </div>
+
+          <!-- Painel Central de Chat -->
+          <div class="col-span-12 lg:col-span-6 bg-white rounded-xl border border-[#E3E8E5] flex flex-col overflow-hidden relative">
+            <!-- Cabeçalho da Conversa -->
+            <div class="px-5 py-3.5 border-b border-[#E3E8E5] flex flex-wrap items-center justify-between gap-2 bg-white">
+              <div class="flex items-center gap-3">
+                <div id="chat-avatar" class="w-10 h-10 rounded-full bg-[#EAF2ED] text-[#243E30] font-bold text-sm flex items-center justify-center border border-[#E3E8E5]">
+                  ?
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 id="chat-contact-name" class="font-bold text-sm text-[#1A2B21]">Selecione um contato</h3>
+                    <span id="chat-channel-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30]"></span>
+                  </div>
+                  <p id="chat-stage-banner" class="text-xs text-[#63756A]">Estágio no Funil: —</p>
+                </div>
+              </div>
+
+              <!-- Controles Discretos: Debouncer, Simulador 3 Msgs e Handoff -->
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1.5 text-xs bg-[#F6F8F7] border border-[#E3E8E5] px-3 py-1.5 rounded-lg cursor-pointer text-[#1A2B21]">
+                  <input type="checkbox" id="toggle-debouncer" class="accent-[#243E30] rounded" />
+                  <span class="font-medium">Buffer 2s</span>
+                </label>
+
+                <button
+                  onclick="simulateBurstMessages()"
+                  title="Simular envio de 3 mensagens picadas concorrentes agrupadas pelo MessageDebouncer"
+                  class="text-xs bg-[#EAF2ED] hover:bg-[#d8e8dd] text-[#243E30] font-semibold px-3 py-1.5 rounded-lg transition"
+                >
+                  <i class="fa-solid fa-layer-group mr-1"></i> Rajada (3x)
+                </button>
+
+                <button
+                  onclick="toggleHumanHandoff()"
+                  id="btn-handoff"
+                  class="text-xs bg-white hover:bg-[#F6F8F7] text-[#1A2B21] border border-[#E3E8E5] font-medium px-3 py-1.5 rounded-lg transition"
+                >
+                  <span id="btn-handoff-label">Assumir Chat</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Aviso Discreto de Movimentação de Card / Evento -->
+            <div id="chat-event-toast" class="hidden bg-[#EAF2ED] border-b border-[#d5e3da] px-5 py-2 text-xs text-[#243E30] font-medium flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-[#243E30]"></i>
+                <span id="chat-event-text">Card movido automaticamente</span>
+              </div>
+              <button onclick="document.getElementById('chat-event-toast').classList.add('hidden')" class="text-[#63756A] hover:text-[#1A2B21]">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <!-- Área de Mensagens (Fundo calmo #F6F8F7 com balões claros) -->
+            <div id="chat-messages" class="flex-1 p-5 overflow-y-auto space-y-3.5 bg-[#F6F8F7]/70"></div>
+
+            <!-- Menu Flutuante de Respostas Rápidas (/atalhos) -->
+            <div id="quick-replies-popup" class="hidden absolute bottom-28 left-5 right-5 bg-white border border-[#E3E8E5] rounded-xl shadow-lg p-3 z-20 max-h-56 overflow-y-auto">
+              <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E3E8E5]">
+                <span class="text-xs font-bold text-[#243E30]">Respostas Rápidas (Templates)</span>
+                <button onclick="toggleQuickRepliesPopup(false)" class="text-xs text-[#63756A] hover:text-[#1A2B21]"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+              <div id="quick-replies-items" class="space-y-1.5"></div>
+            </div>
+
+            <!-- Sugestões Rápidas para Testar Intenção do Lead -->
+            <div class="px-4 py-2 bg-white border-t border-[#E3E8E5] flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[#63756A] font-medium">Testar Intenção:</span>
+                <button onclick="quickCustomerPrompt('Olá! Quais são os preços e planos? Gostaria de uma proposta para 8 vendedores na empresa Vórtex.')"
+                  class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] transition">
+                  Pedir Proposta / Preços
+                </button>
+                <button onclick="quickCustomerPrompt('É urgente! Preciso de atendimento prioritário.')"
+                  class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] transition">
+                  Gatilho "Urgente"
+                </button>
+                <button onclick="quickCustomerPrompt('Perfeito, aceito a proposta! Vamos fechar o contrato hoje.')"
+                  class="px-2.5 py-1 rounded-md bg-[#EAF2ED] hover:bg-[#d8e8dd] text-[#243E30] font-medium transition">
+                  Fechar Negócio
+                </button>
+              </div>
+              <div class="flex items-center gap-1">
+                <button onclick="simulateAudioMessage()" class="px-2 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5]" title="Simular Áudio Transcrito">
+                  <i class="fa-solid fa-microphone"></i>
+                </button>
+                <button onclick="sendProposalDocument()" class="px-2 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5]" title="Anexar Proposta PDF">
+                  <i class="fa-solid fa-paperclip"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Barra de Digitação -->
+            <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2">
+              <select
+                id="chat-sender-mode"
+                class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-2.5 py-2.5 text-xs text-[#1A2B21] font-medium focus:outline-none focus:border-[#243E30]"
+              >
+                <option value="contact">Simular Cliente (Inbound)</option>
+                <option value="human">Responder (Atendente)</option>
+                <option value="internal">Nota Interna (Equipe)</option>
+              </select>
+
+              <button
+                onclick="toggleQuickRepliesPopup()"
+                title="Inserir resposta rápida (/)"
+                class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition"
+              >
+                /
+              </button>
+
+              <input
+                id="chat-input"
+                type="text"
+                placeholder="Digite uma mensagem ou '/' para atalhos..."
+                oninput="handleChatInputKey(this.value)"
+                onkeydown="if(event.key==='Enter') sendChatMessage()"
+                class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
+              />
+
+              <button
+                onclick="sendChatMessage()"
+                class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5"
+              >
+                <span>Enviar</span>
+                <i class="fa-solid fa-paper-plane text-[10px]"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Painel Direito: Ficha Executiva do Lead -->
+          <div class="col-span-12 lg:col-span-3 bg-white rounded-xl border border-[#E3E8E5] p-5 flex flex-col gap-5 overflow-y-auto">
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-[#63756A]">Ficha do Contato</h3>
+                <div class="flex gap-1">
+                  <button onclick="setLeadTemp('hot')" class="text-[10px] px-2 py-0.5 rounded bg-[#EAF2ED] text-[#243E30] font-medium hover:bg-[#d8e8dd]">Quente</button>
+                  <button onclick="setLeadTemp('warm')" class="text-[10px] px-2 py-0.5 rounded bg-[#F6F8F7] text-[#63756A] border border-[#E3E8E5]">Morno</button>
+                  <button onclick="setLeadTemp('cold')" class="text-[10px] px-2 py-0.5 rounded bg-[#F6F8F7] text-[#63756A] border border-[#E3E8E5]">Frio</button>
+                </div>
+              </div>
+              <div id="inspector-card" class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-3.5 space-y-2 text-xs"></div>
+            </div>
+
+            <!-- Etiquetas (Tags) -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-[#63756A] mb-2">Etiquetas (Tags)</h4>
+              <div id="inspector-tags" class="flex flex-wrap gap-1.5 mb-2.5"></div>
+              <div class="flex gap-1.5">
+                <input
+                  id="new-tag-input"
+                  type="text"
+                  placeholder="Adicionar tag..."
+                  onkeydown="if(event.key==='Enter') addTagToCurrentContact()"
+                  class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-1.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]"
+                />
+                <button onclick="addTagToCurrentContact()" class="bg-[#243E30] hover:bg-[#365945] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                  +
+                </button>
+              </div>
+            </div>
+
+            <!-- Dados Extraídos na Conversa -->
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-[#63756A] mb-2">Campos Extraídos (IA)</h4>
+              <div id="inspector-custom-fields" class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-3.5 text-xs space-y-1.5"></div>
+            </div>
+
+            <!-- Log Técnico Discreto -->
+            <div class="flex-1 flex flex-col">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-[#63756A] mb-2">Último Retorno da API</h4>
+              <pre id="engine-telemetry" class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-3 text-[10px] text-[#1A2B21] font-mono overflow-auto max-h-40 whitespace-pre-wrap">Pronto.</pre>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 3: FUNIL KANBAN DINÂMICO                                     -->
+      <!-- ================================================================= -->
+      <section id="view-kanban" class="view-section hidden space-y-4">
+        <div class="bg-white rounded-xl border border-[#E3E8E5] px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <div id="chat-avatar" class="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center font-bold text-indigo-300">
-              ?
+            <span class="text-xs font-semibold text-[#63756A]">Pipeline selecionada:</span>
+            <select
+              id="kanban-pipeline-select"
+              onchange="loadKanban(this.value)"
+              class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-1.5 text-xs font-semibold text-[#1A2B21] focus:outline-none focus:border-[#243E30]"
+            ></select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="promptCreatePipeline()" class="text-xs bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] font-semibold px-3 py-1.5 rounded-lg transition">
+              + Novo Funil
+            </button>
+            <button onclick="loadKanban(currentPipelineId)" class="text-xs bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
+              Atualizar Quadro
+            </button>
+          </div>
+        </div>
+
+        <div id="kanban-board" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-4"></div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 4: BASE DE CONHECIMENTO (KNOWLEDGE BASE)                     -->
+      <!-- ================================================================= -->
+      <section id="view-kb" class="view-section hidden">
+        <div class="grid grid-cols-12 gap-6">
+          <!-- Coluna Esquerda: Consulta & Novo Artigo -->
+          <div class="col-span-12 lg:col-span-4 space-y-5">
+            <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
+              <h3 class="text-sm font-bold text-[#1A2B21]">Testar Consulta na Base</h3>
+              <p class="text-xs text-[#63756A]">Verifique a resposta oficial que o agente utiliza para responder aos clientes.</p>
+              <div class="flex gap-2">
+                <input
+                  id="kb-search-input"
+                  type="text"
+                  placeholder="Ex: preços e planos..."
+                  onkeydown="if(event.key==='Enter') testKbSearch()"
+                  class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]"
+                />
+                <button onclick="testKbSearch()" class="bg-[#243E30] hover:bg-[#365945] text-white text-xs font-semibold px-4 py-2 rounded-lg transition">
+                  Buscar
+                </button>
+              </div>
+              <div id="kb-search-results" class="space-y-2 text-xs"></div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
+              <h3 class="text-sm font-bold text-[#1A2B21]">Cadastrar Pergunta & Resposta</h3>
+              <input id="kb-question" type="text" placeholder="Pergunta frequente..."
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+              <input id="kb-category" type="text" placeholder="Categoria (ex: Comercial)"
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+              <input id="kb-tags" type="text" placeholder="Tags separadas por vírgula (ex: preco, plano)"
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+              <textarea id="kb-answer" rows="3" placeholder="Resposta oficial detalhada..."
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-3 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]"></textarea>
+              <button onclick="createKbItem()" class="w-full bg-[#243E30] hover:bg-[#365945] text-white font-semibold py-2.5 rounded-lg text-xs transition">
+                Adicionar à Base de Conhecimento
+              </button>
+            </div>
+          </div>
+
+          <!-- Coluna Direita: Lista de Artigos -->
+          <div class="col-span-12 lg:col-span-8 bg-white rounded-xl border border-[#E3E8E5] p-6">
+            <h3 class="text-sm font-bold text-[#1A2B21] mb-4">Artigos Cadastrados</h3>
+            <div id="kb-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 5: AUTOMAÇÕES, WORKFLOWS & DISPAROS EM MASSA (BROADCAST)     -->
+      <!-- ================================================================= -->
+      <section id="view-workflows" class="view-section hidden space-y-6">
+        <div class="grid grid-cols-12 gap-6">
+          <!-- Nova Regra de Workflow -->
+          <div class="col-span-12 lg:col-span-4 space-y-5">
+            <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
+              <h3 class="text-sm font-bold text-[#1A2B21]">Nova Regra de Automação</h3>
+              <p class="text-xs text-[#63756A]">Gatilhos por palavra-chave, tag ou estágio do funil.</p>
+              <input id="wf-name" type="text" placeholder="Nome da regra..."
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]" />
+              <div class="grid grid-cols-2 gap-2">
+                <select id="wf-trigger-type" class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]">
+                  <option value="keyword">Palavra-chave</option>
+                  <option value="stage_change">Estágio Kanban</option>
+                  <option value="tag">Tag</option>
+                </select>
+                <input id="wf-trigger-val" type="text" placeholder="Valor do gatilho"
+                  class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]" />
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <select id="wf-action-type" class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]">
+                  <option value="add_tag">Aplicar Tag</option>
+                  <option value="send_message">Enviar Mensagem</option>
+                  <option value="move_stage">Mover Estágio</option>
+                </select>
+                <input id="wf-action-val" type="text" placeholder="Valor da ação"
+                  class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]" />
+              </div>
+              <button onclick="createWorkflowRule()" class="w-full bg-[#243E30] hover:bg-[#365945] text-white font-semibold py-2.5 rounded-lg text-xs transition">
+                Salvar Workflow
+              </button>
+            </div>
+
+            <!-- Disparos Ativos (Broadcast) -->
+            <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
+              <h3 class="text-sm font-bold text-[#1A2B21]">Campanha de Broadcast</h3>
+              <p class="text-xs text-[#63756A]">Envie comunicados segmentados usando <code class="text-[#243E30] font-semibold">{{nome}}</code> e <code class="text-[#243E30] font-semibold">{{empresa}}</code>.</p>
+              <input id="bc-name" type="text" value="Comunicado Executivo - Condição Especial"
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]" />
+              <div class="grid grid-cols-2 gap-2">
+                <select id="bc-channel" class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]">
+                  <option value="all">Todos os Canais</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="web">Web</option>
+                </select>
+                <input id="bc-tag" type="text" placeholder="Filtrar Tag (opcional)"
+                  class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs text-[#1A2B21]" />
+              </div>
+              <textarea id="bc-template" rows="3"
+                class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-3 text-xs text-[#1A2B21]">Olá {{nome}}, preparamos uma condição especial do Plano Pro para a {{empresa}}.</textarea>
+              <button onclick="sendBroadcastCampaign()" class="w-full bg-[#243E30] hover:bg-[#365945] text-white font-semibold py-2.5 rounded-lg text-xs transition">
+                Disparar Broadcast
+              </button>
+            </div>
+          </div>
+
+          <!-- Lista de Workflows + Histórico de Broadcasts -->
+          <div class="col-span-12 lg:col-span-8 space-y-6">
+            <div class="bg-white rounded-xl border border-[#E3E8E5] p-6">
+              <h3 class="text-sm font-bold text-[#1A2B21] mb-4">Workflows Declarativos Ativos</h3>
+              <div id="workflows-list" class="space-y-3"></div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-[#E3E8E5] p-6">
+              <h3 class="text-sm font-bold text-[#1A2B21] mb-4">Campanhas Enviadas Recentemente</h3>
+              <div id="broadcasts-list" class="space-y-2.5"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- VIEW 6: CATÁLOGO E CONSOLE DE FERRAMENTAS MCP                     -->
+      <!-- ================================================================= -->
+      <section id="view-mcp" class="view-section hidden">
+        <div class="grid grid-cols-12 gap-6">
+          <div class="col-span-12 lg:col-span-7 bg-white rounded-xl border border-[#E3E8E5] p-6">
+            <div class="mb-4">
+              <h3 class="text-sm font-bold text-[#1A2B21]">Catálogo Model Context Protocol (MCP)</h3>
+              <p class="text-xs text-[#63756A]">Selecione uma ferramenta abaixo para preencher seus parâmetros de chamada.</p>
+            </div>
+            <div id="mcp-tools-list" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
+          </div>
+
+          <div class="col-span-12 lg:col-span-5 bg-white rounded-xl border border-[#E3E8E5] p-6 flex flex-col gap-3.5">
+            <h3 class="text-sm font-bold text-[#1A2B21]">Executor de Ferramentas MCP</h3>
+            <div>
+              <label class="text-[11px] font-semibold text-[#63756A]">Nome da Ferramenta</label>
+              <input id="mcp-exec-name" type="text" value="query_knowledge_base"
+                class="w-full mt-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3 py-2 text-xs font-mono text-[#243E30] font-semibold" />
             </div>
             <div>
-              <div class="flex items-center gap-2">
-                <h3 id="chat-contact-name" class="font-bold text-sm text-white">Selecione um contato</h3>
-                <span id="chat-channel-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300"></span>
-                <span id="chat-temp-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30"></span>
-              </div>
-              <p id="chat-stage-banner" class="text-xs text-slate-400">Estágio no Funil: —</p>
+              <label class="text-[11px] font-semibold text-[#63756A]">Argumentos JSON</label>
+              <textarea id="mcp-exec-args" rows="6"
+                class="w-full mt-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-3 text-xs font-mono text-[#1A2B21]">{"query": "preços e planos", "top_k": 2}</textarea>
+            </div>
+            <button onclick="executeMcpTool()" class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold py-2.5 rounded-lg text-xs transition">
+              Executar Chamada MCP
+            </button>
+            <div class="flex-1 flex flex-col">
+              <label class="text-[11px] font-semibold text-[#63756A] mb-1">Resultado JSON</label>
+              <pre id="mcp-exec-output" class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-3.5 text-xs font-mono text-[#1A2B21] overflow-auto max-h-64">Aguardando execução...</pre>
             </div>
           </div>
-
-          <!-- Botões de Handoff Humano e Debouncer -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <button onclick="toggleHumanHandoff()" id="btn-handoff"
-              class="text-xs px-3 py-1.5 rounded-xl font-semibold border transition flex items-center gap-1.5 bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30">
-              <i class="fa-solid fa-headset"></i> <span id="btn-handoff-label">Assumir Atendimento</span>
-            </button>
-
-            <label class="flex items-center gap-1.5 text-xs bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-xl cursor-pointer">
-              <input type="checkbox" id="toggle-debouncer" class="accent-indigo-500 rounded" />
-              <span class="text-slate-300 font-medium">Debouncer 2s</span>
-            </label>
-
-            <button onclick="simulateBurstMessages()" title="Envia 3 mensagens picadas concorrentes para demonstrar a fusão pelo MessageDebouncer"
-              class="text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl font-medium transition flex items-center gap-1">
-              <i class="fa-solid fa-layer-group"></i> 3 Msgs Picadas
-            </button>
-          </div>
         </div>
+      </section>
 
-        <!-- Toast de Evento -->
-        <div id="chat-event-toast" class="hidden bg-indigo-950/90 border-b border-indigo-500/30 px-4 py-2 text-xs text-indigo-200 flex items-center justify-between">
-          <span id="chat-event-text"></span>
-          <button onclick="document.getElementById('chat-event-toast').classList.add('hidden')" class="text-indigo-400 hover:text-white">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
+    </main>
+  </div>
 
-        <!-- Histórico de Mensagens -->
-        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-950/50"></div>
-
-        <!-- Popup de Respostas Rápidas (/atalhos) -->
-        <div id="quick-replies-popup" class="hidden absolute bottom-28 left-4 right-4 bg-slate-900 border border-indigo-500/50 rounded-2xl shadow-2xl p-3 z-20 max-h-60 overflow-y-auto">
-          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-            <span class="text-xs font-bold text-indigo-300"><i class="fa-solid fa-bolt mr-1"></i> Respostas Rápidas (Templates com Variáveis)</span>
-            <button onclick="toggleQuickRepliesPopup(false)" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-          </div>
-          <div id="quick-replies-items" class="space-y-1.5"></div>
-        </div>
-
-        <!-- Barra de Simulação de Intenções, Áudio e Anexos -->
-        <div class="px-3 py-2 bg-slate-900 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-1.5">
-          <div class="flex flex-wrap items-center gap-1">
-            <span class="text-[10px] text-slate-400 mr-1">Simular Cliente:</span>
-            <button onclick="quickCustomerPrompt('Olá! Quais são os preços e planos? Quero receber uma proposta para 8 vendedores na empresa Vórtex.')"
-              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg border border-slate-700">
-              💰 Pedir Proposta
-            </button>
-            <button onclick="quickCustomerPrompt('Quero agendar reunião de demonstração para amanhã!')"
-              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-lg border border-slate-700">
-              📅 Agendar Call
-            </button>
-            <button onclick="quickCustomerPrompt('Quero falar com atendente humano agora, por favor.')"
-              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 px-2 py-1 rounded-lg border border-slate-700">
-              🎧 Pedir Humano
-            </button>
-            <button onclick="quickCustomerPrompt('Perfeito, aceito a proposta! Vamos fechar o plano Enterprise hoje.')"
-              class="text-[11px] bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 px-2 py-1 rounded-lg border border-emerald-700/50">
-              🤝 Vamos Fechar!
-            </button>
-          </div>
-
-          <div class="flex items-center gap-1">
-            <button onclick="simulateAudioMessage()" title="Simular envio de nota de voz / áudio pelo WhatsApp"
-              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-300 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1">
-              <i class="fa-solid fa-microphone"></i> Áudio
-            </button>
-            <button onclick="sendProposalDocument()" title="Enviar PDF de Proposta Comercial no chat"
-              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-indigo-300 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1">
-              <i class="fa-solid fa-file-pdf"></i> PDF Proposta
-            </button>
-          </div>
-        </div>
-
-        <!-- Input de Envio + Modo Nota Interna (Sussurro) + Atalhos / -->
-        <div class="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
-          <select id="chat-sender-mode" onchange="updateSenderModeStyle()" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-            <option value="contact">👤 Como Lead (Cliente)</option>
-            <option value="human">🎧 Atendente Humano</option>
-            <option value="internal">🔒 Nota Interna (Sussurro Equipe)</option>
-          </select>
-
-          <button onclick="toggleQuickRepliesPopup()" title="Abrir Respostas Rápidas (/atalhos)"
-            class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold">
-            / Atalhos
-          </button>
-
-          <input id="chat-input" type="text" placeholder="Digite a mensagem ou '/' para respostas rápidas..."
-            oninput="handleChatInputKey(this.value)"
-            onkeydown="if(event.key==='Enter') sendChatMessage()"
-            class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
-
-          <button onclick="sendChatMessage()" id="btn-send-msg" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5">
-            <i class="fa-solid fa-paper-plane"></i> Enviar
-          </button>
-        </div>
-      </div>
-
-      <!-- Coluna Direita: CRM Inspector, Temperatura, Responsável & Telemetria -->
-      <div class="col-span-12 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3.5 overflow-y-auto">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Raio-X do Lead</h3>
-            <div class="flex gap-1">
-              <button onclick="setLeadTemp('hot')" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30">🔥 Quente</button>
-              <button onclick="setLeadTemp('warm')" class="text-[10px] px-2 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30">🌤️ Morno</button>
-              <button onclick="setLeadTemp('cold')" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">❄️ Frio</button>
-            </div>
-          </div>
-          <div id="inspector-card" class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
-            <p class="text-slate-500">Selecione um contato para inspecionar.</p>
-          </div>
-        </div>
-
-        <!-- Atribuição de Responsável -->
-        <div>
-          <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Atendente Responsável</label>
-          <div class="flex gap-1.5 mt-1">
-            <select id="inspector-assignee" onchange="changeContactAssignee(this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white">
-              <option value="Agente IA">🤖 Agente Automático</option>
-              <option value="Lucas (Closer)">🎧 Lucas (Closer)</option>
-              <option value="Fernanda (CS)">🎧 Fernanda (CS)</option>
-              <option value="Marcos (SDR)">🎧 Marcos (SDR)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Etiquetas (Tags) -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Etiquetas (Tags)</h4>
-          <div id="inspector-tags" class="flex flex-wrap gap-1.5 mb-2"></div>
-          <div class="flex gap-1.5">
-            <input id="new-tag-input" type="text" placeholder="Nova tag (ex: vip)"
-              onkeydown="if(event.key==='Enter') addTagToCurrentContact()"
-              class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white" />
-            <button onclick="addTagToCurrentContact()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-700">
-              + Tag
-            </button>
-          </div>
-        </div>
-
-        <!-- Campos Customizados Extraídos -->
-        <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            <i class="fa-solid fa-database text-indigo-400 mr-1"></i> Campos Customizados (CRM)
-          </h4>
-          <div id="inspector-custom-fields" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs space-y-1.5"></div>
-        </div>
-
-        <!-- Telemetria -->
-        <div class="flex-1">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            <i class="fa-solid fa-gauge-high text-emerald-400 mr-1"></i> Telemetria de Eventos
-          </h4>
-          <pre id="engine-telemetry" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] text-emerald-300 font-mono overflow-x-auto max-h-48 whitespace-pre-wrap">Aguardando interação...</pre>
-        </div>
-      </div>
-    </section>
-
-    <!-- ========================================================= -->
-    <!-- TAB 2: FUNIL KANBAN COM DRAG & DROP E MÚLTIPLOS FUNIS     -->
-    <!-- ========================================================= -->
-    <section id="tab-kanban" class="tab-panel hidden flex-1 flex flex-col gap-4">
-      <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-        <div class="flex items-center gap-3">
-          <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-table-columns text-indigo-400"></i> Pipeline Kanban Interativo (Drag & Drop)
-            </h2>
-            <p class="text-xs text-slate-400">Arraste e solte os cards entre as colunas ou alterne entre os múltiplos funis da operação.</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-slate-400">Funil Ativo:</span>
-          <select id="kanban-pipeline-select" onchange="loadKanban(this.value)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white">
-          </select>
-          <button onclick="promptCreatePipeline()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5">
-            <i class="fa-solid fa-plus"></i> Novo Funil
-          </button>
-          <button onclick="loadKanban(currentPipelineId)" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700">
-            <i class="fa-solid fa-rotate"></i>
-          </button>
-        </div>
-      </div>
-
-      <div id="kanban-board" class="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 overflow-x-auto pb-2"></div>
-    </section>
-
-    <!-- ========================================================= -->
-    <!-- TAB 3: AGENDA DE REUNIÕES & MOTOR ANTI-VÁCUO (FOLLOW-UP)  -->
-    <!-- ========================================================= -->
-    <section id="tab-agenda" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
-      <!-- Agendamento de Reuniões -->
-      <div class="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-calendar-check text-emerald-400"></i> Agenda de Demonstrações & Calls
-            </h3>
-            <p class="text-xs text-slate-400">Compromissos criados pelo chat ou agendados manualmente pelos vendedores.</p>
-          </div>
-        </div>
-
-        <!-- Formulário Novo Agendamento -->
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
-          <select id="appt-contact" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white"></select>
-          <input id="appt-title" type="text" placeholder="Título (ex: Demo Plano Enterprise)" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white" />
-          <input id="appt-date" type="datetime-local" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white" />
-          <button onclick="createManualAppointment()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg px-3 py-2 transition">
-            <i class="fa-solid fa-calendar-plus mr-1"></i> Agendar Reunião
-          </button>
-        </div>
-
-        <div id="appointments-list" class="flex-1 space-y-2.5 overflow-y-auto"></div>
-      </div>
-
-      <!-- Fila Anti-Vácuo (Recuperação de Follow-up) -->
-      <div class="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-bell text-amber-400"></i> Radar Anti-Vácuo (Follow-up Automático)
-            </h3>
-            <p class="text-xs text-slate-400">Oportunidades abertas aguardando retorno do lead no WhatsApp/Instagram.</p>
-          </div>
-          <button onclick="triggerFollowupBatch()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5">
-            <i class="fa-solid fa-paper-plane"></i> Disparar Follow-up em Todos
-          </button>
-        </div>
-
-        <div id="followups-list" class="flex-1 space-y-2.5 overflow-y-auto"></div>
-      </div>
-    </section>
-
-    <!-- ========================================================= -->
-    <!-- TAB 4: BROADCAST (DISPAROS ATIVOS EM MASSA SEGMENTADOS)   -->
-    <!-- ========================================================= -->
-    <section id="tab-broadcast" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
-      <div class="col-span-12 lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3.5 h-fit">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-bullhorn text-indigo-400"></i> Nova Campanha de Broadcast
-        </h3>
-        <p class="text-xs text-slate-400">Segmente leads por Canal ou Tag e envie mensagens personalizadas com variáveis <code class="text-emerald-300">{{nome}}</code> e <code class="text-emerald-300">{{empresa}}</code>.</p>
-
-        <div>
-          <label class="text-[11px] text-slate-400">Nome da Campanha</label>
-          <input id="bc-name" type="text" value="Campanha Fechamento de Mês - Condição Especial"
-            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-        </div>
-
-        <div class="grid grid-cols-2 gap-2.5">
-          <div>
-            <label class="text-[11px] text-slate-400">Filtrar Canal</label>
-            <select id="bc-channel" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-              <option value="all">Todos os Canais</option>
-              <option value="whatsapp">Apenas WhatsApp</option>
-              <option value="instagram">Apenas Instagram</option>
-              <option value="web">Apenas Web</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-[11px] text-slate-400">Filtrar por Tag (Opcional)</label>
-            <input id="bc-tag" type="text" placeholder="Ex: interesse-comercial"
-              class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          </div>
-        </div>
-
-        <div>
-          <label class="text-[11px] text-slate-400">Template da Mensagem</label>
-          <textarea id="bc-template" rows="4"
-            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white">Olá {{nome}}! Tudo bem? Liberamos uma condição exclusiva para a {{empresa}} ativar o Plano Pro com isenção de setup hoje. Vamos conversar?</textarea>
-        </div>
-
-        <button onclick="sendBroadcastCampaign()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-rocket"></i> Disparar Campanha Agora
-        </button>
-      </div>
-
-      <div class="col-span-12 lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
-        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Histórico de Campanhas Disparadas
-        </h3>
-        <div id="broadcasts-list" class="space-y-2.5 overflow-y-auto flex-1"></div>
-      </div>
-    </section>
-
-    <!-- ========================================================= -->
-    <!-- TAB 5: BASE DE CONHECIMENTO (KNOWLEDGE BASE)              -->
-    <!-- ========================================================= -->
-    <section id="tab-kb" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
-      <div class="col-span-12 lg:col-span-4 space-y-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-magnifying-glass-chart text-indigo-400"></i> Simulador de Consulta KB
-          </h3>
-          <div class="flex gap-2">
-            <input id="kb-search-input" type="text" placeholder="Ex: Quais são os valores dos planos?"
-              onkeydown="if(event.key==='Enter') testKbSearch()"
-              class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-            <button onclick="testKbSearch()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl">
-              Buscar
-            </button>
-          </div>
-          <div id="kb-search-results" class="space-y-2 text-xs"></div>
-        </div>
-
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-plus-circle text-emerald-400"></i> Adicionar Conhecimento
-          </h3>
-          <input id="kb-question" type="text" placeholder="Pergunta frequente do cliente..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <input id="kb-category" type="text" placeholder="Categoria (ex: Preços e Planos)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <input id="kb-tags" type="text" placeholder="Tags separadas por vírgula (ex: desconto, anual, pix)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <textarea id="kb-answer" rows="3" placeholder="Resposta oficial..."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"></textarea>
-          <button onclick="createKbItem()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-xl text-xs transition">
-            Salvar na Base de Conhecimento
-          </button>
-        </div>
-      </div>
-
-      <div class="col-span-12 lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
-        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-book text-indigo-400"></i> Artigos Ativos na Base
-        </h3>
-        <div id="kb-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto"></div>
-      </div>
-    </section>
-
-    <!-- ========================================================= -->
-    <!-- TAB 6: AUTOMAÇÕES, ATALHOS & WEBHOOK WHATSAPP             -->
-    <!-- ========================================================= -->
-    <section id="tab-workflows" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
-      <div class="col-span-12 lg:col-span-4 space-y-4">
-        <!-- Criador de Workflow -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-bolt text-amber-400"></i> Nova Regra de Automação
-          </h3>
-          <input id="wf-name" type="text" placeholder="Nome da Regra (ex: Interesse Enterprise)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <div class="grid grid-cols-2 gap-2">
-            <select id="wf-trigger-type" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-              <option value="keyword">Palavra-chave</option>
-              <option value="stage_change">Mudança de Estágio</option>
-              <option value="tag">Tag Adicionada</option>
-            </select>
-            <input id="wf-trigger-val" type="text" placeholder="Gatilho (ex: enterprise)"
-              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <select id="wf-action-type" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-              <option value="add_tag">Adicionar Tag</option>
-              <option value="send_message">Enviar Mensagem</option>
-              <option value="move_stage">Mover Estágio Kanban</option>
-            </select>
-            <input id="wf-action-val" type="text" placeholder="Valor da ação"
-              class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          </div>
-          <button onclick="createWorkflowRule()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-xl text-xs transition">
-            Criar Automação
-          </button>
-        </div>
-
-        <!-- Simulador de Webhook Externo WhatsApp (Evolution API / Z-API / Meta) -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="fa-brands fa-whatsapp text-emerald-400"></i> Webhook WhatsApp (<code class="text-[11px] text-emerald-300">/api/webhooks/whatsapp</code>)
-          </h3>
-          <p class="text-xs text-slate-400">Simule um evento vindo da Evolution API / Meta Cloud API. Se o número não existir, o lead e o card no Kanban são criados na hora!</p>
-          <input id="wh-phone" type="text" value="+55 41 99988-7766" placeholder="Telefone do Lead"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <input id="wh-name" type="text" value="Rafael Nogueira (Webhook)" placeholder="Nome do Perfil WhatsApp"
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <input id="wh-msg" type="text" value="Olá! Vi o anúncio e quero um orçamento urgente do plano Pro para 5 vendedores."
-            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-          <button onclick="triggerSimulatedWebhook()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-xl text-xs transition">
-            Disparar Payload de Webhook
-          </button>
-        </div>
-      </div>
-
-      <div class="col-span-12 lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
-        <div>
-          <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-gears text-indigo-400"></i> Regras Declarativas de Workflow
-          </h3>
-          <div id="workflows-list" class="space-y-2.5"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ========================================================= -->
-    <!-- TAB 7: CATÁLOGO E CONSOLE MCP (MODEL CONTEXT PROTOCOL)    -->
-    <!-- ========================================================= -->
-    <section id="tab-mcp" class="tab-panel hidden flex-1 grid grid-cols-12 gap-4">
-      <div class="col-span-12 lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
-        <div class="mb-3">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-plug-circle-bolt text-emerald-400"></i> Ferramentas MCP Expostas (Claude / Cursor / ChatGPT)
-          </h3>
-          <p class="text-xs text-slate-400">Clique em qualquer ferramenta abaixo para carregar um payload de exemplo no executor ao lado.</p>
-        </div>
-        <div id="mcp-tools-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto"></div>
-      </div>
-
-      <div class="col-span-12 lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-terminal text-indigo-400"></i> Executor Interativo MCP (<code class="text-xs text-indigo-300">POST /api/mcp/execute</code>)
-        </h3>
-        <div>
-          <label class="text-[11px] text-slate-400">Ferramenta Selecionada</label>
-          <input id="mcp-exec-name" type="text" value="query_knowledge_base"
-            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-emerald-300" />
-        </div>
-        <div>
-          <label class="text-[11px] text-slate-400">Argumentos JSON (<code class="text-slate-300">arguments</code>)</label>
-          <textarea id="mcp-exec-args" rows="6"
-            class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200">{"query": "preços e planos", "top_k": 2}</textarea>
-        </div>
-        <button onclick="executeMcpTool()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-play"></i> Invocar Ferramenta MCP Agora
-        </button>
-        <div class="flex-1 flex flex-col">
-          <label class="text-[11px] text-slate-400 mb-1">Resposta do Servidor MCP</label>
-          <pre id="mcp-exec-output" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-emerald-300 overflow-auto max-h-72">Clique em "Invocar Ferramenta MCP Agora"...</pre>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Modal: Novo Contato / Lead -->
-  <div id="modal-contact" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-3">
+  <!-- ===================================================================== -->
+  <!-- MODAL: NOVO CONTATO / LEAD                                            -->
+  <!-- ===================================================================== -->
+  <div id="modal-contact" class="hidden fixed inset-0 bg-[#1A2B21]/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
       <div class="flex items-center justify-between">
-        <h3 class="font-bold text-sm text-white">Cadastrar Novo Lead no Funil</h3>
-        <button onclick="closeNewContactModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <h3 class="font-bold text-base text-[#1A2B21]">Novo Contato Comercial</h3>
+        <button onclick="closeNewContactModal()" class="text-[#63756A] hover:text-[#1A2B21]"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <input id="modal-c-name" type="text" placeholder="Nome completo (ex: Fernanda Lima)"
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-      <input id="modal-c-phone" type="text" placeholder="Telefone / WhatsApp (ex: +55 11 98888-7777)"
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-      <input id="modal-c-email" type="email" placeholder="E-mail (ex: fernanda@empresa.com.br)"
-        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
-      <select id="modal-c-channel" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-        <option value="whatsapp">WhatsApp</option>
-        <option value="instagram">Instagram Direct</option>
-        <option value="web">Web Chat</option>
-      </select>
+      <div class="space-y-3">
+        <input id="modal-c-name" type="text" placeholder="Nome completo (ex: Helena Martins)"
+          class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+        <input id="modal-c-phone" type="text" placeholder="Telefone / WhatsApp (ex: +55 11 98888-7777)"
+          class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+        <input id="modal-c-email" type="email" placeholder="E-mail corporativo"
+          class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+        <select id="modal-c-channel" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]">
+          <option value="whatsapp">Canal: WhatsApp</option>
+          <option value="instagram">Canal: Instagram Direct</option>
+          <option value="web">Canal: Web Chat</option>
+        </select>
+      </div>
       <div class="flex justify-end gap-2 pt-2">
-        <button onclick="closeNewContactModal()" class="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300">Cancelar</button>
-        <button onclick="submitNewContact()" class="px-4 py-2 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">Criar Lead</button>
+        <button onclick="closeNewContactModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21]">Cancelar</button>
+        <button onclick="submitNewContact()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-[#243E30] hover:bg-[#365945] text-white">Cadastrar Lead</button>
       </div>
     </div>
   </div>
 
+  <!-- ===================================================================== -->
+  <!-- MODAL: AGENDAR REUNIÃO                                                -->
+  <!-- ===================================================================== -->
+  <div id="modal-appointment" class="hidden fixed inset-0 bg-[#1A2B21]/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-base text-[#1A2B21]">Agendar Demonstração</h3>
+        <button onclick="closeNewAppointmentModal()" class="text-[#63756A] hover:text-[#1A2B21]"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-3">
+        <select id="appt-contact" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21]"></select>
+        <input id="appt-title" type="text" placeholder="Assunto (ex: Apresentação Plano Enterprise)"
+          class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21]" />
+        <input id="appt-date" type="datetime-local"
+          class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21]" />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeNewAppointmentModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A]">Cancelar</button>
+        <button onclick="createManualAppointment()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-[#243E30] hover:bg-[#365945] text-white">Confirmar Agendamento</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LÓGICA DE INTEGRAÇÃO REST E ESTADO DA APLICAÇÃO                       -->
+  <!-- ===================================================================== -->
   <script>
+    let currentTab = 'dashboard';
     let currentContactId = null;
     let currentContactObj = null;
     let currentChannelFilter = '';
-    let currentAttendanceFilter = '';
     let currentPipelineId = null;
+    let searchFilterText = '';
     let allContacts = [];
     let allStages = [];
     let quickRepliesCache = [];
     let draggedDealId = null;
 
-    function channelIcon(channel) {
-      if (channel === 'whatsapp') return '<i class="fa-brands fa-whatsapp text-emerald-400"></i>';
-      if (channel === 'instagram') return '<i class="fa-brands fa-instagram text-pink-400"></i>';
-      return '<i class="fa-solid fa-globe text-sky-400"></i>';
-    }
+    const TAB_META = {
+      dashboard: {
+        title: 'Visão Geral & Métricas',
+        subtitle: 'Acompanhamento executivo de atendimento, pipeline comercial e inteligência'
+      },
+      inbox: {
+        title: 'Central de Atendimento Omnichannel',
+        subtitle: 'Fila unificada com anti-fragmentação (Debouncer) e movimentação automática de estágios'
+      },
+      kanban: {
+        title: 'Funil Kanban Comercial',
+        subtitle: 'Oportunidades organizadas por estágio com progressão automática ou arrastar e soltar'
+      },
+      kb: {
+        title: 'Base de Conhecimento Corporativa',
+        subtitle: 'Repositório de perguntas, respostas e políticas consultadas pelo agente'
+      },
+      workflows: {
+        title: 'Automações & Campanhas',
+        subtitle: 'Gatilhos declarativos por palavra-chave, estágio e disparos segmentados'
+      },
+      mcp: {
+        title: 'Catálogo Model Context Protocol (MCP)',
+        subtitle: 'Ferramentas padronizadas para integração com agentes externos (Claude, Cursor, ChatGPT)'
+      }
+    };
 
-    function tempBadgeHtml(temp, score) {
-      if (temp === 'hot') return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">🔥 ${score || 85} pts</span>`;
-      if (temp === 'cold') return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">❄️ ${score || 20} pts</span>`;
-      return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">🌤️ ${score || 50} pts</span>`;
+    function channelLabel(ch) {
+      if (ch === 'whatsapp') return '<i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp';
+      if (ch === 'instagram') return '<i class="fa-brands fa-instagram mr-1"></i>Instagram';
+      return '<i class="fa-solid fa-globe mr-1"></i>Web';
     }
 
     function switchTab(tab) {
-      document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
-      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      currentTab = tab;
+      document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+      const target = document.getElementById(`view-${tab}`);
+      if (target) target.classList.remove('hidden');
 
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-400 hover:text-white whitespace-nowrap';
+      ['dashboard', 'inbox', 'kanban', 'kb', 'workflows', 'mcp'].forEach(id => {
+        const btn = document.getElementById(`nav-${id}`);
+        if (!btn) return;
+        if (id === tab) {
+          btn.className = 'nav-item w-12 h-12 rounded-xl flex items-center justify-center transition bg-[#365945] text-white shadow-sm';
+        } else {
+          btn.className = 'nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60';
+        }
       });
-      const activeBtn = document.getElementById(`tab-btn-${tab}`);
-      if (activeBtn) {
-        activeBtn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition bg-indigo-600 text-white whitespace-nowrap';
-      }
 
+      const meta = TAB_META[tab] || TAB_META.dashboard;
+      document.getElementById('header-title').textContent = meta.title;
+      document.getElementById('header-subtitle').textContent = meta.subtitle;
+
+      if (tab === 'dashboard') loadDashboardOverview();
+      if (tab === 'inbox') loadContacts(true);
       if (tab === 'kanban') loadKanban(currentPipelineId);
-      if (tab === 'agenda') loadAgendaAndFollowups();
-      if (tab === 'broadcast') loadBroadcasts();
       if (tab === 'kb') loadKb();
-      if (tab === 'workflows') loadWorkflows();
+      if (tab === 'workflows') { loadWorkflows(); loadBroadcasts(); }
       if (tab === 'mcp') loadMcpTools();
+    }
+
+    function handleGlobalSearch(query) {
+      searchFilterText = (query || '').trim().toLowerCase();
+      if (currentTab === 'inbox') {
+        renderContactsList();
+      } else if (currentTab === 'kanban') {
+        loadKanban(currentPipelineId);
+      } else if (searchFilterText.length > 1) {
+        switchTab('inbox');
+      }
     }
 
     // WebSocket Tempo Real
     function connectWebSocket() {
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${proto}//${location.host}/ws`);
-      ws.onmessage = async (event) => {
-        try {
-          const msg = JSON.parse(event.data);
+      try {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws.onopen = () => {
+          const ind = document.getElementById('ws-indicator');
+          if (ind) ind.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        };
+        ws.onmessage = async () => {
           await refreshStats();
-          if (msg.event && currentContactId) {
-            await loadContacts(false);
-          }
-        } catch (e) {}
-      };
-      ws.onclose = () => setTimeout(connectWebSocket, 3000);
+          if (currentTab === 'dashboard') await loadDashboardOverview();
+          if (currentTab === 'inbox' && currentContactId) await loadContacts(false);
+          if (currentTab === 'kanban') await loadKanban(currentPipelineId);
+        };
+        ws.onclose = () => setTimeout(connectWebSocket, 3500);
+      } catch (e) {}
     }
 
     async function refreshStats() {
       const res = await fetch('/api/stats');
+      if (!res.ok) return;
       const data = await res.json();
-      const hotEl = document.getElementById('kpi-hot');
-      if (hotEl) hotEl.textContent = data.hot_leads_count;
-      document.getElementById('kpi-open-val').textContent = `R$ ${data.open_pipeline_value.toLocaleString('pt-BR')}`;
-      document.getElementById('kpi-won-val').textContent = `R$ ${data.won_value.toLocaleString('pt-BR')}`;
+      document.getElementById('kpi-contacts').textContent = data.total_contacts;
+      document.getElementById('kpi-hot-badge').textContent = `${data.hot_leads_count || 0} quentes`;
+      document.getElementById('kpi-open-val').textContent = `R$ ${(data.open_pipeline_value || 0).toLocaleString('pt-BR')}`;
+      document.getElementById('kpi-open-count').textContent = data.open_deals_count || 0;
+      document.getElementById('kpi-won-val').textContent = `R$ ${(data.won_value || 0).toLocaleString('pt-BR')}`;
+      document.getElementById('kpi-won-count').textContent = data.won_deals_count || 0;
+      document.getElementById('kpi-messages').textContent = data.total_messages || 0;
+      document.getElementById('kpi-kb-count').textContent = data.kb_count || 0;
     }
 
+    // ===============================================================
+    // DASHBOARD OVERVIEW
+    // ===============================================================
+    async function loadDashboardOverview() {
+      const [kanbanRes, fwRes, apptRes] = await Promise.all([
+        fetch('/api/kanban'),
+        fetch('/api/followups'),
+        fetch('/api/appointments')
+      ]);
+      const kanban = await kanbanRes.json();
+      const followups = await fwRes.json();
+      const appointments = await apptRes.json();
+
+      const stages = kanban.stages || [];
+      const totalDeals = stages.reduce((acc, s) => acc + s.deals.length, 0) || 1;
+      const barsContainer = document.getElementById('dashboard-funnel-bars');
+
+      barsContainer.innerHTML = stages.map(s => {
+        const pct = Math.round((s.deals.length / totalDeals) * 100);
+        return `
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-[#1A2B21]">${s.name}</span>
+              <span class="text-[#63756A]">${s.deals.length} card(s) • <strong class="text-[#1A2B21]">R$ ${s.total_value.toLocaleString('pt-BR')}</strong></span>
+            </div>
+            <div class="w-full h-2.5 bg-[#F6F8F7] rounded-full overflow-hidden border border-[#E3E8E5]">
+              <div class="h-full bg-[#243E30] rounded-full transition-all duration-300" style="width: ${Math.max(pct, s.deals.length ? 8 : 0)}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const fwContainer = document.getElementById('dashboard-followups');
+      fwContainer.innerHTML = followups.length ? followups.map(f => `
+        <div class="p-3 rounded-lg bg-[#F6F8F7] border border-[#E3E8E5] flex items-center justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-[#1A2B21]">${f.contact.name}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30] font-medium">${f.stage_name}</span>
+            </div>
+            <p class="text-[11px] text-[#63756A] truncate max-w-xs mt-0.5">${f.last_message ? f.last_message.content : 'Aguardando interação'}</p>
+          </div>
+          <button onclick="openContactInInbox('${f.contact.id}')" class="text-xs font-semibold text-[#243E30] hover:underline shrink-0">
+            Atender
+          </button>
+        </div>
+      `).join('') : `<p class="text-xs text-[#63756A] py-4 text-center">Nenhum contato pendente de retorno.</p>`;
+
+      const apptContainer = document.getElementById('dashboard-appointments');
+      apptContainer.innerHTML = appointments.length ? appointments.map(a => `
+        <div class="p-2.5 rounded-lg bg-[#F6F8F7] border border-[#E3E8E5] flex items-center justify-between text-xs">
+          <div>
+            <span class="font-semibold text-[#1A2B21]">${a.title}</span>
+            <span class="block text-[11px] text-[#63756A]">${a.contact_name} • ${a.scheduled_at}</span>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30] font-semibold">${a.status}</span>
+        </div>
+      `).join('') : `<p class="text-xs text-[#63756A] py-2">Nenhuma reunião agendada.</p>`;
+    }
+
+    function openContactInInbox(contactId) {
+      currentContactId = contactId;
+      switchTab('inbox');
+    }
+
+    // ===============================================================
+    // INBOX & CONTATOS
+    // ===============================================================
     async function loadContacts(selectCurrent = true) {
-      const params = new URLSearchParams();
-      if (currentChannelFilter) params.set('channel', currentChannelFilter);
-      if (currentAttendanceFilter) params.set('attendance_status', currentAttendanceFilter);
-      const res = await fetch(`/api/contacts?${params.toString()}`);
+      const url = currentChannelFilter ? `/api/contacts?channel=${currentChannelFilter}` : '/api/contacts';
+      const res = await fetch(url);
       allContacts = await res.json();
 
+      if (!currentContactId || !allContacts.some(c => c.id === currentContactId)) {
+        currentContactId = allContacts[0] ? allContacts[0].id : null;
+      }
+
+      renderContactsList();
+
+      if (selectCurrent && currentContactId) {
+        await selectContact(currentContactId, false);
+      }
+    }
+
+    function renderContactsList() {
       const container = document.getElementById('contacts-list');
-      if (!allContacts.length) {
-        container.innerHTML = `<div class="p-6 text-center text-xs text-slate-500">Nenhum contato nesta fila.</div>`;
+      const filtered = allContacts.filter(c => {
+        if (!searchFilterText) return true;
+        const haystack = `${c.name} ${c.phone || ''} ${c.email || ''} ${(c.tags || []).join(' ')} ${c.stage_name || ''}`.toLowerCase();
+        return haystack.includes(searchFilterText);
+      });
+
+      if (!filtered.length) {
+        container.innerHTML = `<div class="p-6 text-center text-xs text-[#63756A]">Nenhum contato encontrado.</div>`;
         return;
       }
 
-      if (!currentContactId || !allContacts.some(c => c.id === currentContactId)) {
-        currentContactId = allContacts[0].id;
-      }
-
-      container.innerHTML = allContacts.map(c => {
+      container.innerHTML = filtered.map(c => {
         const isSelected = c.id === currentContactId;
         const stageName = c.stage_name || 'Novo Lead';
-        const attBadge = !c.ai_enabled
-          ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">🎧 ${c.assignee || 'Humano'}</span>`
-          : `<span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">🤖 Auto</span>`;
-
         return `
-          <div onclick="selectContact('${c.id}')" class="p-3 cursor-pointer transition hover:bg-slate-800/60 ${isSelected ? 'bg-slate-800/90 border-l-4 border-l-indigo-500' : ''}">
+          <div
+            onclick="selectContact('${c.id}')"
+            class="p-3.5 cursor-pointer transition ${isSelected ? 'bg-[#EAF2ED] border-l-4 border-l-[#243E30]' : 'bg-white hover:bg-[#F6F8F7]'}"
+          >
             <div class="flex items-center justify-between mb-1">
-              <span class="font-semibold text-xs text-white truncate">${c.name}</span>
-              <div class="flex items-center gap-1.5">
-                ${tempBadgeHtml(c.temperature, c.lead_score)}
-                <span class="text-xs">${channelIcon(c.channel)}</span>
-              </div>
+              <span class="font-semibold text-xs text-[#1A2B21] truncate">${c.name}</span>
+              <span class="text-[10px] font-medium text-[#63756A]">${channelLabel(c.channel)}</span>
             </div>
-            <div class="flex items-center justify-between text-[11px] text-slate-400">
-              ${attBadge}
-              <span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 border border-slate-700 text-slate-300">${stageName}</span>
+            <div class="flex items-center justify-between text-[11px] text-[#63756A]">
+              <span>${c.phone || c.email || 'Sem telefone'}</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white border border-[#E3E8E5] text-[#243E30]">${stageName}</span>
             </div>
             ${c.tags && c.tags.length ? `
-              <div class="flex flex-wrap gap-1 mt-1.5">
-                ${c.tags.map(t => `<span class="text-[10px] bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">#${t}</span>`).join('')}
+              <div class="flex flex-wrap gap-1 mt-2">
+                ${c.tags.map(t => `<span class="text-[10px] bg-[#EAF2ED] text-[#243E30] px-2 py-0.5 rounded font-medium">#${t}</span>`).join('')}
               </div>
             ` : ''}
           </div>
         `;
       }).join('');
-
-      if (selectCurrent) {
-        await selectContact(currentContactId, false);
-      }
     }
 
     function filterContacts(ch) {
       currentChannelFilter = ch;
       document.querySelectorAll('.ch-filter').forEach(b => {
-        b.className = 'ch-filter flex-1 py-1 rounded text-slate-400 hover:text-white';
+        b.className = 'ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]';
       });
       const active = document.getElementById(ch ? `ch-${ch}` : 'ch-all');
-      if (active) active.className = 'ch-filter flex-1 py-1 rounded bg-indigo-600 text-white font-medium';
-      loadContacts();
-    }
-
-    function filterAttendance(status) {
-      currentAttendanceFilter = status;
-      document.querySelectorAll('.att-filter').forEach(b => {
-        b.className = 'att-filter flex-1 py-1 rounded text-slate-400 hover:text-white';
-      });
-      const active = document.getElementById(status ? `att-${status}` : 'att-all');
-      if (active) active.className = 'att-filter flex-1 py-1 rounded bg-slate-800 text-white font-semibold';
-      loadContacts();
+      if (active) active.className = 'ch-filter px-2 py-1 rounded bg-[#243E30] text-white font-medium';
+      loadContacts(true);
     }
 
     async function selectContact(contactId, reloadList = true) {
@@ -759,72 +1013,58 @@
 
       document.getElementById('chat-avatar').textContent = contact.name.charAt(0).toUpperCase();
       document.getElementById('chat-contact-name').textContent = contact.name;
-      document.getElementById('chat-channel-badge').innerHTML = `${channelIcon(contact.channel)} <span class="ml-1 uppercase">${contact.channel}</span>`;
-      document.getElementById('chat-temp-badge').outerHTML = `<span id="chat-temp-badge">${tempBadgeHtml(contact.temperature, contact.lead_score)}</span>`;
-
+      document.getElementById('chat-channel-badge').innerHTML = channelLabel(contact.channel);
       document.getElementById('chat-stage-banner').innerHTML = stage
-        ? `Kanban: <strong class="text-indigo-300">${stage.name}</strong> • Valor: <strong class="text-emerald-400">R$ ${(deal?.value || 0).toLocaleString('pt-BR')}</strong> • Resp: <strong class="text-white">${contact.assignee || 'Agente IA'}</strong>`
+        ? `Estágio: <strong class="text-[#1A2B21]">${stage.name}</strong> • Valor: <strong class="text-[#243E30]">R$ ${(deal?.value || 0).toLocaleString('pt-BR')}</strong>`
         : 'Sem negócio vinculado';
 
-      // Atualiza botão de Handoff
-      const btnHandoff = document.getElementById('btn-handoff');
       const lblHandoff = document.getElementById('btn-handoff-label');
-      if (contact.ai_enabled) {
-        btnHandoff.className = 'text-xs px-3 py-1.5 rounded-xl font-semibold border transition flex items-center gap-1.5 bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30';
-        lblHandoff.textContent = 'Assumir (Pausar Auto)';
-      } else {
-        btnHandoff.className = 'text-xs px-3 py-1.5 rounded-xl font-semibold border transition flex items-center gap-1.5 bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30';
-        lblHandoff.textContent = 'Devolver p/ Automático';
-      }
-
-      document.getElementById('inspector-assignee').value = contact.assignee || 'Agente IA';
+      lblHandoff.textContent = contact.ai_enabled ? 'Assumir Chat' : 'Reativar Bot';
 
       const msgBox = document.getElementById('chat-messages');
       if (!messages.length) {
-        msgBox.innerHTML = `<div class="text-center text-xs text-slate-500 py-12">Nenhuma mensagem ainda.</div>`;
+        msgBox.innerHTML = `<div class="text-center text-xs text-[#63756A] py-12">Nenhuma mensagem registrada para este contato.</div>`;
       } else {
         msgBox.innerHTML = messages.map(m => {
           const isCustomer = m.sender === 'contact';
           const isInternal = m.is_internal || m.sender === 'internal';
           const isSystem = m.sender === 'system';
 
-          let badge = '<span class="text-[10px] text-emerald-300">🎧 Atendente Humano</span>';
-          if (isCustomer) badge = '<span class="text-[10px] text-slate-400">👤 Cliente</span>';
-          else if (isInternal) badge = '<span class="text-[10px] text-amber-300 font-bold"><i class="fa-solid fa-lock"></i> Nota Interna da Equipe (Sussurro)</span>';
-          else if (isSystem) badge = '<span class="text-[10px] text-amber-300"><i class="fa-solid fa-bolt"></i> Automação Workflow</span>';
-          else if (m.sender === 'agent') badge = '<span class="text-[10px] text-indigo-300"><i class="fa-solid fa-robot"></i> Assistente 24/7</span>';
+          let senderTitle = 'Atendente';
+          if (isCustomer) senderTitle = contact.name;
+          else if (isInternal) senderTitle = 'Nota Interna da Equipe';
+          else if (isSystem) senderTitle = 'Automação de Workflow';
+          else if (m.sender === 'agent') senderTitle = 'Assistente Inteligente';
 
-          let bubbleClass = 'bg-indigo-950/80 border-indigo-500/40 text-indigo-50 ml-auto';
-          if (isCustomer) bubbleClass = 'bg-slate-800 border-slate-700 text-slate-100 mr-auto';
-          else if (isInternal) bubbleClass = 'bg-amber-950/70 border-amber-400/50 text-amber-100 mx-auto w-full border-dashed';
-          else if (isSystem) bubbleClass = 'bg-slate-900 border-amber-500/30 text-amber-200 mx-auto max-w-xl';
+          let bubbleStyle = 'bg-[#EAF2ED] border-[#d3e2d8] text-[#1A2B21] ml-auto';
+          if (isCustomer) bubbleStyle = 'bg-white border-[#E3E8E5] text-[#1A2B21] mr-auto';
+          else if (isInternal) bubbleStyle = 'bg-[#F6F8F7] border-[#243E30]/30 text-[#1A2B21] mx-auto w-full border-dashed';
+          else if (isSystem) bubbleStyle = 'bg-white border-[#E3E8E5] text-[#63756A] mx-auto max-w-lg';
 
-          let mediaHtml = '';
+          let attachmentBlock = '';
           if (m.media_type === 'audio') {
-            mediaHtml = `
-              <div class="flex items-center gap-2 bg-slate-950/70 p-2 rounded-xl mb-1.5 border border-sky-500/30">
-                <i class="fa-solid fa-circle-play text-sky-400 text-lg"></i>
-                <div class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden"><div class="w-2/3 h-full bg-sky-400"></div></div>
-                <span class="text-[10px] text-sky-300 font-mono">0:14 • Áudio Transcrito</span>
+            attachmentBlock = `
+              <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
+                <i class="fa-solid fa-volume-high text-[#243E30]"></i>
+                <span class="text-[11px] font-medium text-[#1A2B21]">Áudio Transcrito Automaticamente</span>
               </div>
             `;
           } else if (m.media_type === 'document') {
-            mediaHtml = `
-              <div class="flex items-center gap-2 bg-slate-950/70 p-2 rounded-xl mb-1.5 border border-indigo-500/30">
-                <i class="fa-solid fa-file-pdf text-rose-400 text-lg"></i>
-                <span class="text-xs font-semibold text-white">Proposta_Comercial_OpenChatFunnel.pdf</span>
-                <span class="text-[10px] text-slate-400 ml-auto">420 KB</span>
+            attachmentBlock = `
+              <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
+                <i class="fa-regular fa-file-pdf text-[#243E30]"></i>
+                <span class="text-[11px] font-medium text-[#1A2B21]">Proposta_Comercial_OpenChatFunnel.pdf</span>
               </div>
             `;
           }
 
           return `
-            <div class="max-w-[85%] rounded-2xl px-3.5 py-2.5 border text-xs leading-relaxed ${bubbleClass}">
+            <div class="max-w-[80%] rounded-xl px-4 py-3 border text-xs leading-relaxed shadow-[0_1px_2px_rgba(26,43,33,0.03)] ${bubbleStyle}">
               <div class="flex items-center justify-between gap-4 mb-1">
-                ${badge}
-                <span class="text-[10px] text-slate-500">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
+                <span class="text-[10px] font-bold text-[#63756A]">${senderTitle}</span>
+                <span class="text-[10px] text-[#63756A]">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
               </div>
-              ${mediaHtml}
+              ${attachmentBlock}
               <div class="whitespace-pre-line">${m.content}</div>
             </div>
           `;
@@ -832,134 +1072,31 @@
         msgBox.scrollTop = msgBox.scrollHeight;
       }
 
-      // Inspector Card
+      // Ficha do Contato
       document.getElementById('inspector-card').innerHTML = `
-        <div class="flex justify-between"><span class="text-slate-400">Telefone:</span><span class="text-white">${contact.phone || '—'}</span></div>
-        <div class="flex justify-between"><span class="text-slate-400">E-mail:</span><span class="text-white">${contact.email || '—'}</span></div>
-        <div class="flex justify-between"><span class="text-slate-400">Fila Atual:</span><span class="font-bold uppercase ${contact.ai_enabled ? 'text-indigo-400' : 'text-emerald-400'}">${contact.attendance_status}</span></div>
-        <div class="flex justify-between"><span class="text-slate-400">Estágio Kanban:</span><span class="font-bold text-indigo-300">${stage ? stage.name : '—'}</span></div>
-        <div class="flex justify-between"><span class="text-slate-400">Score do Lead:</span><span class="font-bold text-amber-300">${contact.lead_score} / 100</span></div>
+        <div class="flex justify-between"><span class="text-[#63756A]">Telefone</span><span class="font-medium text-[#1A2B21]">${contact.phone || '—'}</span></div>
+        <div class="flex justify-between"><span class="text-[#63756A]">E-mail</span><span class="font-medium text-[#1A2B21]">${contact.email || '—'}</span></div>
+        <div class="flex justify-between"><span class="text-[#63756A]">Estágio</span><span class="font-semibold text-[#243E30]">${stage ? stage.name : '—'}</span></div>
+        <div class="flex justify-between"><span class="text-[#63756A]">Temperatura</span><span class="font-semibold uppercase text-[#1A2B21]">${contact.temperature || 'warm'} (${contact.lead_score || 50} pts)</span></div>
+        <div class="flex justify-between"><span class="text-[#63756A]">Atendimento</span><span class="font-medium text-[#1A2B21]">${contact.ai_enabled ? 'Automático (IA)' : 'Humano (' + (contact.assignee || 'Equipe') + ')'}</span></div>
       `;
 
       // Tags
       const tagsContainer = document.getElementById('inspector-tags');
       tagsContainer.innerHTML = (contact.tags || []).length
-        ? contact.tags.map(t => `<span class="text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">#${t}</span>`).join('')
-        : `<span class="text-xs text-slate-500">Nenhuma tag atribuída.</span>`;
+        ? contact.tags.map(t => `<span class="text-[11px] bg-[#EAF2ED] text-[#243E30] font-medium px-2.5 py-0.5 rounded-md">#${t}</span>`).join('')
+        : `<span class="text-xs text-[#63756A]">Sem tags cadastradas.</span>`;
 
-      // Custom fields
+      // Campos Customizados
       const cf = contact.custom_fields || {};
       const cfKeys = Object.keys(cf);
       document.getElementById('inspector-custom-fields').innerHTML = cfKeys.length
-        ? cfKeys.map(k => `<div class="flex justify-between"><span class="text-slate-400">${k}:</span><span class="font-semibold text-emerald-300">${cf[k]}</span></div>`).join('')
-        : `<span class="text-slate-500">Sem campos extras capturados.</span>`;
+        ? cfKeys.map(k => `<div class="flex justify-between"><span class="text-[#63756A]">${k}</span><span class="font-semibold text-[#1A2B21]">${cf[k]}</span></div>`).join('')
+        : `<span class="text-xs text-[#63756A]">Nenhum campo extraído ainda.</span>`;
 
       if (reloadList) {
-        await loadContacts(false);
+        renderContactsList();
       }
-    }
-
-    function updateSenderModeStyle() {
-      const mode = document.getElementById('chat-sender-mode').value;
-      const btn = document.getElementById('btn-send-msg');
-      if (mode === 'internal') {
-        btn.className = 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5';
-        btn.innerHTML = '<i class="fa-solid fa-lock"></i> Salvar Nota';
-      } else {
-        btn.className = 'bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-1.5';
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar';
-      }
-    }
-
-    async function toggleHumanHandoff() {
-      if (!currentContactObj) return;
-      const newAiEnabled = !currentContactObj.ai_enabled;
-      const payload = {
-        ai_enabled: newAiEnabled,
-        attendance_status: newAiEnabled ? 'bot' : 'human',
-        assignee: newAiEnabled ? 'Agente IA' : 'Lucas (Closer)'
-      };
-      const res = await fetch(`/api/contacts/${currentContactId}/handoff`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-      showEventToast(newAiEnabled ? '🤖 Assistente automático reativado para este lead.' : '🎧 Você assumiu a conversa! Respostas automáticas pausadas.');
-      await selectContact(currentContactId, true);
-    }
-
-    async function changeContactAssignee(assignee) {
-      if (!currentContactId) return;
-      const isBot = assignee === 'Agente IA';
-      await fetch(`/api/contacts/${currentContactId}/handoff`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          ai_enabled: isBot,
-          attendance_status: isBot ? 'bot' : 'human',
-          assignee
-        })
-      });
-      await selectContact(currentContactId, true);
-    }
-
-    async function setLeadTemp(temperature) {
-      if (!currentContactId) return;
-      await fetch(`/api/contacts/${currentContactId}/temperature`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ temperature })
-      });
-      await selectContact(currentContactId, true);
-      await refreshStats();
-    }
-
-    // Respostas Rápidas (/atalhos)
-    async function loadQuickReplies() {
-      const res = await fetch('/api/quick-replies');
-      quickRepliesCache = await res.json();
-      const box = document.getElementById('quick-replies-items');
-      box.innerHTML = quickRepliesCache.map(qr => `
-        <div onclick="applyQuickReply('${qr.shortcut}')" class="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 cursor-pointer flex items-center justify-between gap-2">
-          <div>
-            <span class="font-mono text-xs font-bold text-emerald-400">${qr.shortcut}</span>
-            <span class="text-xs font-semibold text-white ml-2">${qr.title}</span>
-            <p class="text-[11px] text-slate-400 truncate max-w-lg">${qr.content}</p>
-          </div>
-          <span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-400">${qr.category}</span>
-        </div>
-      `).join('');
-    }
-
-    function toggleQuickRepliesPopup(forceState) {
-      const popup = document.getElementById('quick-replies-popup');
-      const show = typeof forceState === 'boolean' ? forceState : popup.classList.contains('hidden');
-      if (show) {
-        loadQuickReplies();
-        popup.classList.remove('hidden');
-      } else {
-        popup.classList.add('hidden');
-      }
-    }
-
-    function handleChatInputKey(val) {
-      if (val.startsWith('/')) {
-        toggleQuickRepliesPopup(true);
-      } else {
-        toggleQuickRepliesPopup(false);
-      }
-    }
-
-    function applyQuickReply(shortcut) {
-      const qr = quickRepliesCache.find(item => item.shortcut === shortcut);
-      if (!qr) return;
-      document.getElementById('chat-sender-mode').value = 'human';
-      updateSenderModeStyle();
-      document.getElementById('chat-input').value = qr.content;
-      toggleQuickRepliesPopup(false);
-      document.getElementById('chat-input').focus();
     }
 
     async function sendChatMessage() {
@@ -999,20 +1136,47 @@
       document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
 
       if (data.status === 'buffered') {
-        showEventToast(`⏳ MessageDebouncer ativo: ${data.buffered_fragments} fragmento(s) em buffer (aguardando 2s)...`);
+        showEventToast(`Buffer Debouncer ativo: ${data.buffered_fragments} mensagem(ns) agrupada(s) (janela 2s)...`);
         setTimeout(async () => {
-          await selectContact(currentContactId, true);
+          await loadContacts(true);
           await refreshStats();
         }, 2200);
       } else {
         if (data.stage_transition) {
-          showEventToast(`🚀 Funil Kanban Avançou: "${data.stage_transition.from_stage}" ➔ "${data.stage_transition.to_stage}"`);
-        } else if (data.scheduled_appointment) {
-          showEventToast(`📅 Reunião agendada automaticamente para ${data.scheduled_appointment.scheduled_at}!`);
+          showEventToast(`Card movido para ${data.stage_transition.to_stage}`);
         }
-        await selectContact(currentContactId, true);
+        await loadContacts(true);
         await refreshStats();
       }
+    }
+
+    function quickCustomerPrompt(text) {
+      document.getElementById('chat-sender-mode').value = 'contact';
+      document.getElementById('chat-input').value = text;
+      sendChatMessage();
+    }
+
+    async function simulateBurstMessages() {
+      if (!currentContactId) return;
+      const fragments = [
+        "Olá!",
+        "Gostaria de conhecer os preços e planos",
+        "Preciso de uma proposta urgente para 8 vendedores"
+      ];
+      const res = await fetch('/api/messages/burst', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contact_id: currentContactId, fragments })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      if (data.stage_transition) {
+        showEventToast(`3 mensagens fundidas pelo Debouncer • Card movido para ${data.stage_transition.to_stage}`);
+      } else {
+        showEventToast(`3 mensagens concorrentes agrupadas em uma única entrada pelo MessageDebouncer.`);
+      }
+      await loadContacts(true);
+      await refreshStats();
     }
 
     async function simulateAudioMessage() {
@@ -1022,14 +1186,16 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           contact_id: currentContactId,
-          content: '🎙️ [Transcrição de Áudio]: Oi pessoal! Mandei esse áudio porque preciso de um orçamento para 10 vendedores no plano Pro.',
+          content: '[Áudio Transcrito]: Olá, gostaria de receber uma proposta comercial para o plano Pro.',
           media_type: 'audio'
         })
       });
       const data = await res.json();
       document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-      showEventToast('🎙️ Áudio recebido, transcrito e oportunidade avançada no Kanban!');
-      await selectContact(currentContactId, true);
+      if (data.stage_transition) {
+        showEventToast(`Card movido para ${data.stage_transition.to_stage}`);
+      }
+      await loadContacts(true);
       await refreshStats();
     }
 
@@ -1041,44 +1207,40 @@
         body: JSON.stringify({
           contact_id: currentContactId,
           sender: 'human',
-          content: 'Olá {{nome}}! Segue em anexo o PDF completo da nossa proposta comercial para a {{empresa}}.',
+          content: 'Olá {{nome}}, encaminhamos a proposta comercial detalhada para a {{empresa}}.',
           media_type: 'document'
         })
       });
       await selectContact(currentContactId, true);
     }
 
-    function quickCustomerPrompt(text) {
-      document.getElementById('chat-sender-mode').value = 'contact';
-      updateSenderModeStyle();
-      document.getElementById('chat-input').value = text;
-      sendChatMessage();
-    }
-
-    async function simulateBurstMessages() {
-      if (!currentContactId) return;
-      const fragments = [
-        "Oi, tudo bem?",
-        "Gostaria de saber os preços e planos",
-        "Preciso de uma proposta urgente para 10 vendedores"
-      ];
-      showEventToast(`⚡ Disparando 3 mensagens picadas concorrentes no MessageDebouncer...`);
-      const res = await fetch('/api/messages/burst', {
-        method: 'POST',
+    async function toggleHumanHandoff() {
+      if (!currentContactObj) return;
+      const newAiEnabled = !currentContactObj.ai_enabled;
+      const res = await fetch(`/api/contacts/${currentContactId}/handoff`, {
+        method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ contact_id: currentContactId, fragments })
+        body: JSON.stringify({
+          ai_enabled: newAiEnabled,
+          attendance_status: newAiEnabled ? 'bot' : 'human',
+          assignee: newAiEnabled ? 'Agente IA' : 'Atendente Executivo'
+        })
       });
       const data = await res.json();
       document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-      showEventToast(`✅ MessageDebouncer fundiu ${data.fragments_received} mensagens em 1 entrada única!`);
+      showEventToast(newAiEnabled ? 'Assistente automático reativado.' : 'Atendimento assumido manualmente.');
       await selectContact(currentContactId, true);
-      await refreshStats();
     }
 
-    function showEventToast(text) {
-      const toast = document.getElementById('chat-event-toast');
-      document.getElementById('chat-event-text').textContent = text;
-      toast.classList.remove('hidden');
+    async function setLeadTemp(temperature) {
+      if (!currentContactId) return;
+      await fetch(`/api/contacts/${currentContactId}/temperature`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ temperature })
+      });
+      await selectContact(currentContactId, true);
+      await refreshStats();
     }
 
     async function addTagToCurrentContact() {
@@ -1093,11 +1255,60 @@
       });
       const data = await res.json();
       document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-      await selectContact(currentContactId, true);
+      await loadContacts(true);
+    }
+
+    function showEventToast(text) {
+      const toast = document.getElementById('chat-event-toast');
+      document.getElementById('chat-event-text').textContent = text;
+      toast.classList.remove('hidden');
+    }
+
+    // Respostas Rápidas (/atalhos)
+    async function loadQuickReplies() {
+      const res = await fetch('/api/quick-replies');
+      if (!res.ok) return;
+      quickRepliesCache = await res.json();
+      const box = document.getElementById('quick-replies-items');
+      box.innerHTML = quickRepliesCache.map(qr => `
+        <div onclick="applyQuickReply('${qr.shortcut}')" class="p-2.5 rounded-lg bg-[#F6F8F7] hover:bg-[#EAF2ED] border border-[#E3E8E5] cursor-pointer flex items-center justify-between gap-2 transition">
+          <div>
+            <span class="font-mono text-xs font-bold text-[#243E30]">${qr.shortcut}</span>
+            <span class="text-xs font-semibold text-[#1A2B21] ml-2">${qr.title}</span>
+            <p class="text-[11px] text-[#63756A] truncate max-w-md">${qr.content}</p>
+          </div>
+          <span class="text-[10px] bg-white px-2 py-0.5 rounded border border-[#E3E8E5] text-[#63756A]">${qr.category}</span>
+        </div>
+      `).join('');
+    }
+
+    function toggleQuickRepliesPopup(forceState) {
+      const popup = document.getElementById('quick-replies-popup');
+      const show = typeof forceState === 'boolean' ? forceState : popup.classList.contains('hidden');
+      if (show) {
+        loadQuickReplies();
+        popup.classList.remove('hidden');
+      } else {
+        popup.classList.add('hidden');
+      }
+    }
+
+    function handleChatInputKey(val) {
+      if (val.startsWith('/')) toggleQuickRepliesPopup(true);
+      else toggleQuickRepliesPopup(false);
+    }
+
+    function applyQuickReply(shortcut) {
+      const qr = quickRepliesCache.find(i => i.shortcut === shortcut);
+      if (!qr) return;
+      document.getElementById('chat-sender-mode').value = 'human';
+      document.getElementById('chat-input').value = qr.content;
+      toggleQuickRepliesPopup(false);
+      document.getElementById('chat-input').focus();
     }
 
     // ===============================================================
-    // KANBAN COM DRAG & DROP HTML5 NATIVO & MÚLTIPLOS FUNIS
+    // FUNIL KANBAN DINÂMICO
     // ===============================================================
     async function loadKanban(pipelineId = null) {
       const url = pipelineId ? `/api/kanban?pipeline_id=${pipelineId}` : '/api/kanban';
@@ -1116,51 +1327,65 @@
 
       const board = document.getElementById('kanban-board');
       board.innerHTML = allStages.map(stage => {
-        const headerBadge = stage.is_won
-          ? 'border-emerald-500/40 bg-emerald-950/20'
-          : stage.is_lost
-          ? 'border-rose-500/40 bg-rose-950/20'
-          : 'border-slate-800 bg-slate-900';
+        const filteredDeals = stage.deals.filter(d => {
+          if (!searchFilterText) return true;
+          const c = d.contact || {};
+          return `${d.title} ${c.name || ''} ${(c.tags || []).join(' ')}`.toLowerCase().includes(searchFilterText);
+        });
 
         return `
-          <div class="rounded-2xl border ${headerBadge} p-3 flex flex-col min-h-[540px] transition"
-               ondragover="handleDragOver(event)"
-               ondragleave="handleDragLeave(event)"
-               ondrop="handleDropStage(event, '${stage.id}')">
-            <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-800">
+          <div
+            class="bg-[#F6F8F7] rounded-xl border border-[#E3E8E5] p-3.5 flex flex-col min-h-[500px] transition"
+            ondragover="handleDragOver(event)"
+            ondragleave="handleDragLeave(event)"
+            ondrop="handleDropStage(event, '${stage.id}')"
+          >
+            <!-- Cabeçalho da Coluna -->
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#E3E8E5]">
               <div>
-                <h4 class="font-bold text-xs text-white">${stage.name}</h4>
-                <span class="text-[11px] text-slate-400">${stage.deals.length} negócio(s)</span>
+                <h4 class="font-bold text-xs text-[#1A2B21]">${stage.name}</h4>
+                <span class="text-[11px] text-[#63756A]">${filteredDeals.length} oportunidade(s)</span>
               </div>
-              <span class="text-xs font-bold text-emerald-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              <span class="text-xs font-bold text-[#243E30] bg-[#EAF2ED] px-2.5 py-1 rounded-md">
                 R$ ${stage.total_value.toLocaleString('pt-BR')}
               </span>
             </div>
 
-            <div class="space-y-2.5 flex-1">
-              ${stage.deals.map(deal => {
+            <!-- Cards Brancos com Borda Sutil (#E3E8E5) -->
+            <div class="space-y-3 flex-1">
+              ${filteredDeals.map(deal => {
                 const c = deal.contact || {};
+                const tags = (c.tags || []).slice(0, 3);
                 return `
-                  <div draggable="true"
-                       ondragstart="handleDragStart(event, '${deal.id}')"
-                       class="bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-xl p-3 space-y-2 transition shadow cursor-grab active:cursor-grabbing">
+                  <div
+                    draggable="true"
+                    ondragstart="handleDragStart(event, '${deal.id}')"
+                    class="bg-white border border-[#E3E8E5] hover:border-[#243E30] rounded-xl p-4 space-y-2.5 transition shadow-[0_1px_2px_rgba(26,43,33,0.04)] cursor-grab active:cursor-grabbing"
+                  >
                     <div class="flex items-start justify-between gap-2">
-                      <span class="font-semibold text-xs text-white leading-snug">${deal.title}</span>
-                      <span class="text-xs">${channelIcon(c.channel || 'whatsapp')}</span>
+                      <span class="font-bold text-xs text-[#1A2B21] leading-snug">${deal.title}</span>
+                      <span class="text-[11px] text-[#63756A] shrink-0">${channelLabel(c.channel || 'whatsapp')}</span>
                     </div>
-                    <div class="flex items-center justify-between text-[11px] text-slate-400">
-                      <span><i class="fa-regular fa-user mr-1"></i> ${c.name || 'Lead'}</span>
-                      ${tempBadgeHtml(c.temperature, c.lead_score)}
+
+                    <div class="text-xs text-[#63756A] flex items-center justify-between">
+                      <span>${c.name || 'Contato'}</span>
+                      <span class="font-bold text-[#243E30]">R$ ${deal.value.toLocaleString('pt-BR')}</span>
                     </div>
-                    <div class="flex items-center justify-between text-[10px] text-slate-400">
-                      <span>🎧 ${c.assignee || 'Agente IA'}</span>
-                      <span class="text-emerald-400 font-bold text-xs">R$ ${deal.value.toLocaleString('pt-BR')}</span>
-                    </div>
-                    <div class="flex items-center justify-between pt-1.5 border-t border-slate-900">
-                      <button onclick="openContactFromKanban('${deal.contact_id}')" class="text-[11px] text-indigo-400 hover:underline">
-                        Abrir Chat →
+
+                    ${tags.length ? `
+                      <div class="flex flex-wrap gap-1 pt-0.5">
+                        ${tags.map(t => `<span class="text-[10px] bg-[#EAF2ED] text-[#243E30] px-2 py-0.5 rounded font-medium">#${t}</span>`).join('')}
+                      </div>
+                    ` : ''}
+
+                    <div class="pt-2.5 border-t border-[#E3E8E5] flex items-center justify-between gap-2">
+                      <button onclick="openContactInInbox('${deal.contact_id}')" class="text-[11px] font-semibold text-[#243E30] hover:underline">
+                        Abrir Conversa
                       </button>
-                      <select onchange="moveDealStage('${deal.id}', this.value)" class="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-300">
+                      <select
+                        onchange="moveDealStage('${deal.id}', this.value)"
+                        class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-md px-2 py-1 text-[10px] text-[#1A2B21] focus:outline-none focus:border-[#243E30]"
+                      >
                         ${allStages.map(s => `<option value="${s.id}" ${s.id === stage.id ? 'selected' : ''}>${s.name}</option>`).join('')}
                       </select>
                     </div>
@@ -1202,168 +1427,23 @@
         body: JSON.stringify({ stage_id: stageId })
       });
       await loadKanban(currentPipelineId);
-      await loadContacts(false);
       await refreshStats();
     }
 
     async function promptCreatePipeline() {
-      const name = prompt('Nome do novo Funil / Pipeline:', 'Funil de Renovação & Upsell');
+      const name = prompt('Nome do novo Funil Kanban:', 'Funil de Expansão & Contas');
       if (!name) return;
       const res = await fetch('/api/pipelines', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           name,
-          description: 'Funil customizado',
-          stages: ['Mapeamento', 'Oferta Enviada', 'Em Negociação', 'Renovado Ganho']
+          description: 'Pipeline customizada',
+          stages: ['Mapeamento', 'Diagnóstico', 'Proposta', 'Fechado Ganho']
         })
       });
       const created = await res.json();
       await loadKanban(created.id);
-    }
-
-    function openContactFromKanban(contactId) {
-      currentContactId = contactId;
-      switchTab('inbox');
-      selectContact(contactId, true);
-    }
-
-    // ===============================================================
-    // AGENDA DE REUNIÕES & RADAR ANTI-VÁCUO (FOLLOW-UP)
-    // ===============================================================
-    async function loadAgendaAndFollowups() {
-      const [apptsRes, followupsRes] = await Promise.all([
-        fetch('/api/appointments'),
-        fetch('/api/followups')
-      ]);
-      const appts = await apptsRes.json();
-      const followups = await followupsRes.json();
-
-      // Preenche select de contatos para agendamento
-      const sel = document.getElementById('appt-contact');
-      sel.innerHTML = allContacts.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
-      const apptBox = document.getElementById('appointments-list');
-      apptBox.innerHTML = appts.length ? appts.map(a => `
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between gap-3">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-bold text-white">${a.title}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded-full ${a.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' : a.status === 'cancelled' ? 'bg-rose-500/20 text-rose-300' : 'bg-indigo-500/20 text-indigo-300'}">${a.status}</span>
-            </div>
-            <p class="text-xs text-slate-400">👤 ${a.contact_name} • 🕒 <strong class="text-slate-200">${a.scheduled_at}</strong> (${a.duration_minutes} min)</p>
-            <p class="text-[11px] text-indigo-400">${a.meeting_link}</p>
-          </div>
-          <div class="flex gap-1.5">
-            <button onclick="updateApptStatus('${a.id}', 'completed')" class="text-[11px] bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-500/30">Concluir</button>
-            <button onclick="updateApptStatus('${a.id}', 'cancelled')" class="text-[11px] bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 px-2.5 py-1 rounded-lg border border-rose-500/30">Cancelar</button>
-          </div>
-        </div>
-      `).join('') : `<div class="text-xs text-slate-500 py-8 text-center">Nenhuma reunião agendada.</div>`;
-
-      const fwBox = document.getElementById('followups-list');
-      fwBox.innerHTML = followups.length ? followups.map(f => `
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between gap-3">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-xs text-white">${f.contact.name}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300">${f.stage_name}</span>
-              ${f.waiting_customer_reply ? '<span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300">⏳ No Vácuo</span>' : '<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300">Cliente respondeu</span>'}
-            </div>
-            <p class="text-xs text-slate-400 truncate max-w-md">Última msg: "${f.last_message ? f.last_message.content : 'Sem mensagens'}"</p>
-          </div>
-          <button onclick="triggerSingleFollowup('${f.contact.id}')" class="text-xs bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-300 font-semibold px-3 py-1.5 rounded-xl border border-amber-500/30 transition">
-            Cobrar Retorno
-          </button>
-        </div>
-      `).join('') : `<div class="text-xs text-slate-500 py-8 text-center">Nenhum lead pendente de follow-up.</div>`;
-    }
-
-    async function createManualAppointment() {
-      const contact_id = document.getElementById('appt-contact').value;
-      const title = document.getElementById('appt-title').value.trim() || 'Demonstração Comercial';
-      const scheduled_at = document.getElementById('appt-date').value || '2026-10-17T15:00';
-      if (!contact_id) return;
-      await fetch('/api/appointments', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ contact_id, title, scheduled_at, duration_minutes: 30 })
-      });
-      document.getElementById('appt-title').value = '';
-      await loadAgendaAndFollowups();
-    }
-
-    async function updateApptStatus(id, status) {
-      await fetch(`/api/appointments/${id}/status`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ status })
-      });
-      await loadAgendaAndFollowups();
-    }
-
-    async function triggerSingleFollowup(contactId) {
-      await fetch('/api/followups/trigger', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ contact_id: contactId })
-      });
-      await loadAgendaAndFollowups();
-      await loadContacts(false);
-    }
-
-    async function triggerFollowupBatch() {
-      const res = await fetch('/api/followups/trigger', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({})
-      });
-      const data = await res.json();
-      alert(`Follow-up automático enviado para ${data.triggered_count} contato(s)!`);
-      await loadAgendaAndFollowups();
-      await loadContacts(false);
-    }
-
-    // ===============================================================
-    // BROADCAST EM MASSA
-    // ===============================================================
-    async function loadBroadcasts() {
-      const res = await fetch('/api/broadcasts');
-      const items = await res.json();
-      const box = document.getElementById('broadcasts-list');
-      box.innerHTML = items.length ? items.map(b => `
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-xs text-white">${b.name}</span>
-            <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-              ✅ ${b.sent_count} destinatário(s)
-            </span>
-          </div>
-          <div class="text-[11px] text-slate-400">
-            Canal: <strong class="uppercase text-slate-200">${b.channel}</strong> • Tag: <strong class="text-slate-200">${b.target_tag || 'Todas'}</strong>
-          </div>
-          <p class="text-xs text-slate-300 bg-slate-900 p-2.5 rounded-lg">${b.template_content}</p>
-        </div>
-      `).join('') : `<div class="text-xs text-slate-500 py-12 text-center">Nenhuma campanha disparada ainda. Crie e dispare ao lado!</div>`;
-    }
-
-    async function sendBroadcastCampaign() {
-      const name = document.getElementById('bc-name').value.trim();
-      const channel = document.getElementById('bc-channel').value;
-      const target_tag = document.getElementById('bc-tag').value.trim() || null;
-      const template_content = document.getElementById('bc-template').value.trim();
-      if (!name || !template_content) return;
-
-      const res = await fetch('/api/broadcasts', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name, channel, target_tag, template_content })
-      });
-      const data = await res.json();
-      await loadBroadcasts();
-      await loadContacts(false);
-      await refreshStats();
-      alert(`Campanha disparada com sucesso para ${data.recipients_count} contato(s)!`);
     }
 
     // ===============================================================
@@ -1374,19 +1454,19 @@
       const items = await res.json();
       const list = document.getElementById('kb-list');
       list.innerHTML = items.map(item => `
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between gap-2">
+        <div class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-4 flex flex-col justify-between gap-3">
           <div>
-            <div class="flex items-center justify-between gap-2 mb-1">
-              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300">${item.category}</span>
-              <button onclick="deleteKbItem('${item.id}')" class="text-slate-500 hover:text-rose-400 text-xs">
-                <i class="fa-solid fa-trash"></i>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30]">${item.category}</span>
+              <button onclick="deleteKbItem('${item.id}')" class="text-[#63756A] hover:text-red-700 text-xs" title="Remover">
+                <i class="fa-regular fa-trash-can"></i>
               </button>
             </div>
-            <h4 class="font-bold text-xs text-white mb-1">${item.question}</h4>
-            <p class="text-xs text-slate-300 leading-relaxed">${item.answer}</p>
+            <h4 class="font-bold text-xs text-[#1A2B21] mb-1">${item.question}</h4>
+            <p class="text-xs text-[#63756A] leading-relaxed">${item.answer}</p>
           </div>
-          <div class="flex flex-wrap gap-1 pt-2 border-t border-slate-900">
-            ${(item.tags || []).map(t => `<span class="text-[10px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded">#${t}</span>`).join('')}
+          <div class="flex flex-wrap gap-1 pt-2 border-t border-[#E3E8E5]">
+            ${(item.tags || []).map(t => `<span class="text-[10px] bg-white border border-[#E3E8E5] text-[#63756A] px-2 py-0.5 rounded">#${t}</span>`).join('')}
           </div>
         </div>
       `).join('');
@@ -1399,16 +1479,16 @@
       const data = await res.json();
       const box = document.getElementById('kb-search-results');
       if (!data.matches || !data.matches.length) {
-        box.innerHTML = `<div class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300">Nenhuma correspondência encontrada.</div>`;
+        box.innerHTML = `<div class="p-3 rounded-lg bg-[#F6F8F7] border border-[#E3E8E5] text-[#63756A]">Nenhum artigo correspondente encontrado.</div>`;
         return;
       }
       box.innerHTML = data.matches.map(m => `
-        <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
+        <div class="p-3.5 rounded-lg bg-[#EAF2ED] border border-[#d3e2d8] space-y-1">
           <div class="flex justify-between">
-            <span class="font-bold text-emerald-300">${m.question}</span>
-            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Score: ${m.score}</span>
+            <span class="font-bold text-[#243E30]">${m.question}</span>
+            <span class="text-[10px] font-semibold text-[#243E30]">Score ${m.score}</span>
           </div>
-          <p class="text-slate-200">${m.answer}</p>
+          <p class="text-[#1A2B21]">${m.answer}</p>
         </div>
       `).join('');
     }
@@ -1440,27 +1520,27 @@
     }
 
     // ===============================================================
-    // WORKFLOWS & SIMULADOR WEBHOOK WHATSAPP
+    // WORKFLOWS & BROADCAST
     // ===============================================================
     async function loadWorkflows() {
       const res = await fetch('/api/workflows');
       const rules = await res.json();
       const container = document.getElementById('workflows-list');
       container.innerHTML = rules.map(r => `
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+        <div class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-4 flex items-center justify-between gap-4">
           <div class="space-y-1">
             <div class="flex items-center gap-2">
-              <span class="font-bold text-xs text-white">${r.name}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded-full ${r.active ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}">
+              <span class="font-bold text-xs text-[#1A2B21]">${r.name}</span>
+              <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${r.active ? 'bg-[#EAF2ED] text-[#243E30]' : 'bg-white border border-[#E3E8E5] text-[#63756A]'}">
                 ${r.active ? 'Ativo' : 'Pausado'}
               </span>
             </div>
-            <div class="text-xs text-slate-400">
-              QUANDO <code class="text-amber-300">${r.trigger_type} == "${r.trigger_value}"</code>
-              ➔ ENTÃO ${r.actions.map(a => `<code class="text-indigo-300">${a.type}("${a.value}")</code>`).join(', ')}
+            <div class="text-xs text-[#63756A]">
+              Gatilho: <strong class="text-[#1A2B21]">${r.trigger_type} = "${r.trigger_value}"</strong>
+              → Ação: ${r.actions.map(a => `<span class="font-medium text-[#243E30]">${a.type}("${a.value}")</span>`).join(', ')}
             </div>
           </div>
-          <button onclick="toggleWorkflow('${r.id}')" class="text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800">
+          <button onclick="toggleWorkflow('${r.id}')" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E3E8E5] bg-white hover:bg-[#EAF2ED] text-[#1A2B21] transition">
             ${r.active ? 'Pausar' : 'Ativar'}
           </button>
         </div>
@@ -1499,42 +1579,66 @@
       await refreshStats();
     }
 
-    async function triggerSimulatedWebhook() {
-      const phone = document.getElementById('wh-phone').value.trim();
-      const name = document.getElementById('wh-name').value.trim();
-      const message = document.getElementById('wh-msg').value.trim();
-      if (!phone || !message) return;
+    async function loadBroadcasts() {
+      const res = await fetch('/api/broadcasts');
+      const items = await res.json();
+      const box = document.getElementById('broadcasts-list');
+      box.innerHTML = items.length ? items.map(b => `
+        <div class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <span class="font-bold text-xs text-[#1A2B21]">${b.name}</span>
+            <p class="text-xs text-[#63756A] mt-0.5">${b.template_content}</p>
+          </div>
+          <span class="text-xs font-semibold px-3 py-1 rounded-full bg-[#EAF2ED] text-[#243E30] shrink-0">
+            ${b.sent_count} enviado(s)
+          </span>
+        </div>
+      `).join('') : `<p class="text-xs text-[#63756A]">Nenhuma campanha disparada até o momento.</p>`;
+    }
 
-      const res = await fetch('/api/webhooks/whatsapp', {
+    async function sendBroadcastCampaign() {
+      const name = document.getElementById('bc-name').value.trim();
+      const channel = document.getElementById('bc-channel').value;
+      const target_tag = document.getElementById('bc-tag').value.trim() || null;
+      const template_content = document.getElementById('bc-template').value.trim();
+      if (!name || !template_content) return;
+
+      await fetch('/api/broadcasts', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ phone, name, message, channel: 'whatsapp' })
+        body: JSON.stringify({ name, channel, target_tag, template_content })
       });
-      const data = await res.json();
-      if (data.contact) {
-        currentContactId = data.contact.id;
-      }
-      switchTab('inbox');
-      await loadContacts(true);
+      await loadBroadcasts();
       await refreshStats();
-      showEventToast(`📲 Webhook WhatsApp processado! Lead "${name || phone}" atualizado no funil.`);
+    }
+
+    async function triggerFollowupBatch() {
+      await fetch('/api/followups/trigger', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+      });
+      await loadDashboardOverview();
+      await refreshStats();
     }
 
     // ===============================================================
-    // MCP TOOLS CATALOG & PLAYGROUND
+    // PROTOCOLO MCP (6 FERRAMENTAS)
     // ===============================================================
     async function loadMcpTools() {
       const res = await fetch('/api/mcp/tools');
       const data = await res.json();
       const container = document.getElementById('mcp-tools-list');
       container.innerHTML = data.tools.map(t => `
-        <div onclick="selectMcpToolExample('${t.name}')" class="bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-xl p-3.5 cursor-pointer transition space-y-2">
+        <div
+          onclick="selectMcpToolExample('${t.name}')"
+          class="bg-[#F6F8F7] border border-[#E3E8E5] hover:border-[#243E30] rounded-xl p-4 cursor-pointer transition space-y-2"
+        >
           <div class="flex items-center justify-between">
-            <code class="text-xs font-bold text-emerald-400">${t.name}</code>
-            <span class="text-[10px] bg-indigo-500/15 text-indigo-300 px-2 py-0.5 rounded">MCP Tool</span>
+            <code class="text-xs font-bold text-[#243E30]">${t.name}</code>
+            <span class="text-[10px] font-semibold bg-[#EAF2ED] text-[#243E30] px-2 py-0.5 rounded">MCP Schema</span>
           </div>
-          <p class="text-xs text-slate-300">${t.description}</p>
-          <pre class="text-[10px] text-slate-400 bg-slate-900 p-2 rounded-lg overflow-x-auto">${JSON.stringify(t.inputSchema.properties, null, 2)}</pre>
+          <p class="text-xs text-[#63756A] leading-relaxed">${t.description}</p>
         </div>
       `).join('');
     }
@@ -1543,12 +1647,12 @@
       document.getElementById('mcp-exec-name').value = name;
       const cid = currentContactId || (allContacts[0] && allContacts[0].id) || 'ID_DO_CONTATO';
       const examples = {
-        create_contact: { name: "Lucas Mendes (Via MCP)", phone: "+55 11 97777-1234", channel: "whatsapp", tags: ["mcp-lead"] },
+        create_contact: { name: "Gustavo Ribeiro (Via MCP)", phone: "+55 11 97777-1234", channel: "whatsapp", tags: ["mcp-lead"] },
         list_contacts: { limit: 10 },
         move_deal_stage: { contact_id: cid, stage_name: "Proposta Apresentada", value: 997.0 },
         add_contact_tag: { contact_id: cid, tag: "qualificado-mcp" },
         query_knowledge_base: { query: "Quais são os preços e planos?", top_k: 2 },
-        send_chat_message: { contact_id: cid, content: "Olá! Mensagem disparada via ferramenta MCP.", sender: "agent" }
+        send_chat_message: { contact_id: cid, content: "Olá! Mensagem enviada via protocolo MCP.", sender: "agent" }
       };
       document.getElementById('mcp-exec-args').value = JSON.stringify(examples[name] || {}, null, 2);
     }
@@ -1559,7 +1663,7 @@
       try {
         args = JSON.parse(document.getElementById('mcp-exec-args').value || '{}');
       } catch (err) {
-        document.getElementById('mcp-exec-output').textContent = 'Erro de sintaxe JSON nos argumentos: ' + err.message;
+        document.getElementById('mcp-exec-output').textContent = 'JSON inválido: ' + err.message;
         return;
       }
       const res = await fetch('/api/mcp/execute', {
@@ -1574,7 +1678,7 @@
     }
 
     // ===============================================================
-    // MODAL NOVO CONTATO
+    // MODAIS: NOVO CONTATO & AGENDAMENTO
     // ===============================================================
     function openNewContactModal() {
       document.getElementById('modal-contact').classList.remove('hidden');
@@ -1599,18 +1703,41 @@
       document.getElementById('modal-c-name').value = '';
       document.getElementById('modal-c-phone').value = '';
       document.getElementById('modal-c-email').value = '';
-      if (data.contact) {
-        currentContactId = data.contact.id;
-      }
-      await loadContacts(true);
+      if (data.contact) currentContactId = data.contact.id;
       await refreshStats();
+      await loadContacts(true);
+      if (currentTab === 'dashboard') await loadDashboardOverview();
+      if (currentTab === 'kanban') await loadKanban(currentPipelineId);
     }
 
+    function openNewAppointmentModal() {
+      const sel = document.getElementById('appt-contact');
+      sel.innerHTML = allContacts.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      document.getElementById('modal-appointment').classList.remove('hidden');
+    }
+    function closeNewAppointmentModal() {
+      document.getElementById('modal-appointment').classList.add('hidden');
+    }
+    async function createManualAppointment() {
+      const contact_id = document.getElementById('appt-contact').value;
+      const title = document.getElementById('appt-title').value.trim() || 'Demonstração Executiva';
+      const scheduled_at = document.getElementById('appt-date').value || '2026-10-17T15:00';
+      if (!contact_id) return;
+      await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contact_id, title, scheduled_at, duration_minutes: 30 })
+      });
+      closeNewAppointmentModal();
+      await loadDashboardOverview();
+    }
+
+    // Inicialização
     window.addEventListener('DOMContentLoaded', async () => {
       connectWebSocket();
       await refreshStats();
-      await loadContacts(true);
-      await loadQuickReplies();
+      await loadContacts(false);
+      await loadDashboardOverview();
     });
   </script>
 </body>
