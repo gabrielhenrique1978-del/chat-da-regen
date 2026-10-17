@@ -77,7 +77,6 @@
   <!-- 1. BARRA LATERAL ESQUERDA (SIDEBAR VERTICAL ESGUIA — #243E30)         -->
   <!-- ===================================================================== -->
   <aside class="w-20 bg-[#243E30] text-white flex flex-col items-center justify-between py-6 shrink-0 z-40 shadow-sm">
-    <!-- Topo: Logotipo Minimalista -->
     <div class="flex flex-col items-center gap-6 w-full">
       <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-xl bg-[#365945] hover:bg-[#416B53] flex items-center justify-center transition shadow-inner border border-white/10" title="OpenChatFunnel">
         <i class="fa-solid fa-filter-circle-dollar text-white text-lg"></i>
@@ -94,7 +93,7 @@
 
         <button onclick="switchTab('inbox')" id="nav-inbox" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
           <i class="fa-regular fa-comments text-[18px]"></i>
-          <span class="nav-tooltip">💬 Inbox & Chat</span>
+          <span class="nav-tooltip">💬 Inbox & Atendimento</span>
         </button>
 
         <button onclick="switchTab('kanban')" id="nav-kanban" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
@@ -119,7 +118,7 @@
       </nav>
     </div>
 
-    <!-- Rodapé da Sidebar: Status da Conexão (WhatsApp/Instagram) e Perfil -->
+    <!-- Rodapé da Sidebar -->
     <div class="flex flex-col items-center gap-4">
       <div class="nav-item flex flex-col items-center gap-1.5 bg-[#365945]/60 px-2.5 py-2 rounded-xl border border-white/10">
         <div class="flex items-center gap-1.5">
@@ -180,7 +179,6 @@
       <!-- FAIXA DE CARDS DE MÉTRICAS SUPERIORES (ESTILO EXECUTIVO)          -->
       <!-- ================================================================= -->
       <section id="metrics-strip" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <!-- Card 1 -->
         <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
           <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Contatos Ativos</span>
@@ -197,7 +195,6 @@
           </div>
         </div>
 
-        <!-- Card 2 -->
         <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
           <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Pipeline em Aberto</span>
@@ -214,7 +211,6 @@
           </div>
         </div>
 
-        <!-- Card 3 -->
         <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
           <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Receita Fechada (Ganho)</span>
@@ -231,7 +227,6 @@
           </div>
         </div>
 
-        <!-- Card 4 -->
         <div class="bg-white rounded-xl border border-[#E3E8E5] overflow-hidden shadow-[0_1px_3px_rgba(26,43,33,0.03)]">
           <div class="bg-[#243E30] px-4 py-2.5 flex items-center justify-between text-white">
             <span class="text-[11px] font-semibold uppercase tracking-wider text-white/90">Inteligência & Automação</span>
@@ -250,11 +245,10 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- VIEW 1: DASHBOARD EXECUTIVO (VISÃO GERAL, AGENDA & FOLLOW-UP)     -->
+      <!-- VIEW 1: DASHBOARD EXECUTIVO                                       -->
       <!-- ================================================================= -->
       <section id="view-dashboard" class="view-section space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Resumo do Funil Comercial -->
           <div class="lg:col-span-7 bg-white rounded-xl border border-[#E3E8E5] p-6 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-5">
@@ -275,7 +269,6 @@
             </div>
           </div>
 
-          <!-- Radar Anti-Vácuo & Próximas Reuniões -->
           <div class="lg:col-span-5 bg-white rounded-xl border border-[#E3E8E5] p-6 flex flex-col justify-between space-y-4">
             <div>
               <div class="flex items-center justify-between mb-4">
@@ -302,17 +295,20 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- VIEW 2: INBOX & CHAT OMNICHANNEL                                  -->
+      <!-- VIEW 2: INBOX COM 3 AMBIENTES DE CONVERSA TOTALMENTE SEPARADOS    -->
+      <!--   1) Atendimento (Chat Oficial)                                   -->
+      <!--   2) Notas Internas da Equipe (Thread Privada)                    -->
+      <!--   3) Simulador do Cliente (Inbound + Debouncer)                   -->
       <!-- ================================================================= -->
       <section id="view-inbox" class="view-section hidden">
-        <div class="grid grid-cols-12 gap-5 h-[calc(100vh-15.5rem)] min-h-[540px]">
+        <div class="grid grid-cols-12 gap-5 h-[calc(100vh-15.5rem)] min-h-[560px]">
 
-          <!-- Lista de Leads à Esquerda -->
+          <!-- Coluna Esquerda: Lista de Leads -->
           <div class="col-span-12 lg:col-span-3 bg-white rounded-xl border border-[#E3E8E5] flex flex-col overflow-hidden">
             <div class="p-4 border-b border-[#E3E8E5] flex items-center justify-between">
               <div>
-                <h2 class="text-sm font-bold text-[#1A2B21]">Conversas</h2>
-                <p class="text-[11px] text-[#63756A]">WhatsApp, Instagram & Web</p>
+                <h2 class="text-sm font-bold text-[#1A2B21]">Contatos</h2>
+                <p class="text-[11px] text-[#63756A]">Fila única de atendimento</p>
               </div>
               <div class="flex gap-1 bg-[#F6F8F7] p-1 rounded-lg border border-[#E3E8E5] text-[11px]">
                 <button onclick="filterContacts('')" id="ch-all" class="ch-filter px-2 py-1 rounded bg-[#243E30] text-white font-medium">Todos</button>
@@ -331,49 +327,68 @@
             <div id="contacts-list" class="flex-1 overflow-y-auto divide-y divide-[#E3E8E5]"></div>
           </div>
 
-          <!-- Painel Central de Chat -->
+          <!-- Coluna Central: Ambientes de Conversa Separados por Abas -->
           <div class="col-span-12 lg:col-span-6 bg-white rounded-xl border border-[#E3E8E5] flex flex-col overflow-hidden relative">
-            <!-- Cabeçalho da Conversa -->
-            <div class="px-5 py-3.5 border-b border-[#E3E8E5] flex flex-wrap items-center justify-between gap-2 bg-white">
-              <div class="flex items-center gap-3">
-                <div id="chat-avatar" class="w-10 h-10 rounded-full bg-[#EAF2ED] text-[#243E30] font-bold text-sm flex items-center justify-center border border-[#E3E8E5]">
-                  ?
-                </div>
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h3 id="chat-contact-name" class="font-bold text-sm text-[#1A2B21]">Selecione um contato</h3>
-                    <span id="chat-channel-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30]"></span>
+
+            <!-- Topo do Contato + Seletor dos 3 Canais Separados -->
+            <div class="px-5 pt-3.5 pb-0 border-b border-[#E3E8E5] bg-white space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-3">
+                  <div id="chat-avatar" class="w-10 h-10 rounded-full bg-[#EAF2ED] text-[#243E30] font-bold text-sm flex items-center justify-center border border-[#E3E8E5]">
+                    ?
                   </div>
-                  <p id="chat-stage-banner" class="text-xs text-[#63756A]">Estágio no Funil: —</p>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 id="chat-contact-name" class="font-bold text-sm text-[#1A2B21]">Selecione um contato</h3>
+                      <span id="chat-channel-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30]"></span>
+                    </div>
+                    <p id="chat-stage-banner" class="text-xs text-[#63756A]">Estágio no Funil: —</p>
+                  </div>
                 </div>
-              </div>
-
-              <!-- Controles Discretos: Debouncer, Simulador 3 Msgs e Handoff -->
-              <div class="flex items-center gap-2">
-                <label class="flex items-center gap-1.5 text-xs bg-[#F6F8F7] border border-[#E3E8E5] px-3 py-1.5 rounded-lg cursor-pointer text-[#1A2B21]">
-                  <input type="checkbox" id="toggle-debouncer" class="accent-[#243E30] rounded" />
-                  <span class="font-medium">Buffer 2s</span>
-                </label>
-
-                <button
-                  onclick="simulateBurstMessages()"
-                  title="Simular envio de 3 mensagens picadas concorrentes agrupadas pelo MessageDebouncer"
-                  class="text-xs bg-[#EAF2ED] hover:bg-[#d8e8dd] text-[#243E30] font-semibold px-3 py-1.5 rounded-lg transition"
-                >
-                  <i class="fa-solid fa-layer-group mr-1"></i> Rajada (3x)
-                </button>
 
                 <button
                   onclick="toggleHumanHandoff()"
                   id="btn-handoff"
-                  class="text-xs bg-white hover:bg-[#F6F8F7] text-[#1A2B21] border border-[#E3E8E5] font-medium px-3 py-1.5 rounded-lg transition"
+                  class="text-xs bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] font-semibold px-3 py-1.5 rounded-lg transition"
                 >
-                  <span id="btn-handoff-label">Assumir Chat</span>
+                  <span id="btn-handoff-label">Assumir Atendimento</span>
+                </button>
+              </div>
+
+              <!-- Abas de Separação Estrita das 3 Conversas -->
+              <div class="flex items-center gap-2 pt-1">
+                <button
+                  onclick="switchInboxChannel('attendance')"
+                  id="subtab-attendance"
+                  class="px-4 py-2 text-xs font-semibold border-b-2 border-[#243E30] text-[#243E30] flex items-center gap-2 transition"
+                >
+                  <i class="fa-regular fa-comments"></i>
+                  <span>Atendimento & Chat</span>
+                  <span id="badge-count-attendance" class="text-[10px] px-1.5 py-0.2 rounded-full bg-[#EAF2ED] text-[#243E30]">0</span>
+                </button>
+
+                <button
+                  onclick="switchInboxChannel('notes')"
+                  id="subtab-notes"
+                  class="px-4 py-2 text-xs font-medium border-b-2 border-transparent text-[#63756A] hover:text-[#1A2B21] flex items-center gap-2 transition"
+                >
+                  <i class="fa-solid fa-lock text-[11px]"></i>
+                  <span>Notas da Equipe</span>
+                  <span id="badge-count-notes" class="text-[10px] px-1.5 py-0.2 rounded-full bg-[#F6F8F7] border border-[#E3E8E5] text-[#63756A]">0</span>
+                </button>
+
+                <button
+                  onclick="switchInboxChannel('simulator')"
+                  id="subtab-simulator"
+                  class="px-4 py-2 text-xs font-medium border-b-2 border-transparent text-[#63756A] hover:text-[#1A2B21] flex items-center gap-2 transition"
+                >
+                  <i class="fa-solid fa-flask text-[11px]"></i>
+                  <span>Simulador do Cliente</span>
                 </button>
               </div>
             </div>
 
-            <!-- Aviso Discreto de Movimentação de Card / Evento -->
+            <!-- Aviso Discreto de Movimentação de Card -->
             <div id="chat-event-toast" class="hidden bg-[#EAF2ED] border-b border-[#d5e3da] px-5 py-2 text-xs text-[#243E30] font-medium flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <i class="fa-solid fa-circle-check text-[#243E30]"></i>
@@ -384,84 +399,161 @@
               </button>
             </div>
 
-            <!-- Área de Mensagens (Fundo calmo #F6F8F7 com balões claros) -->
-            <div id="chat-messages" class="flex-1 p-5 overflow-y-auto space-y-3.5 bg-[#F6F8F7]/70"></div>
+            <!-- =========================================================== -->
+            <!-- CONVERSA 1: ATENDIMENTO OFICIAL (SOMENTE CHAT DO ATENDENTE) -->
+            <!-- =========================================================== -->
+            <div id="panel-inbox-attendance" class="flex-1 flex flex-col overflow-hidden relative">
+              <div id="feed-attendance" class="flex-1 p-5 overflow-y-auto space-y-3.5 bg-[#F6F8F7]/70"></div>
 
-            <!-- Menu Flutuante de Respostas Rápidas (/atalhos) -->
-            <div id="quick-replies-popup" class="hidden absolute bottom-28 left-5 right-5 bg-white border border-[#E3E8E5] rounded-xl shadow-lg p-3 z-20 max-h-56 overflow-y-auto">
-              <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E3E8E5]">
-                <span class="text-xs font-bold text-[#243E30]">Respostas Rápidas (Templates)</span>
-                <button onclick="toggleQuickRepliesPopup(false)" class="text-xs text-[#63756A] hover:text-[#1A2B21]"><i class="fa-solid fa-xmark"></i></button>
+              <!-- Menu Flutuante de Respostas Rápidas (/atalhos) -->
+              <div id="quick-replies-popup" class="hidden absolute bottom-16 left-5 right-5 bg-white border border-[#E3E8E5] rounded-xl shadow-lg p-3 z-20 max-h-56 overflow-y-auto">
+                <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E3E8E5]">
+                  <span class="text-xs font-bold text-[#243E30]">Respostas Rápidas do Atendente (Templates)</span>
+                  <button onclick="toggleQuickRepliesPopup(false)" class="text-xs text-[#63756A] hover:text-[#1A2B21]"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="quick-replies-items" class="space-y-1.5"></div>
               </div>
-              <div id="quick-replies-items" class="space-y-1.5"></div>
-            </div>
 
-            <!-- Sugestões Rápidas para Testar Intenção do Lead -->
-            <div class="px-4 py-2 bg-white border-t border-[#E3E8E5] flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
-              <div class="flex flex-wrap items-center gap-1.5">
-                <span class="text-[#63756A] font-medium">Testar Intenção:</span>
-                <button onclick="quickCustomerPrompt('Olá! Quais são os preços e planos? Gostaria de uma proposta para 8 vendedores na empresa Vórtex.')"
-                  class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] transition">
-                  Pedir Proposta / Preços
+              <!-- Barra Exclusiva do Atendente -->
+              <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2">
+                <button
+                  onclick="toggleQuickRepliesPopup()"
+                  title="Inserir resposta rápida (/)"
+                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition"
+                >
+                  / Atalhos
                 </button>
-                <button onclick="quickCustomerPrompt('É urgente! Preciso de atendimento prioritário.')"
-                  class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] transition">
-                  Gatilho "Urgente"
-                </button>
-                <button onclick="quickCustomerPrompt('Perfeito, aceito a proposta! Vamos fechar o contrato hoje.')"
-                  class="px-2.5 py-1 rounded-md bg-[#EAF2ED] hover:bg-[#d8e8dd] text-[#243E30] font-medium transition">
-                  Fechar Negócio
-                </button>
-              </div>
-              <div class="flex items-center gap-1">
-                <button onclick="simulateAudioMessage()" class="px-2 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5]" title="Simular Áudio Transcrito">
-                  <i class="fa-solid fa-microphone"></i>
-                </button>
-                <button onclick="sendProposalDocument()" class="px-2 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5]" title="Anexar Proposta PDF">
+
+                <button
+                  onclick="sendProposalDocument()"
+                  title="Enviar PDF de Proposta Comercial"
+                  class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition"
+                >
                   <i class="fa-solid fa-paperclip"></i>
                 </button>
+
+                <input
+                  id="input-attendance"
+                  type="text"
+                  placeholder="Responder ao cliente como atendente (ou digite '/' para atalhos)..."
+                  oninput="handleChatInputKey(this.value)"
+                  onkeydown="if(event.key==='Enter') sendAttendanceReply()"
+                  class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
+                />
+
+                <button
+                  onclick="sendAttendanceReply()"
+                  class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5"
+                >
+                  <span>Responder</span>
+                  <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                </button>
               </div>
             </div>
 
-            <!-- Barra de Digitação -->
-            <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2">
-              <select
-                id="chat-sender-mode"
-                class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-2.5 py-2.5 text-xs text-[#1A2B21] font-medium focus:outline-none focus:border-[#243E30]"
-              >
-                <option value="contact">Simular Cliente (Inbound)</option>
-                <option value="human">Responder (Atendente)</option>
-                <option value="internal">Nota Interna (Equipe)</option>
-              </select>
+            <!-- =========================================================== -->
+            <!-- CONVERSA 2: NOTAS INTERNAS DA EQUIPE (THREAD SEPARADA)      -->
+            <!-- =========================================================== -->
+            <div id="panel-inbox-notes" class="hidden flex-1 flex flex-col overflow-hidden">
+              <div class="bg-[#F6F8F7] px-5 py-2 border-b border-[#E3E8E5] flex items-center justify-between text-[11px] text-[#63756A]">
+                <span><i class="fa-solid fa-lock text-[#243E30] mr-1"></i> Canal privado da equipe interna — o cliente nunca vê estas anotações.</span>
+                <span class="font-medium text-[#243E30]">Uso Interno</span>
+              </div>
 
-              <button
-                onclick="toggleQuickRepliesPopup()"
-                title="Inserir resposta rápida (/)"
-                class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition"
-              >
-                /
-              </button>
+              <div id="feed-notes" class="flex-1 p-5 overflow-y-auto space-y-3 bg-[#F6F8F7]/50"></div>
 
-              <input
-                id="chat-input"
-                type="text"
-                placeholder="Digite uma mensagem ou '/' para atalhos..."
-                oninput="handleChatInputKey(this.value)"
-                onkeydown="if(event.key==='Enter') sendChatMessage()"
-                class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
-              />
+              <!-- Barra Exclusiva para Notas da Equipe -->
+              <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2">
+                <input
+                  id="input-notes"
+                  type="text"
+                  placeholder="Registrar anotação interna para a equipe (ex: liberar desconto de 10% no plano anual)..."
+                  onkeydown="if(event.key==='Enter') sendInternalNote()"
+                  class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
+                />
 
-              <button
-                onclick="sendChatMessage()"
-                class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5"
-              >
-                <span>Enviar</span>
-                <i class="fa-solid fa-paper-plane text-[10px]"></i>
-              </button>
+                <button
+                  onclick="sendInternalNote()"
+                  class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5"
+                >
+                  <i class="fa-solid fa-lock text-[10px]"></i>
+                  <span>Registrar Nota</span>
+                </button>
+              </div>
             </div>
+
+            <!-- =========================================================== -->
+            <!-- CONVERSA 3: SIMULADOR DO CLIENTE (AMBIENTE DE TESTE ISOLADO)-->
+            <!-- =========================================================== -->
+            <div id="panel-inbox-simulator" class="hidden flex-1 flex flex-col overflow-hidden">
+              <!-- Barra de Controle do Debouncer e Disparo em Rajada -->
+              <div class="bg-[#F6F8F7] px-5 py-2.5 border-b border-[#E3E8E5] flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[11px] text-[#63756A]">
+                  <i class="fa-solid fa-flask text-[#243E30] mr-1"></i> Simule o envio de mensagens como se fosse o cliente no WhatsApp/Instagram.
+                </span>
+                <div class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 text-xs bg-white border border-[#E3E8E5] px-2.5 py-1 rounded-lg cursor-pointer text-[#1A2B21]">
+                    <input type="checkbox" id="toggle-debouncer" class="accent-[#243E30] rounded" />
+                    <span class="font-medium">Buffer Debouncer (2s)</span>
+                  </label>
+
+                  <button
+                    onclick="simulateBurstMessages()"
+                    class="text-xs bg-[#EAF2ED] hover:bg-[#d8e8dd] text-[#243E30] font-semibold px-3 py-1 rounded-lg transition"
+                  >
+                    <i class="fa-solid fa-layer-group mr-1"></i> Disparar 3 Msgs Picadas
+                  </button>
+                </div>
+              </div>
+
+              <!-- Histórico da Simulação Inbound (Cliente <-> Resposta Automática IA) -->
+              <div id="feed-simulator" class="flex-1 p-5 overflow-y-auto space-y-3.5 bg-[#F6F8F7]/40"></div>
+
+              <!-- Botões Rápidos de Cenário de Intenção -->
+              <div class="px-4 py-2.5 bg-white border-t border-[#E3E8E5] flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="text-[#63756A] font-medium">Cenários prontos:</span>
+                  <button onclick="quickCustomerPrompt('Olá! Quais são os preços e planos? Gostaria de uma proposta para 8 vendedores na empresa Vórtex.')"
+                    class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] transition">
+                    Pedir Proposta / Preços
+                  </button>
+                  <button onclick="quickCustomerPrompt('É urgente! Preciso de atendimento prioritário.')"
+                    class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] transition">
+                    Gatilho "Urgente"
+                  </button>
+                  <button onclick="quickCustomerPrompt('Perfeito, aceito a proposta! Vamos fechar o contrato hoje.')"
+                    class="px-2.5 py-1 rounded-md bg-[#EAF2ED] hover:bg-[#d8e8dd] text-[#243E30] font-medium transition">
+                    Fechar Negócio
+                  </button>
+                </div>
+                <button onclick="simulateAudioMessage()" class="px-2.5 py-1 rounded-md bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] font-medium" title="Simular Áudio Transcrito">
+                  <i class="fa-solid fa-microphone mr-1"></i> Enviar Áudio
+                </button>
+              </div>
+
+              <!-- Input Exclusivo do Simulador de Cliente -->
+              <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2">
+                <input
+                  id="input-simulator"
+                  type="text"
+                  placeholder="Digite como se fosse o cliente enviando mensagem no WhatsApp/Instagram..."
+                  onkeydown="if(event.key==='Enter') sendSimulatedCustomerMessage()"
+                  class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
+                />
+
+                <button
+                  onclick="sendSimulatedCustomerMessage()"
+                  class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5"
+                >
+                  <span>Simular Envio do Cliente</span>
+                  <i class="fa-solid fa-bolt text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+
           </div>
 
-          <!-- Painel Direito: Ficha Executiva do Lead -->
+          <!-- Coluna Direita: Ficha Executiva do Lead -->
           <div class="col-span-12 lg:col-span-3 bg-white rounded-xl border border-[#E3E8E5] p-5 flex flex-col gap-5 overflow-y-auto">
             <div>
               <div class="flex items-center justify-between mb-3">
@@ -541,7 +633,6 @@
       <!-- ================================================================= -->
       <section id="view-kb" class="view-section hidden">
         <div class="grid grid-cols-12 gap-6">
-          <!-- Coluna Esquerda: Consulta & Novo Artigo -->
           <div class="col-span-12 lg:col-span-4 space-y-5">
             <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
               <h3 class="text-sm font-bold text-[#1A2B21]">Testar Consulta na Base</h3>
@@ -577,7 +668,6 @@
             </div>
           </div>
 
-          <!-- Coluna Direita: Lista de Artigos -->
           <div class="col-span-12 lg:col-span-8 bg-white rounded-xl border border-[#E3E8E5] p-6">
             <h3 class="text-sm font-bold text-[#1A2B21] mb-4">Artigos Cadastrados</h3>
             <div id="kb-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -590,7 +680,6 @@
       <!-- ================================================================= -->
       <section id="view-workflows" class="view-section hidden space-y-6">
         <div class="grid grid-cols-12 gap-6">
-          <!-- Nova Regra de Workflow -->
           <div class="col-span-12 lg:col-span-4 space-y-5">
             <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
               <h3 class="text-sm font-bold text-[#1A2B21]">Nova Regra de Automação</h3>
@@ -620,7 +709,6 @@
               </button>
             </div>
 
-            <!-- Disparos Ativos (Broadcast) -->
             <div class="bg-white rounded-xl border border-[#E3E8E5] p-5 space-y-3">
               <h3 class="text-sm font-bold text-[#1A2B21]">Campanha de Broadcast</h3>
               <p class="text-xs text-[#63756A]">Envie comunicados segmentados usando <code class="text-[#243E30] font-semibold">{{nome}}</code> e <code class="text-[#243E30] font-semibold">{{empresa}}</code>.</p>
@@ -644,7 +732,6 @@
             </div>
           </div>
 
-          <!-- Lista de Workflows + Histórico de Broadcasts -->
           <div class="col-span-12 lg:col-span-8 space-y-6">
             <div class="bg-white rounded-xl border border-[#E3E8E5] p-6">
               <h3 class="text-sm font-bold text-[#1A2B21] mb-4">Workflows Declarativos Ativos</h3>
@@ -755,6 +842,7 @@
   <!-- ===================================================================== -->
   <script>
     let currentTab = 'dashboard';
+    let currentInboxChannel = 'attendance'; // 'attendance' | 'notes' | 'simulator'
     let currentContactId = null;
     let currentContactObj = null;
     let currentChannelFilter = '';
@@ -772,7 +860,7 @@
       },
       inbox: {
         title: 'Central de Atendimento Omnichannel',
-        subtitle: 'Fila unificada com anti-fragmentação (Debouncer) e movimentação automática de estágios'
+        subtitle: 'Ambientes separados para Atendimento ao Cliente, Notas Internas da Equipe e Simulador Inbound'
       },
       kanban: {
         title: 'Funil Kanban Comercial',
@@ -796,6 +884,26 @@
       if (ch === 'whatsapp') return '<i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp';
       if (ch === 'instagram') return '<i class="fa-brands fa-instagram mr-1"></i>Instagram';
       return '<i class="fa-solid fa-globe mr-1"></i>Web';
+    }
+
+    // Alterna entre as 3 conversas separadas dentro do Inbox
+    function switchInboxChannel(channelName) {
+      currentInboxChannel = channelName;
+      ['attendance', 'notes', 'simulator'].forEach(ch => {
+        const panel = document.getElementById(`panel-inbox-${ch}`);
+        const tabBtn = document.getElementById(`subtab-${ch}`);
+        if (panel) {
+          if (ch === channelName) panel.classList.remove('hidden');
+          else panel.classList.add('hidden');
+        }
+        if (tabBtn) {
+          if (ch === channelName) {
+            tabBtn.className = 'px-4 py-2 text-xs font-semibold border-b-2 border-[#243E30] text-[#243E30] flex items-center gap-2 transition';
+          } else {
+            tabBtn.className = 'px-4 py-2 text-xs font-medium border-b-2 border-transparent text-[#63756A] hover:text-[#1A2B21] flex items-center gap-2 transition';
+          }
+        }
+      });
     }
 
     function switchTab(tab) {
@@ -837,7 +945,6 @@
       }
     }
 
-    // WebSocket Tempo Real
     function connectWebSocket() {
       try {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -933,10 +1040,11 @@
     function openContactInInbox(contactId) {
       currentContactId = contactId;
       switchTab('inbox');
+      switchInboxChannel('attendance');
     }
 
     // ===============================================================
-    // INBOX & CONTATOS
+    // INBOX & CONTATOS (3 CONVERSAS SEPARADAS)
     // ===============================================================
     async function loadContacts(selectCurrent = true) {
       const url = currentChannelFilter ? `/api/contacts?channel=${currentChannelFilter}` : '/api/contacts';
@@ -1003,6 +1111,56 @@
       loadContacts(true);
     }
 
+    function renderBubbleHtml(m, contactName, invertPerspective = false) {
+      const isCustomer = m.sender === 'contact';
+      const isSystem = m.sender === 'system';
+
+      let senderTitle = 'Atendente';
+      if (isCustomer) senderTitle = contactName;
+      else if (isSystem) senderTitle = 'Automação de Workflow';
+      else if (m.sender === 'agent') senderTitle = 'Assistente Inteligente';
+
+      // No Atendimento Oficial: Cliente à esquerda (branco), Equipe/IA à direita (#EAF2ED)
+      // No Simulador do Cliente: Cliente à direita (#EAF2ED), Resposta recebida à esquerda (branco)
+      let bubbleStyle = '';
+      if (!invertPerspective) {
+        if (isCustomer) bubbleStyle = 'bg-white border-[#E3E8E5] text-[#1A2B21] mr-auto';
+        else if (isSystem) bubbleStyle = 'bg-white border-[#E3E8E5] text-[#63756A] mx-auto max-w-lg';
+        else bubbleStyle = 'bg-[#EAF2ED] border-[#d3e2d8] text-[#1A2B21] ml-auto';
+      } else {
+        if (isCustomer) bubbleStyle = 'bg-[#EAF2ED] border-[#d3e2d8] text-[#1A2B21] ml-auto';
+        else bubbleStyle = 'bg-white border-[#E3E8E5] text-[#1A2B21] mr-auto';
+      }
+
+      let attachmentBlock = '';
+      if (m.media_type === 'audio') {
+        attachmentBlock = `
+          <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
+            <i class="fa-solid fa-volume-high text-[#243E30]"></i>
+            <span class="text-[11px] font-medium text-[#1A2B21]">Áudio Transcrito Automaticamente</span>
+          </div>
+        `;
+      } else if (m.media_type === 'document') {
+        attachmentBlock = `
+          <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
+            <i class="fa-regular fa-file-pdf text-[#243E30]"></i>
+            <span class="text-[11px] font-medium text-[#1A2B21]">Proposta_Comercial_OpenChatFunnel.pdf</span>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="max-w-[80%] rounded-xl px-4 py-3 border text-xs leading-relaxed shadow-[0_1px_2px_rgba(26,43,33,0.03)] ${bubbleStyle}">
+          <div class="flex items-center justify-between gap-4 mb-1">
+            <span class="text-[10px] font-bold text-[#63756A]">${senderTitle}</span>
+            <span class="text-[10px] text-[#63756A]">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+          </div>
+          ${attachmentBlock}
+          <div class="whitespace-pre-line">${m.content}</div>
+        </div>
+      `;
+    }
+
     async function selectContact(contactId, reloadList = true) {
       currentContactId = contactId;
       const res = await fetch(`/api/contacts/${contactId}`);
@@ -1019,57 +1177,48 @@
         : 'Sem negócio vinculado';
 
       const lblHandoff = document.getElementById('btn-handoff-label');
-      lblHandoff.textContent = contact.ai_enabled ? 'Assumir Chat' : 'Reativar Bot';
+      lblHandoff.textContent = contact.ai_enabled ? 'Assumir Atendimento' : 'Reativar Bot';
 
-      const msgBox = document.getElementById('chat-messages');
-      if (!messages.length) {
-        msgBox.innerHTML = `<div class="text-center text-xs text-[#63756A] py-12">Nenhuma mensagem registrada para este contato.</div>`;
+      // Separa estritamente as mensagens externas das notas internas da equipe
+      const externalMessages = (messages || []).filter(m => !m.is_internal && m.sender !== 'internal');
+      const internalNotes = (messages || []).filter(m => m.is_internal || m.sender === 'internal');
+
+      document.getElementById('badge-count-attendance').textContent = externalMessages.length;
+      document.getElementById('badge-count-notes').textContent = internalNotes.length;
+
+      // 1. Renderiza Feed de Atendimento Oficial (sem notas internas)
+      const feedAttendance = document.getElementById('feed-attendance');
+      if (!externalMessages.length) {
+        feedAttendance.innerHTML = `<div class="text-center text-xs text-[#63756A] py-12">Nenhuma mensagem trocada com este cliente ainda.</div>`;
       } else {
-        msgBox.innerHTML = messages.map(m => {
-          const isCustomer = m.sender === 'contact';
-          const isInternal = m.is_internal || m.sender === 'internal';
-          const isSystem = m.sender === 'system';
+        feedAttendance.innerHTML = externalMessages.map(m => renderBubbleHtml(m, contact.name, false)).join('');
+        feedAttendance.scrollTop = feedAttendance.scrollHeight;
+      }
 
-          let senderTitle = 'Atendente';
-          if (isCustomer) senderTitle = contact.name;
-          else if (isInternal) senderTitle = 'Nota Interna da Equipe';
-          else if (isSystem) senderTitle = 'Automação de Workflow';
-          else if (m.sender === 'agent') senderTitle = 'Assistente Inteligente';
-
-          let bubbleStyle = 'bg-[#EAF2ED] border-[#d3e2d8] text-[#1A2B21] ml-auto';
-          if (isCustomer) bubbleStyle = 'bg-white border-[#E3E8E5] text-[#1A2B21] mr-auto';
-          else if (isInternal) bubbleStyle = 'bg-[#F6F8F7] border-[#243E30]/30 text-[#1A2B21] mx-auto w-full border-dashed';
-          else if (isSystem) bubbleStyle = 'bg-white border-[#E3E8E5] text-[#63756A] mx-auto max-w-lg';
-
-          let attachmentBlock = '';
-          if (m.media_type === 'audio') {
-            attachmentBlock = `
-              <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
-                <i class="fa-solid fa-volume-high text-[#243E30]"></i>
-                <span class="text-[11px] font-medium text-[#1A2B21]">Áudio Transcrito Automaticamente</span>
-              </div>
-            `;
-          } else if (m.media_type === 'document') {
-            attachmentBlock = `
-              <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
-                <i class="fa-regular fa-file-pdf text-[#243E30]"></i>
-                <span class="text-[11px] font-medium text-[#1A2B21]">Proposta_Comercial_OpenChatFunnel.pdf</span>
-              </div>
-            `;
-          }
-
-          return `
-            <div class="max-w-[80%] rounded-xl px-4 py-3 border text-xs leading-relaxed shadow-[0_1px_2px_rgba(26,43,33,0.03)] ${bubbleStyle}">
-              <div class="flex items-center justify-between gap-4 mb-1">
-                <span class="text-[10px] font-bold text-[#63756A]">${senderTitle}</span>
-                <span class="text-[10px] text-[#63756A]">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
-              </div>
-              ${attachmentBlock}
-              <div class="whitespace-pre-line">${m.content}</div>
+      // 2. Renderiza Feed Exclusivo de Notas Internas da Equipe
+      const feedNotes = document.getElementById('feed-notes');
+      if (!internalNotes.length) {
+        feedNotes.innerHTML = `<div class="text-center text-xs text-[#63756A] py-12">Nenhuma nota interna registrada para este contato.</div>`;
+      } else {
+        feedNotes.innerHTML = internalNotes.map(note => `
+          <div class="bg-white border border-[#E3E8E5] border-l-4 border-l-[#243E30] rounded-xl p-4 text-xs space-y-1.5 shadow-[0_1px_2px_rgba(26,43,33,0.03)]">
+            <div class="flex items-center justify-between text-[10px] text-[#63756A]">
+              <span class="font-bold text-[#243E30]"><i class="fa-solid fa-user-shield mr-1"></i> Anotação da Equipe</span>
+              <span>${new Date(note.timestamp).toLocaleString('pt-BR', {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'})}</span>
             </div>
-          `;
-        }).join('');
-        msgBox.scrollTop = msgBox.scrollHeight;
+            <div class="text-[#1A2B21] whitespace-pre-line leading-relaxed">${note.content}</div>
+          </div>
+        `).join('');
+        feedNotes.scrollTop = feedNotes.scrollHeight;
+      }
+
+      // 3. Renderiza Feed do Simulador do Cliente (visão na perspectiva do cliente)
+      const feedSimulator = document.getElementById('feed-simulator');
+      if (!externalMessages.length) {
+        feedSimulator.innerHTML = `<div class="text-center text-xs text-[#63756A] py-12">Use os botões abaixo ou digite uma frase para simular o cliente entrando em contato.</div>`;
+      } else {
+        feedSimulator.innerHTML = externalMessages.map(m => renderBubbleHtml(m, `Você (${contact.name})`, true)).join('');
+        feedSimulator.scrollTop = feedSimulator.scrollHeight;
       }
 
       // Ficha do Contato
@@ -1099,34 +1248,61 @@
       }
     }
 
-    async function sendChatMessage() {
-      const input = document.getElementById('chat-input');
+    // 1) Envio exclusivo da aba de Atendimento (Atendente Humano)
+    async function sendAttendanceReply() {
+      const input = document.getElementById('input-attendance');
       const content = input.value.trim();
       if (!content || !currentContactId) return;
       input.value = '';
       toggleQuickRepliesPopup(false);
 
-      const senderMode = document.getElementById('chat-sender-mode').value;
+      const res = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contact_id: currentContactId,
+          content,
+          sender: 'human',
+          is_internal: false
+        })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      await selectContact(currentContactId, true);
+      await refreshStats();
+    }
+
+    // 2) Envio exclusivo da aba de Notas Internas da Equipe
+    async function sendInternalNote() {
+      const input = document.getElementById('input-notes');
+      const content = input.value.trim();
+      if (!content || !currentContactId) return;
+      input.value = '';
+
+      const res = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contact_id: currentContactId,
+          content,
+          sender: 'internal',
+          is_internal: true
+        })
+      });
+      const data = await res.json();
+      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
+      await selectContact(currentContactId, true);
+      await refreshStats();
+    }
+
+    // 3) Envio exclusivo da aba Simulador do Cliente (Inbound + Debouncer)
+    async function sendSimulatedCustomerMessage() {
+      const input = document.getElementById('input-simulator');
+      const content = input.value.trim();
+      if (!content || !currentContactId) return;
+      input.value = '';
+
       const useDebouncer = document.getElementById('toggle-debouncer').checked;
-
-      if (senderMode === 'human' || senderMode === 'internal') {
-        const res = await fetch('/api/messages/send', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            contact_id: currentContactId,
-            content,
-            sender: senderMode,
-            is_internal: senderMode === 'internal'
-          })
-        });
-        const data = await res.json();
-        document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-        await selectContact(currentContactId, true);
-        await refreshStats();
-        return;
-      }
-
       const res = await fetch('/api/messages/incoming', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1151,13 +1327,14 @@
     }
 
     function quickCustomerPrompt(text) {
-      document.getElementById('chat-sender-mode').value = 'contact';
-      document.getElementById('chat-input').value = text;
-      sendChatMessage();
+      switchInboxChannel('simulator');
+      document.getElementById('input-simulator').value = text;
+      sendSimulatedCustomerMessage();
     }
 
     async function simulateBurstMessages() {
       if (!currentContactId) return;
+      switchInboxChannel('simulator');
       const fragments = [
         "Olá!",
         "Gostaria de conhecer os preços e planos",
@@ -1181,6 +1358,7 @@
 
     async function simulateAudioMessage() {
       if (!currentContactId) return;
+      switchInboxChannel('simulator');
       const res = await fetch('/api/messages/incoming', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1228,7 +1406,7 @@
       });
       const data = await res.json();
       document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-      showEventToast(newAiEnabled ? 'Assistente automático reativado.' : 'Atendimento assumido manualmente.');
+      showEventToast(newAiEnabled ? 'Assistente automático reativado.' : 'Atendimento assumido manualmente (nota registrada em Notas da Equipe).');
       await selectContact(currentContactId, true);
     }
 
@@ -1301,10 +1479,9 @@
     function applyQuickReply(shortcut) {
       const qr = quickRepliesCache.find(i => i.shortcut === shortcut);
       if (!qr) return;
-      document.getElementById('chat-sender-mode').value = 'human';
-      document.getElementById('chat-input').value = qr.content;
+      document.getElementById('input-attendance').value = qr.content;
       toggleQuickRepliesPopup(false);
-      document.getElementById('chat-input').focus();
+      document.getElementById('input-attendance').focus();
     }
 
     // ===============================================================
@@ -1340,7 +1517,6 @@
             ondragleave="handleDragLeave(event)"
             ondrop="handleDropStage(event, '${stage.id}')"
           >
-            <!-- Cabeçalho da Coluna -->
             <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#E3E8E5]">
               <div>
                 <h4 class="font-bold text-xs text-[#1A2B21]">${stage.name}</h4>
@@ -1351,7 +1527,6 @@
               </span>
             </div>
 
-            <!-- Cards Brancos com Borda Sutil (#E3E8E5) -->
             <div class="space-y-3 flex-1">
               ${filteredDeals.map(deal => {
                 const c = deal.contact || {};
