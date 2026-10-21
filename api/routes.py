@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -198,7 +199,8 @@ class MCPExecuteRequest(BaseModel):
 # =====================================================================
 
 
-def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> FastAPI:
+def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI:
+    resolved_db_path = db_path or os.getenv("DATABASE_PATH", "openchatfunnel.db")
     app = FastAPI(
         title="OpenChatFunnel CRM & MCP Server v2.0",
         description="Plataforma Open-Source de CRM Conversacional, Kanban Drag & Drop, Handoff Humano, Broadcast, Agenda e Servidor MCP",
@@ -225,7 +227,7 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
         response.headers["X-Data-Protection"] = "OpenChatFunnel-AES256-Encrypted"
         return response
 
-    db = Database(db_path=db_path, auto_seed=True)
+    db = Database(db_path=resolved_db_path, auto_seed=True)
     if seed_demo:
         db.seed_demo_data()
 

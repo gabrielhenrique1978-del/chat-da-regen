@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import os
 from typing import Any, Dict, Optional
 import httpx
 
@@ -16,13 +17,14 @@ class WhatsAppService:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8080",
-        api_key: str = "OPENCHATFUNNEL_SECRET_KEY_2026",
-        instance_name: str = "openchatfunnel",
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        instance_name: Optional[str] = None,
     ):
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
-        self.instance_name = instance_name
+        resolved_url = base_url or os.getenv("EVOLUTION_API_URL", "http://localhost:8080")
+        self.base_url = resolved_url.rstrip("/")
+        self.api_key = api_key or os.getenv("EVOLUTION_API_KEY", "OPENCHATFUNNEL_SECRET_KEY_2026")
+        self.instance_name = instance_name or os.getenv("EVOLUTION_INSTANCE_NAME", "openchatfunnel")
         self._connected = False
         self._phone_number: Optional[str] = None
         self._last_qrcode: Optional[str] = None

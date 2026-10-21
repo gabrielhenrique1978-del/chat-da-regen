@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: openchatfunnel
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: OPENCHATFUNNEL_SECRET_KEY
+        generateValue: true
+      - key: EVOLUTION_API_URL
+        value: http://localhost:8080
+      - key: EVOLUTION_API_KEY
+        value: OPENCHATFUNNEL_SECRET_KEY_2026
+      - key: EVOLUTION_INSTANCE_NAME
+        value: openchatfunnel
