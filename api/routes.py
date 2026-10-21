@@ -764,6 +764,13 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         await ws_manager.broadcast_event("whatsapp_status_updated", res)
         return res
 
+    @router.post("/whatsapp/simulate-scan")
+    async def simulate_whatsapp_scan():
+        """Simula a leitura instantânea do QR Code pelo celular."""
+        res = whatsapp_service.simulate_scan()
+        await ws_manager.broadcast_event("whatsapp_status_updated", res)
+        return res
+
     @router.post("/whatsapp/send-audio")
     async def send_whatsapp_audio(req: WhatsAppSendAudioRequest):
         """Salva áudio gravado no chat como PTT e dispara para o WhatsApp real."""
