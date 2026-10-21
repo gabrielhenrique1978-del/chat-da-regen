@@ -168,7 +168,7 @@ def test_5_mcp_protocol_tools_and_rest_api_integration():
     app = create_app(db_path=":memory:", seed_demo=False)
     client = TestClient(app)
 
-    # 1. Descoberta das 6 ferramentas MCP
+    # 1. Descoberta das ferramentas MCP
     tools_resp = client.get("/api/mcp/tools")
     assert tools_resp.status_code == 200
     tools = tools_resp.json()["tools"]
@@ -180,10 +180,12 @@ def test_5_mcp_protocol_tools_and_rest_api_integration():
         "add_contact_tag",
         "query_knowledge_base",
         "send_chat_message",
+        "schedule_appointment",
+        "get_pipeline_overview",
     }
     assert expected_tools == tool_names
 
-    # 2. Execução MCP: create_contact
+    # 2. Execução MCP: create_contact (via /api/mcp/execute)
     create_resp = client.post(
         "/api/mcp/execute",
         json={
@@ -240,6 +242,32 @@ def test_5_mcp_protocol_tools_and_rest_api_integration():
     list_resp = client.post("/api/mcp/execute", json={"name": "list_contacts", "arguments": {"tag": "qualificado"}})
     assert list_resp.status_code == 200
     assert list_resp.json()["result"]["count"] == 1
+
+    # 7. Execução MCP: schedule_appointment (via alias /api/mcp/call)
+    appt_resp = client.post(
+        "/api/mcp/call",
+        json={
+            "name": "schedule_appointment",
+            "arguments": {
+                "contact_id": cid,
+                "title": "Apresentação Plano Enterprise",
+                "scheduled_at": "2026-10-25T14:30:00",
+                "duration_minutes": 45,
+            },
+        },
+    )
+    assert appt_resp.status_code == 200
+    assert appt_resp.json()["success"] is True
+    assert appt_resp.json()["result"]["appointment"]["title"] == "Apresentação Plano Enterprise"
+
+    # 8. Execução MCP: get_pipeline_overview (via /api/mcp/call)
+    pipe_resp = client.post(
+        "/api/mcp/call",
+        json={"name": "get_pipeline_overview", "arguments": {}},
+    )
+    assert pipe_resp.status_code == 200
+    assert pipe_resp.json()["success"] is True
+    assert len(pipe_resp.json()["result"]["stages"]) > 0
 
 
 def test_6_handoff_internal_notes_appointments_broadcast_and_webhook():

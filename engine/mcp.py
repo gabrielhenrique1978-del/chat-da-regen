@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from core.db import Contact, Database, Message
+from core.db import Appointment, Contact, Database, Message
 from engine.agent import ConversationalAgent
 from engine.workflow import WorkflowEngine
 
@@ -126,6 +126,31 @@ class MCPServer:
                         },
                     },
                     "required": ["contact_id", "content"],
+                },
+            },
+            {
+                "name": "schedule_appointment",
+                "description": "Agenda uma reunião ou demonstração comercial com um lead/cliente.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "contact_id": {"type": "string", "description": "UUID do contato"},
+                        "title": {"type": "string", "description": "Título/assunto da reunião", "default": "Demonstração Comercial"},
+                        "scheduled_at": {"type": "string", "description": "Data e hora ISO (ex: '2026-10-22T14:00:00')"},
+                        "duration_minutes": {"type": "integer", "description": "Duração em minutos", "default": 30},
+                        "notes": {"type": "string", "description": "Pauta ou anotações preparatórias", "default": ""},
+                    },
+                    "required": ["contact_id", "title"],
+                },
+            },
+            {
+                "name": "get_pipeline_overview",
+                "description": "Retorna o panorama das etapas e negócios em andamento no Funil Kanban.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pipeline_id": {"type": "string", "description": "ID opcional do pipeline específico"},
+                    },
                 },
             },
         ]
@@ -282,6 +307,64 @@ class MCPServer:
                 "success": True,
                 "tool": name,
                 "result": {"message": msg.model_dump()},
+            }
+
+        elif name == "schedule_appointment":
+            contact_id = args["contact_id"]
+            title = args.get("title", "Demonstração Comercial")
+            scheduled_at = args.get("scheduled_at") or "2026-10-22T14:00:00"
+            duration = int(args.get("duration_minutes", 30))
+            notes = args.get("notes", "")
+
+            contact = self.db.get_contact(contact_id)
+            if not contact:
+                return {"success": False, "tool": name, "error": f"Contato '{contact_id}' não encontrado."}
+
+            deal = self.db.get_contact_active_deal(contact_id)
+            appt = self.db.create_appointment(
+                Appointment(
+                    contact_id=contact_id,
+                    deal_id=deal.id if deal else None,
+                    title=title,
+                    scheduled_at=scheduled_at,
+                    duration_minutes=duration,
+                    notes=notes,
+                )
+            )
+            self.db.add_contact_tag(contact_id, "reuniao-agendada")
+            return {
+                "success": True,
+                "tool": name,
+                "result": {"appointment": appt.model_dump(), "contact_name": contact.name},
+            }
+
+        elif name == "get_pipeline_overview":
+            pipelines = self.db.list_pipelines()
+            pipe_id = args.get("pipeline_id") or (pipelines[0].id if pipelines else None)
+            if not pipe_id:
+                return {"success": False, "tool": name, "error": "Nenhum pipeline cadastrado."}
+
+            stages = self.db.list_stages(pipe_id)
+            deals = self.db.list_deals(pipe_id)
+            overview = []
+            for s in stages:
+                stage_deals = [d for d in deals if d.stage_id == s.id]
+                total_val = sum(d.value for d in stage_deals)
+                overview.append({
+                    "stage_id": s.id,
+                    "stage_name": s.name,
+                    "order": s.order,
+                    "deals_count": len(stage_deals),
+                    "total_value": total_val,
+                })
+            return {
+                "success": True,
+                "tool": name,
+                "result": {
+                    "pipeline_id": pipe_id,
+                    "stages": overview,
+                    "total_deals": len(deals),
+                },
             }
 
         raise ValueError(f"Ferramenta MCP desconhecida: {name}")

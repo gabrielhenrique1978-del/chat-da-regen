@@ -2086,7 +2086,9 @@
         move_deal_stage: { contact_id: cid, stage_name: "Proposta Apresentada", value: 997.0 },
         add_contact_tag: { contact_id: cid, tag: "qualificado-mcp" },
         query_knowledge_base: { query: "Quais são os preços e planos?", top_k: 2 },
-        send_chat_message: { contact_id: cid, content: "Olá! Mensagem enviada via protocolo MCP.", sender: "agent" }
+        send_chat_message: { contact_id: cid, content: "Olá! Mensagem enviada via protocolo MCP.", sender: "agent" },
+        schedule_appointment: { contact_id: cid, title: "Apresentação Plano Enterprise", scheduled_at: "2026-10-23T15:00:00", duration_minutes: 30, notes: "Alinhar integração MCP" },
+        get_pipeline_overview: {}
       };
       document.getElementById('mcp-exec-args').value = JSON.stringify(examples[name] || {}, null, 2);
     }

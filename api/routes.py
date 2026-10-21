@@ -583,7 +583,16 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
             "stages": columns,
         }
 
+    @router.get("/stages")
+    def list_stages(pipeline_id: Optional[str] = None):
+        return [s.model_dump() for s in db.list_stages(pipeline_id)]
+
+    @router.get("/deals")
+    def list_deals(pipeline_id: Optional[str] = None):
+        return [d.model_dump() for d in db.list_deals(pipeline_id)]
+
     @router.patch("/deals/{deal_id}/stage")
+    @router.post("/deals/{deal_id}/move")
     async def update_deal_stage(deal_id: str, req: MoveDealStageRequest):
         res = mcp_server.call_tool(
             "move_deal_stage",
@@ -852,10 +861,12 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
     # -----------------------------------------------------------------
 
     @router.get("/kb")
+    @router.get("/knowledge")
     def list_kb():
         return [item.model_dump() for item in db.list_knowledge_items()]
 
     @router.post("/kb")
+    @router.post("/knowledge")
     def create_kb_item(req: CreateKnowledgeRequest):
         item = db.create_knowledge_item(
             KnowledgeItem(
@@ -916,6 +927,7 @@ def create_app(db_path: str = "openchatfunnel.db", seed_demo: bool = True) -> Fa
         return {"tools": mcp_server.list_tools()}
 
     @router.post("/mcp/execute")
+    @router.post("/mcp/call")
     def execute_mcp_tool(req: MCPExecuteRequest):
         try:
             return mcp_server.call_tool(req.name, req.arguments)
