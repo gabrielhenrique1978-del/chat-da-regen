@@ -341,21 +341,59 @@
 
           <!-- Coluna Esquerda: Lista de Leads -->
           <div class="col-span-12 lg:col-span-3 bg-white rounded-xl border border-[#E3E8E5] flex flex-col overflow-hidden">
-            <div class="p-4 border-b border-[#E3E8E5] flex items-center justify-between">
-              <div>
-                <h2 class="text-sm font-bold text-[#1A2B21]">Contatos</h2>
-                <p class="text-[11px] text-[#63756A]">Fila única de atendimento</p>
+            <!-- Topo da Coluna: Título, Canais, Busca e Chips de Status da Fila -->
+            <div class="p-3.5 border-b border-[#E3E8E5] space-y-2.5 bg-white">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-xs font-bold text-[#1A2B21] uppercase tracking-wider">Fila de Atendimento</h2>
+                  <p class="text-[10px] text-[#63756A]">Gerenciamento de conversas</p>
+                </div>
+                <div class="flex gap-1 bg-[#F6F8F7] p-1 rounded-lg border border-[#E3E8E5] text-[11px]">
+                  <button onclick="filterContacts('')" id="ch-all" class="ch-filter px-2 py-0.5 rounded bg-[#243E30] text-white font-medium text-[10px]">Todos</button>
+                  <button onclick="filterContacts('whatsapp')" id="ch-whatsapp" class="ch-filter px-2 py-0.5 rounded text-[#63756A] hover:text-[#1A2B21]" title="WhatsApp">
+                    <i class="fa-brands fa-whatsapp"></i>
+                  </button>
+                  <button onclick="filterContacts('instagram')" id="ch-instagram" class="ch-filter px-2 py-0.5 rounded text-[#63756A] hover:text-[#1A2B21]" title="Instagram">
+                    <i class="fa-brands fa-instagram"></i>
+                  </button>
+                  <button onclick="filterContacts('web')" id="ch-web" class="ch-filter px-2 py-0.5 rounded text-[#63756A] hover:text-[#1A2B21]" title="Web">
+                    <i class="fa-solid fa-globe"></i>
+                  </button>
+                </div>
               </div>
-              <div class="flex gap-1 bg-[#F6F8F7] p-1 rounded-lg border border-[#E3E8E5] text-[11px]">
-                <button onclick="filterContacts('')" id="ch-all" class="ch-filter px-2 py-1 rounded bg-[#243E30] text-white font-medium">Todos</button>
-                <button onclick="filterContacts('whatsapp')" id="ch-whatsapp" class="ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]" title="WhatsApp">
-                  <i class="fa-brands fa-whatsapp"></i>
+
+              <!-- Campo de Busca no Inbox -->
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-[#63756A] text-xs"></i>
+                <input
+                  id="inbox-search-input"
+                  type="text"
+                  placeholder="Buscar lead, fone ou tag..."
+                  oninput="handleGlobalSearch(this.value)"
+                  class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
+                />
+              </div>
+
+              <!-- Chips Rápidos de Status da Fila (Prioridade 1) -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[10px] font-semibold no-scrollbar">
+                <button onclick="filterByStatus('all')" id="status-all" class="status-chip px-2.5 py-1 rounded-full bg-[#243E30] text-white shrink-0 transition flex items-center gap-1 shadow-sm">
+                  <span>Todos</span>
+                  <span id="count-status-all" class="text-[9px] bg-white/20 px-1.5 rounded-full">0</span>
                 </button>
-                <button onclick="filterContacts('instagram')" id="ch-instagram" class="ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]" title="Instagram">
-                  <i class="fa-brands fa-instagram"></i>
+                <button onclick="filterByStatus('waiting')" id="status-waiting" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-amber-50 text-amber-800 border border-amber-200 shrink-0 transition flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  <span>Aguardando</span>
+                  <span id="count-status-waiting" class="text-[9px] bg-amber-100 px-1.5 rounded-full">0</span>
                 </button>
-                <button onclick="filterContacts('web')" id="ch-web" class="ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]" title="Web">
-                  <i class="fa-solid fa-globe"></i>
+                <button onclick="filterByStatus('human')" id="status-human" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-blue-50 text-blue-800 border border-blue-200 shrink-0 transition flex items-center gap-1">
+                  <i class="fa-solid fa-user-check text-[9px]"></i>
+                  <span>Humano</span>
+                  <span id="count-status-human" class="text-[9px] bg-blue-100 px-1.5 rounded-full">0</span>
+                </button>
+                <button onclick="filterByStatus('bot')" id="status-bot" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0 transition flex items-center gap-1">
+                  <i class="fa-solid fa-robot text-[9px]"></i>
+                  <span>IA Ativa</span>
+                  <span id="count-status-bot" class="text-[9px] bg-emerald-100 px-1.5 rounded-full">0</span>
                 </button>
               </div>
             </div>
@@ -441,10 +479,14 @@
             <div id="panel-inbox-attendance" class="flex-1 flex flex-col overflow-hidden relative">
               <div id="feed-attendance" class="flex-1 p-5 overflow-y-auto space-y-3.5 bg-[#F6F8F7]/70"></div>
 
-              <!-- Menu Flutuante de Respostas Rápidas (/atalhos) -->
-              <div id="quick-replies-popup" class="hidden absolute bottom-16 left-5 right-5 bg-white border border-[#E3E8E5] rounded-xl shadow-lg p-3 z-20 max-h-56 overflow-y-auto">
-                <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E3E8E5]">
-                  <span class="text-xs font-bold text-[#243E30]">Respostas Rápidas do Atendente (Templates)</span>
+              <!-- Menu Flutuante de Respostas Rápidas (/atalhos com Autocomplete e Navegação por Teclado) -->
+              <div id="quick-replies-popup" class="hidden absolute bottom-16 left-5 right-5 bg-white border border-[#E3E8E5] rounded-xl shadow-2xl p-3.5 z-30 max-h-64 overflow-y-auto backdrop-blur-md">
+                <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-[#E3E8E5]">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-xs font-bold text-[#243E30]">⚡ Respostas Rápidas & Templates</span>
+                    <span class="text-[10px] text-[#63756A] bg-[#F6F8F7] border border-[#E3E8E5] px-2 py-0.5 rounded font-mono">↑ ↓ navegar • Enter / Tab inserir • Esc fechar</span>
+                  </div>
                   <button onclick="toggleQuickRepliesPopup(false)" class="text-xs text-[#63756A] hover:text-[#1A2B21]"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div id="quick-replies-items" class="space-y-1.5"></div>
@@ -508,9 +550,9 @@
                 <input
                   id="input-attendance"
                   type="text"
-                  placeholder="Responder ao cliente como atendente (ou digite '/' para atalhos)..."
+                  placeholder="Responder ao cliente (digite '/' para respostas rápidas com autocomplete)..."
                   oninput="handleChatInputKey(this.value)"
-                  onkeydown="if(event.key==='Enter') sendAttendanceReply()"
+                  onkeydown="handleChatInputKeyDown(event)"
                   class="flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition"
                 />
 
@@ -1091,6 +1133,9 @@
     let allStages = [];
     let quickRepliesCache = [];
     let draggedDealId = null;
+    let currentStatusFilter = 'all'; // 'all' | 'waiting' | 'human' | 'bot'
+    let selectedSlashIndex = 0;
+    let filteredSlashReplies = [];
 
     const TAB_META = {
       dashboard: {
@@ -1317,22 +1362,80 @@
       }
     }
 
+    function filterByStatus(status) {
+      currentStatusFilter = status;
+      document.querySelectorAll('.status-chip').forEach(b => {
+        b.className = 'status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] border border-[#E3E8E5] shrink-0 transition flex items-center gap-1';
+      });
+      const activeBtn = document.getElementById(`status-${status}`);
+      if (activeBtn) {
+        if (status === 'all') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-[#243E30] text-white shrink-0 transition flex items-center gap-1 shadow-sm';
+        else if (status === 'waiting') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-amber-600 text-white border border-amber-600 shrink-0 transition flex items-center gap-1 shadow-sm';
+        else if (status === 'human') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-blue-600 text-white border border-blue-600 shrink-0 transition flex items-center gap-1 shadow-sm';
+        else if (status === 'bot') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-emerald-700 text-white border border-emerald-700 shrink-0 transition flex items-center gap-1 shadow-sm';
+      }
+      renderContactsList();
+    }
+
     function renderContactsList() {
       const container = document.getElementById('contacts-list');
+      if (!container) return;
+
+      // Contadores dinâmicos dos chips
+      const countAll = allContacts.length;
+      const countWaiting = allContacts.filter(c => c.attendance_status === 'waiting' || (c.tags && c.tags.includes('prioridade-alta'))).length;
+      const countHuman = allContacts.filter(c => c.attendance_status === 'human' || c.ai_enabled === false).length;
+      const countBot = allContacts.filter(c => (c.attendance_status === 'bot' || !c.attendance_status) && c.ai_enabled !== false).length;
+
+      const elAll = document.getElementById('count-status-all');
+      const elWait = document.getElementById('count-status-waiting');
+      const elHum = document.getElementById('count-status-human');
+      const elBot = document.getElementById('count-status-bot');
+      if (elAll) elAll.textContent = countAll;
+      if (elWait) elWait.textContent = countWaiting;
+      if (elHum) elHum.textContent = countHuman;
+      if (elBot) elBot.textContent = countBot;
+
       const filtered = allContacts.filter(c => {
+        // Filtro por Canal
+        if (currentChannelFilter && c.channel !== currentChannelFilter) return false;
+
+        // Filtro por Status da Fila
+        if (currentStatusFilter === 'waiting') {
+          if (c.attendance_status !== 'waiting' && !(c.tags && c.tags.includes('prioridade-alta'))) return false;
+        } else if (currentStatusFilter === 'human') {
+          if (c.attendance_status !== 'human' && c.ai_enabled !== false) return false;
+        } else if (currentStatusFilter === 'bot') {
+          if ((c.attendance_status && c.attendance_status !== 'bot') || c.ai_enabled === false) return false;
+        }
+
+        // Busca textual
         if (!searchFilterText) return true;
         const haystack = `${c.name} ${c.phone || ''} ${c.email || ''} ${(c.tags || []).join(' ')} ${c.stage_name || ''}`.toLowerCase();
         return haystack.includes(searchFilterText);
       });
 
       if (!filtered.length) {
-        container.innerHTML = `<div class="p-6 text-center text-xs text-[#63756A]">Nenhum contato encontrado.</div>`;
+        container.innerHTML = `<div class="p-6 text-center text-xs text-[#63756A] space-y-1">
+          <i class="fa-solid fa-inbox text-lg text-[#63756A]/50"></i>
+          <div>Nenhum contato encontrado nesta fila.</div>
+        </div>`;
         return;
       }
 
       container.innerHTML = filtered.map(c => {
         const isSelected = c.id === currentContactId;
         const stageName = c.stage_name || 'Novo Lead';
+
+        let statusBadge = '';
+        if (c.attendance_status === 'waiting' || (c.tags && c.tags.includes('prioridade-alta'))) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Aguardando</span>`;
+        } else if (c.attendance_status === 'human' || c.ai_enabled === false) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-800 border border-blue-200"><i class="fa-solid fa-user-check text-[8px]"></i>Humano</span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-robot text-[8px]"></i>IA</span>`;
+        }
+
         return `
           <div
             onclick="selectContact('${c.id}')"
@@ -1340,7 +1443,10 @@
           >
             <div class="flex items-center justify-between mb-1">
               <span class="font-semibold text-xs text-[#1A2B21] truncate">${c.name}</span>
-              <span class="text-[10px] font-medium text-[#63756A]">${channelLabel(c.channel)}</span>
+              <div class="flex items-center gap-1.5">
+                ${statusBadge}
+                <span class="text-[10px] font-medium text-[#63756A]">${channelLabel(c.channel)}</span>
+              </div>
             </div>
             <div class="flex items-center justify-between text-[11px] text-[#63756A]">
               <span>${c.phone || c.email || 'Sem telefone'}</span>
@@ -1359,11 +1465,24 @@
     function filterContacts(ch) {
       currentChannelFilter = ch;
       document.querySelectorAll('.ch-filter').forEach(b => {
-        b.className = 'ch-filter px-2 py-1 rounded text-[#63756A] hover:text-[#1A2B21]';
+        b.className = 'ch-filter px-2 py-0.5 rounded text-[#63756A] hover:text-[#1A2B21]';
       });
       const active = document.getElementById(ch ? `ch-${ch}` : 'ch-all');
-      if (active) active.className = 'ch-filter px-2 py-1 rounded bg-[#243E30] text-white font-medium';
+      if (active) active.className = 'ch-filter px-2 py-0.5 rounded bg-[#243E30] text-white font-medium text-[10px]';
       loadContacts(true);
+    }
+
+    function changePlaybackSpeed(btn, speed) {
+      const wrapper = btn.closest('.audio-card-wrapper');
+      if (!wrapper) return;
+      const audio = wrapper.querySelector('audio');
+      if (audio) {
+        audio.playbackRate = speed;
+      }
+      wrapper.querySelectorAll('.speed-pill').forEach(b => {
+        b.className = 'speed-pill px-1.5 py-0.5 rounded font-medium text-[#63756A] hover:text-[#1A2B21] transition';
+      });
+      btn.className = 'speed-pill px-1.5 py-0.5 rounded font-bold bg-[#243E30] text-white transition';
     }
 
     function renderBubbleHtml(m, contactName, invertPerspective = false) {
@@ -1391,10 +1510,18 @@
       if (m.media_type === 'audio') {
         const audioSrc = m.media_url || (m.content && m.content.startsWith('data:audio') ? m.content : '');
         attachmentBlock = `
-          <div class="bg-white/80 p-2.5 rounded-lg mb-2 border border-[#E3E8E5] space-y-1.5">
-            <div class="flex items-center gap-2">
-              <i class="fa-solid fa-microphone text-[#243E30]"></i>
-              <span class="text-[11px] font-semibold text-[#1A2B21]">Mensagem de Voz (PTT)</span>
+          <div class="bg-white/80 p-2.5 rounded-lg mb-2 border border-[#E3E8E5] space-y-1.5 audio-card-wrapper">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-microphone text-[#243E30]"></i>
+                <span class="text-[11px] font-semibold text-[#1A2B21]">Mensagem de Voz (PTT)</span>
+              </div>
+              <!-- Velocímetro de Reprodução 1x / 1.5x / 2x (Prioridade 3) -->
+              <div class="flex items-center gap-1 bg-[#F6F8F7] p-0.5 rounded-md border border-[#E3E8E5] text-[10px]">
+                <button type="button" onclick="changePlaybackSpeed(this, 1.0)" class="speed-pill px-1.5 py-0.5 rounded font-bold bg-[#243E30] text-white transition">1x</button>
+                <button type="button" onclick="changePlaybackSpeed(this, 1.5)" class="speed-pill px-1.5 py-0.5 rounded font-medium text-[#63756A] hover:text-[#1A2B21] transition">1.5x</button>
+                <button type="button" onclick="changePlaybackSpeed(this, 2.0)" class="speed-pill px-1.5 py-0.5 rounded font-medium text-[#63756A] hover:text-[#1A2B21] transition">2x</button>
+              </div>
             </div>
             ${audioSrc ? `<audio controls class="w-full h-8 mt-1" src="${audioSrc}"></audio>` : ''}
           </div>
@@ -1701,29 +1828,52 @@
       toast.classList.remove('hidden');
     }
 
-    // Respostas Rápidas (/atalhos)
+    // ===============================================================
+    // RESPOSTAS RÁPIDAS & SLASH COMMANDS (AUTOCOMPLETE & TECLADO)
+    // ===============================================================
     async function loadQuickReplies() {
       const res = await fetch('/api/quick-replies');
       if (!res.ok) return;
       quickRepliesCache = await res.json();
+      filteredSlashReplies = [...quickRepliesCache];
+      renderSlashMenu();
+    }
+
+    function renderSlashMenu() {
       const box = document.getElementById('quick-replies-items');
-      box.innerHTML = quickRepliesCache.map(qr => `
-        <div onclick="applyQuickReply('${qr.shortcut}')" class="p-2.5 rounded-lg bg-[#F6F8F7] hover:bg-[#EAF2ED] border border-[#E3E8E5] cursor-pointer flex items-center justify-between gap-2 transition">
-          <div>
-            <span class="font-mono text-xs font-bold text-[#243E30]">${qr.shortcut}</span>
-            <span class="text-xs font-semibold text-[#1A2B21] ml-2">${qr.title}</span>
-            <p class="text-[11px] text-[#63756A] truncate max-w-md">${qr.content}</p>
+      if (!box) return;
+      if (!filteredSlashReplies.length) {
+        box.innerHTML = `<div class="p-3 text-center text-xs text-[#63756A] italic">Nenhum atalho encontrado para este comando.</div>`;
+        return;
+      }
+
+      box.innerHTML = filteredSlashReplies.map((qr, idx) => {
+        const isHighlight = idx === selectedSlashIndex;
+        return `
+          <div
+            onclick="applyQuickReply('${qr.shortcut}')"
+            class="p-2.5 rounded-lg border cursor-pointer flex items-center justify-between gap-2 transition ${isHighlight ? 'bg-[#243E30] text-white border-[#243E30] shadow-sm' : 'bg-[#F6F8F7] hover:bg-[#EAF2ED] border-[#E3E8E5] text-[#1A2B21]'}"
+          >
+            <div>
+              <span class="font-mono text-xs font-bold ${isHighlight ? 'text-emerald-300' : 'text-[#243E30]'}">${qr.shortcut}</span>
+              <span class="text-xs font-semibold ml-2 ${isHighlight ? 'text-white' : 'text-[#1A2B21]'}">${qr.title}</span>
+              <p class="text-[11px] truncate max-w-md ${isHighlight ? 'text-white/80' : 'text-[#63756A]'}">${qr.content}</p>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded border ${isHighlight ? 'bg-white/20 border-white/30 text-white' : 'bg-white border-[#E3E8E5] text-[#63756A]'}">${qr.category}</span>
           </div>
-          <span class="text-[10px] bg-white px-2 py-0.5 rounded border border-[#E3E8E5] text-[#63756A]">${qr.category}</span>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function toggleQuickRepliesPopup(forceState) {
       const popup = document.getElementById('quick-replies-popup');
       const show = typeof forceState === 'boolean' ? forceState : popup.classList.contains('hidden');
       if (show) {
-        loadQuickReplies();
+        if (!quickRepliesCache.length) {
+          loadQuickReplies();
+        } else {
+          renderSlashMenu();
+        }
         popup.classList.remove('hidden');
       } else {
         popup.classList.add('hidden');
@@ -1731,8 +1881,54 @@
     }
 
     function handleChatInputKey(val) {
-      if (val.startsWith('/')) toggleQuickRepliesPopup(true);
-      else toggleQuickRepliesPopup(false);
+      if (val.startsWith('/')) {
+        const term = val.slice(1).trim().toLowerCase();
+        filteredSlashReplies = quickRepliesCache.filter(qr =>
+          !term ||
+          qr.shortcut.toLowerCase().includes(term) ||
+          qr.title.toLowerCase().includes(term) ||
+          qr.content.toLowerCase().includes(term)
+        );
+        selectedSlashIndex = 0;
+        renderSlashMenu();
+        toggleQuickRepliesPopup(true);
+      } else {
+        toggleQuickRepliesPopup(false);
+      }
+    }
+
+    function handleChatInputKeyDown(e) {
+      const popup = document.getElementById('quick-replies-popup');
+      const isOpen = popup && !popup.classList.contains('hidden');
+
+      if (isOpen && filteredSlashReplies.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedSlashIndex = (selectedSlashIndex + 1) % filteredSlashReplies.length;
+          renderSlashMenu();
+          return;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedSlashIndex = (selectedSlashIndex - 1 + filteredSlashReplies.length) % filteredSlashReplies.length;
+          renderSlashMenu();
+          return;
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          const chosen = filteredSlashReplies[selectedSlashIndex];
+          if (chosen) {
+            applyQuickReply(chosen.shortcut);
+          }
+          return;
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          toggleQuickRepliesPopup(false);
+          return;
+        }
+      }
+
+      if (e.key === 'Enter') {
+        sendAttendanceReply();
+      }
     }
 
     function applyQuickReply(shortcut) {
