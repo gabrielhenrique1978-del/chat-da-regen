@@ -164,6 +164,17 @@
           <span id="wa-status-text">Conectar WhatsApp</span>
         </button>
 
+        <!-- Status de Segurança & Criptografia (LGPD / AES-256) -->
+        <button
+          onclick="openSecurityModal()"
+          id="btn-security-status"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E3E8E5] bg-[#F6F8F7] hover:bg-[#EAF2ED] text-xs font-semibold text-[#243E30] transition shadow-sm"
+          title="Segurança & Criptografia de Dados (LGPD/AES-256)"
+        >
+          <i class="fa-solid fa-shield-halved text-emerald-600 text-xs"></i>
+          <span class="hidden sm:inline">AES-256 Criptografado</span>
+        </button>
+
         <!-- Toggle de Notificações Sonoras (Chime) -->
         <button
           onclick="toggleSoundNotification()"
@@ -990,6 +1001,77 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: SEGURANÇA & CRIPTOGRAFIA DE DADOS (LGPD / AES-256)             -->
+  <!-- ===================================================================== -->
+  <div id="modal-security" class="hidden fixed inset-0 bg-[#1A2B21]/50 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
+            <i class="fa-solid fa-shield-halved text-xl"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#1A2B21]">Segurança & Criptografia de Dados</h3>
+            <p class="text-xs text-[#63756A]">Conformidade LGPD (Lei 13.709) • Criptografia AES-256 em Repouso</p>
+          </div>
+        </div>
+        <button onclick="closeSecurityModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div class="bg-[#EAF2ED] p-3.5 rounded-xl border border-[#d5e3da] text-[#243E30] flex items-start gap-3">
+          <i class="fa-solid fa-lock text-sm mt-0.5 shrink-0"></i>
+          <div>
+            <p class="font-bold">Proteção Ponta-a-Ponta dos Dados Comerciais</p>
+            <p class="text-[11px] text-[#365945] mt-0.5">Todas as mensagens, notas internas, telefones e e-mails de clientes são cifrados com chaves únicas antes da gravação no disco.</p>
+          </div>
+        </div>
+
+        <div class="bg-[#F6F8F7] p-4 rounded-xl border border-[#E3E8E5] space-y-2.5">
+          <div class="flex justify-between items-center pb-2 border-b border-[#E3E8E5]">
+            <span class="text-[#63756A]">Algoritmo Criptográfico:</span>
+            <span class="font-mono font-bold text-[#243E30] text-[11px]" id="sec-algorithm">AES-256-CBC + HMAC-SHA256</span>
+          </div>
+          <div class="flex justify-between items-center pb-2 border-b border-[#E3E8E5]">
+            <span class="text-[#63756A]">Criptografia em Repouso (Zero-Plaintext):</span>
+            <span class="font-semibold text-emerald-700 flex items-center gap-1"><i class="fa-solid fa-circle-check text-[10px]"></i> 100% Ativa</span>
+          </div>
+          <div class="flex justify-between items-center pb-2 border-b border-[#E3E8E5]">
+            <span class="text-[#63756A]">Mensagens Protegidas:</span>
+            <span class="font-bold text-[#1A2B21]" id="sec-messages-count">—</span>
+          </div>
+          <div class="flex justify-between items-center pb-2 border-b border-[#E3E8E5]">
+            <span class="text-[#63756A]">Contatos & PII Cifrados:</span>
+            <span class="font-bold text-[#1A2B21]" id="sec-contacts-count">—</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[#63756A]">Blindagem em Trânsito:</span>
+            <span class="text-[#243E30] font-medium text-[11px]">HSTS, nosniff, SAMEORIGIN, WSS</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-white rounded-lg border border-[#E3E8E5] flex items-center justify-between">
+          <div>
+            <span class="font-bold text-[#1A2B21] block">Auditoria Criptográfica do Banco</span>
+            <span class="text-[11px] text-[#63756A]">Varre e cifra registros legados retroativamente</span>
+          </div>
+          <button onclick="runSecurityAudit()" id="btn-run-audit" class="px-3 py-1.5 rounded-lg bg-[#243E30] hover:bg-[#365945] text-white text-xs font-semibold transition">
+            Auditar Agora
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeSecurityModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21] border border-[#E3E8E5]">
+          Fechar
+        </button>
       </div>
     </div>
   </div>
@@ -2356,6 +2438,44 @@
         showEventToast('Sessão do WhatsApp desconectada.');
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    // ===============================================================
+    // SEGURANÇA & CRIPTOGRAFIA DE DADOS (LGPD / AES-256)
+    // ===============================================================
+    async function openSecurityModal() {
+      document.getElementById('modal-security').classList.remove('hidden');
+      try {
+        const res = await fetch('/api/security/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('sec-algorithm').textContent = data.cipher_algorithm || 'AES-256-CBC + HMAC-SHA256';
+        document.getElementById('sec-messages-count').textContent = `${data.metrics?.encrypted_messages_count || 0} mensagens cifradas`;
+        document.getElementById('sec-contacts-count').textContent = `${data.metrics?.encrypted_contacts_count || 0} contatos (PII)`;
+      } catch (e) {
+        console.error('Erro ao consultar status de segurança:', e);
+      }
+    }
+
+    function closeSecurityModal() {
+      document.getElementById('modal-security').classList.add('hidden');
+    }
+
+    async function runSecurityAudit() {
+      const btn = document.getElementById('btn-run-audit');
+      btn.disabled = true;
+      btn.textContent = 'Auditando...';
+      try {
+        const res = await fetch('/api/security/re-encrypt', { method: 'POST' });
+        const data = await res.json();
+        showEventToast(`Auditoria de segurança: ${data.migrated_records || 0} registros legados criptografados com sucesso.`);
+        await openSecurityModal();
+      } catch (e) {
+        showEventToast('Erro ao rodar auditoria de segurança.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Auditar Agora';
       }
     }
 

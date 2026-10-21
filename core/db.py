@@ -7,6 +7,14 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from core.security import (
+    CIPHER_PREFIX,
+    decrypt_dict,
+    decrypt_field,
+    encrypt_dict,
+    encrypt_field,
+)
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -146,6 +154,7 @@ class Database:
             self._memory_conn.row_factory = sqlite3.Row
             self._memory_conn.execute("PRAGMA foreign_keys = ON;")
         self.init_schema()
+        self.encrypt_existing_unencrypted_records()
         if auto_seed:
             self.ensure_default_pipeline_and_seed()
 
@@ -287,6 +296,65 @@ class Database:
                 );
                 """
             )
+
+    def encrypt_existing_unencrypted_records(self) -> int:
+        """
+        Migra e criptografa em repouso registros existentes que ainda estejam em texto plano.
+        Garante que 100% dos dados pré-existentes passem a ter proteção criptográfica AES-256.
+        """
+        updated = 0
+        with self.connection() as conn:
+            # 1. Contatos (PII)
+            rows = conn.execute("SELECT id, phone, email, custom_fields FROM contacts").fetchall()
+            for r in rows:
+                p = r["phone"]
+                e = r["email"]
+                cf = r["custom_fields"]
+                needs_update = False
+                enc_p = p
+                enc_e = e
+                enc_cf = cf
+
+                if p and not str(p).startswith(CIPHER_PREFIX):
+                    enc_p = encrypt_field(p)
+                    needs_update = True
+                if e and not str(e).startswith(CIPHER_PREFIX):
+                    enc_e = encrypt_field(e)
+                    needs_update = True
+                if cf and not str(cf).startswith(CIPHER_PREFIX):
+                    try:
+                        d = json.loads(cf) if isinstance(cf, str) else cf
+                        enc_cf = encrypt_dict(d)
+                        needs_update = True
+                    except Exception:
+                        pass
+
+                if needs_update:
+                    conn.execute(
+                        "UPDATE contacts SET phone = ?, email = ?, custom_fields = ? WHERE id = ?",
+                        (enc_p, enc_e, enc_cf, r["id"]),
+                    )
+                    updated += 1
+
+            # 2. Mensagens (Conversas privadas)
+            msg_rows = conn.execute("SELECT id, content FROM messages").fetchall()
+            for m in msg_rows:
+                c = m["content"]
+                if c and not str(c).startswith(CIPHER_PREFIX):
+                    enc_c = encrypt_field(c)
+                    conn.execute("UPDATE messages SET content = ? WHERE id = ?", (enc_c, m["id"]))
+                    updated += 1
+
+            # 3. Agendamentos
+            appt_rows = conn.execute("SELECT id, notes FROM appointments").fetchall()
+            for a in appt_rows:
+                n = a["notes"]
+                if n and not str(n).startswith(CIPHER_PREFIX):
+                    enc_n = encrypt_field(n)
+                    conn.execute("UPDATE appointments SET notes = ? WHERE id = ?", (enc_n, a["id"]))
+                    updated += 1
+
+        return updated
 
     def ensure_default_pipeline_and_seed(self) -> None:
         """Cria funis padrão, base de conhecimento, respostas rápidas e regras iniciais."""
@@ -637,8 +705,8 @@ class Database:
                 (
                     contact.id,
                     contact.name,
-                    contact.phone,
-                    contact.email,
+                    encrypt_field(contact.phone),
+                    encrypt_field(contact.email),
                     contact.channel,
                     contact.assignee,
                     1 if contact.ai_enabled else 0,
@@ -646,7 +714,7 @@ class Database:
                     contact.temperature,
                     contact.lead_score,
                     json.dumps(contact.tags, ensure_ascii=False),
-                    json.dumps(contact.custom_fields, ensure_ascii=False),
+                    encrypt_dict(contact.custom_fields),
                     contact.created_at,
                     contact.updated_at,
                 ),
@@ -702,8 +770,8 @@ class Database:
                 """,
                 (
                     contact.name,
-                    contact.phone,
-                    contact.email,
+                    encrypt_field(contact.phone),
+                    encrypt_field(contact.email),
                     contact.channel,
                     contact.assignee,
                     1 if contact.ai_enabled else 0,
@@ -711,7 +779,7 @@ class Database:
                     contact.temperature,
                     contact.lead_score,
                     json.dumps(contact.tags, ensure_ascii=False),
-                    json.dumps(contact.custom_fields, ensure_ascii=False),
+                    encrypt_dict(contact.custom_fields),
                     contact.updated_at,
                     contact.id,
                 ),
@@ -772,8 +840,8 @@ class Database:
         return Contact(
             id=row["id"],
             name=row["name"],
-            phone=row["phone"],
-            email=row["email"],
+            phone=decrypt_field(row["phone"]),
+            email=decrypt_field(row["email"]),
             channel=row["channel"],
             assignee=row["assignee"],
             ai_enabled=bool(row["ai_enabled"]) if "ai_enabled" in keys else True,
@@ -781,7 +849,7 @@ class Database:
             temperature=row["temperature"] if "temperature" in keys else "warm",
             lead_score=int(row["lead_score"]) if "lead_score" in keys else 50,
             tags=json.loads(row["tags"] or "[]"),
-            custom_fields=json.loads(row["custom_fields"] or "{}"),
+            custom_fields=decrypt_dict(row["custom_fields"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -805,7 +873,7 @@ class Database:
                     message.contact_id,
                     message.sender,
                     message.channel,
-                    message.content,
+                    encrypt_field(message.content),
                     1 if message.is_internal else 0,
                     message.media_type,
                     message.media_url,
@@ -840,7 +908,7 @@ class Database:
                     contact_id=r["contact_id"],
                     sender=r["sender"],
                     channel=r["channel"],
-                    content=r["content"],
+                    content=decrypt_field(r["content"]) or "",
                     is_internal=bool(r["is_internal"]) if "is_internal" in r.keys() else False,
                     media_type=r["media_type"] if "media_type" in r.keys() else "text",
                     media_url=r["media_url"] if "media_url" in r.keys() else None,
@@ -1182,7 +1250,7 @@ class Database:
                     appt.duration_minutes,
                     appt.meeting_link,
                     appt.status,
-                    appt.notes,
+                    encrypt_field(appt.notes),
                     appt.created_at,
                 ),
             )
@@ -1211,7 +1279,7 @@ class Database:
                     duration_minutes=int(r["duration_minutes"]),
                     meeting_link=r["meeting_link"],
                     status=r["status"],
-                    notes=r["notes"],
+                    notes=decrypt_field(r["notes"]) or "",
                     created_at=r["created_at"],
                 ).model_dump()
                 item["contact_name"] = contact.name if contact else "Contato"

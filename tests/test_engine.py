@@ -378,3 +378,84 @@ def test_7_whatsapp_real_connector_and_evolution_webhook():
     julio = next((c for c in contacts_list if "Julio Consultoria" in c["name"]), None)
     assert julio is not None
     assert julio["stage_name"] == "Proposta Apresentada"
+
+
+def test_8_data_encryption_at_rest_and_security_headers():
+    """
+    Garante que todos os dados confidenciais (mensagens, telefones, e-mails, notas)
+    são gravados rigorosamente criptografados (AES + HMAC) no SQLite e que os cabeçalhos
+    de segurança em trânsito estão ativos.
+    """
+    app = create_app(db_path=":memory:", seed_demo=False)
+    client = TestClient(app)
+    db = app.state.db
+
+    # 1. Cria um contato com dados confidenciais
+    contact = db.create_contact(
+        Contact(
+            name="Doutor Carlos Silveira",
+            phone="+55 11 99777-6655",
+            email="carlos.silveira@hospitalar.med.br",
+            custom_fields={"documento": "CPF 123.456.789-00", "plano": "Enterprise"},
+        )
+    )
+
+    # 2. Cria uma mensagem com conteúdo confidencial
+    msg = db.create_message(
+        Message(
+            contact_id=contact.id,
+            sender="contact",
+            content="Dados sigilosos da proposta: Orçamento aprovado de R$ 50.000,00 com pagamento via PIX.",
+        )
+    )
+
+    # 3. VERIFICAÇÃO DE SEGURANÇA EM REPOUSO:
+    # Inspeciona DIRETAMENTE as linhas brutas no SQLite sem passar pelo ORM/decrypter
+    with db.connection() as conn:
+        raw_contact = conn.execute("SELECT phone, email, custom_fields FROM contacts WHERE id = ?", (contact.id,)).fetchone()
+        raw_phone = raw_contact["phone"]
+        raw_email = raw_contact["email"]
+        raw_cf = raw_contact["custom_fields"]
+
+        # O banco NUNCA deve conter o telefone ou e-mail em texto puro!
+        assert raw_phone.startswith("enc:v1:")
+        assert "+55 11 99777-6655" not in raw_phone
+
+        assert raw_email.startswith("enc:v1:")
+        assert "carlos.silveira@hospitalar.med.br" not in raw_email
+
+        assert raw_cf.startswith("enc:v1:")
+        assert "CPF 123.456.789-00" not in raw_cf
+
+        raw_msg = conn.execute("SELECT content FROM messages WHERE id = ?", (msg.id,)).fetchone()
+        raw_content = raw_msg["content"]
+
+        # A mensagem NUNCA deve estar em texto puro no SQLite!
+        assert raw_content.startswith("enc:v1:")
+        assert "Orçamento aprovado de R$ 50.000,00" not in raw_content
+
+    # 4. Transparência para a aplicação autorizada:
+    # A chamada de alto nível descriptografa os dados autenticados
+    loaded_contact = db.get_contact(contact.id)
+    assert loaded_contact.phone == "+55 11 99777-6655"
+    assert loaded_contact.email == "carlos.silveira@hospitalar.med.br"
+    assert loaded_contact.custom_fields["documento"] == "CPF 123.456.789-00"
+
+    loaded_msgs = db.list_messages(contact.id)
+    assert len(loaded_msgs) == 1
+    assert "Orçamento aprovado de R$ 50.000,00" in loaded_msgs[0].content
+
+    # 5. Endpoint de auditoria de segurança
+    sec_resp = client.get("/api/security/status")
+    assert sec_resp.status_code == 200
+    sec_data = sec_resp.json()
+    assert sec_data["status"] == "active"
+    assert sec_data["features"]["data_at_rest_encryption"] is True
+    assert sec_data["metrics"]["active_protection"] is True
+
+    # 6. Cabeçalhos HTTP de proteção contra ataques em trânsito
+    resp = client.get("/api/stats")
+    assert resp.status_code == 200
+    assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+    assert resp.headers.get("X-Frame-Options") == "SAMEORIGIN"
+    assert resp.headers.get("X-Data-Protection") == "OpenChatFunnel-AES256-Encrypted"
