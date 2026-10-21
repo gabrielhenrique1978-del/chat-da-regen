@@ -407,7 +407,7 @@ class Database:
                 ),
                 KnowledgeItem(
                     question="Como funciona a integração com WhatsApp e Instagram?",
-                    answer="O OpenChatFunnel conecta seu WhatsApp e Instagram Direct em uma fila única com anti-fragmentação (debouncer de 2s) e distribuição automática para atendentes humanos ou Agente IA 24/7.",
+                    answer="O Chat da Regen conecta seu WhatsApp e Instagram Direct em uma fila única com anti-fragmentação (debouncer de 2s) e distribuição automática para atendentes humanos ou Agente IA 24/7.",
                     category="Funcionalidades",
                     tags=["whatsapp", "instagram", "canais", "integração", "inbox", "atendimento"],
                 ),
@@ -482,7 +482,7 @@ class Database:
                 QuickReply(
                     shortcut="/boasvindas",
                     title="Boas-vindas Comercial",
-                    content="Olá {{nome}}! Tudo bem? Aqui é da equipe OpenChatFunnel. Como posso ajudar a escalar seu atendimento no WhatsApp e Instagram hoje?",
+                    content="Olá {{nome}}! Tudo bem? Aqui é da equipe Chat da Regen. Como posso ajudar a escalar seu atendimento no WhatsApp e Instagram hoje?",
                     category="Triagem",
                 ),
                 QuickReply(
@@ -545,7 +545,7 @@ class Database:
                 contact_id=c1.id,
                 pipeline_id=sales_pipeline.id,
                 stage_id=stages["Proposta Apresentada"].id,
-                title="Licença OpenChatFunnel Pro - TechNova",
+                title="Licença Chat da Regen Pro - TechNova",
                 value=497.0,
                 status="open",
             )
@@ -678,7 +678,7 @@ class Database:
                 contact_id=c3.id,
                 sender="agent",
                 channel="web",
-                content="Excelente decisão, Roberto! Negócio movido para Fechado Ganho. Bem-vindo ao OpenChatFunnel!",
+                content="Excelente decisão, Roberto! Negócio movido para Fechado Ganho. Bem-vindo ao Chat da Regen!",
             )
         )
 

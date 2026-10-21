@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: openchatfunnel
+    name: chat-da-regen
     env: python
     region: oregon
     plan: free

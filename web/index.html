@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenChatFunnel — Plataforma Executiva de CRM Conversacional & MCP</title>
+  <title>Chat da Regen — Plataforma Executiva de Atendimento & CRM</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -78,8 +78,8 @@
   <!-- ===================================================================== -->
   <aside class="w-20 bg-[#243E30] text-white flex flex-col items-center justify-between py-6 shrink-0 z-40 shadow-sm">
     <div class="flex flex-col items-center gap-6 w-full">
-      <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-xl bg-[#365945] hover:bg-[#416B53] flex items-center justify-center transition shadow-inner border border-white/10" title="OpenChatFunnel">
-        <i class="fa-solid fa-filter-circle-dollar text-white text-lg"></i>
+      <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-xl bg-[#365945] hover:bg-[#416B53] flex items-center justify-center transition shadow-inner border border-white/10" title="Chat da Regen">
+        <i class="fa-solid fa-leaf text-emerald-300 text-lg"></i>
       </button>
 
       <div class="w-8 h-[1px] bg-white/15"></div>
@@ -1403,7 +1403,7 @@
         attachmentBlock = `
           <div class="flex items-center gap-2 bg-white/80 p-2 rounded-lg mb-1.5 border border-[#E3E8E5]">
             <i class="fa-regular fa-file-pdf text-[#243E30]"></i>
-            <span class="text-[11px] font-medium text-[#1A2B21]">Proposta_Comercial_OpenChatFunnel.pdf</span>
+            <span class="text-[11px] font-medium text-[#1A2B21]">Proposta_Comercial_Chat_da_Regen.pdf</span>
           </div>
         `;
       }
@@ -2171,7 +2171,7 @@
     // ===============================================================
     // NOTIFICAÇÕES SONORAS (WEB AUDIO API CHIME)
     // ===============================================================
-    let soundEnabled = localStorage.getItem('openchatfunnel_sound_enabled') !== 'false';
+    let soundEnabled = localStorage.getItem('chat_da_regen_sound_enabled') !== 'false';
 
     function updateSoundIcon() {
       const icon = document.getElementById('sound-icon');
@@ -2188,7 +2188,7 @@
 
     function toggleSoundNotification() {
       soundEnabled = !soundEnabled;
-      localStorage.setItem('openchatfunnel_sound_enabled', soundEnabled ? 'true' : 'false');
+      localStorage.setItem('chat_da_regen_sound_enabled', soundEnabled ? 'true' : 'false');
       updateSoundIcon();
       if (soundEnabled) playChime();
     }

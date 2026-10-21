@@ -202,8 +202,8 @@ class MCPExecuteRequest(BaseModel):
 def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI:
     resolved_db_path = db_path or os.getenv("DATABASE_PATH", "openchatfunnel.db")
     app = FastAPI(
-        title="OpenChatFunnel CRM & MCP Server v2.0",
-        description="Plataforma Open-Source de CRM Conversacional, Kanban Drag & Drop, Handoff Humano, Broadcast, Agenda e Servidor MCP",
+        title="Chat da Regen CRM & MCP Server v2.0",
+        description="Plataforma Executiva de Atendimento, CRM Conversacional, Kanban Drag & Drop, Handoff Humano, Broadcast e Servidor MCP",
         version="2.0.0",
     )
 
@@ -976,6 +976,6 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     def serve_dashboard():
         if web_index_path.exists():
             return FileResponse(web_index_path)
-        return HTMLResponse("<h1>OpenChatFunnel API Online</h1>")
+        return HTMLResponse("<h1>Chat da Regen API Online</h1>")
 
     return app
