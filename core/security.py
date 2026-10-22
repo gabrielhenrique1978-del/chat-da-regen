@@ -1,13 +1,18 @@
 import base64
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
 import logging
 import os
 from pathlib import Path
+import secrets
+import string
 from typing import Any, Dict, Optional
 
+import bcrypt
 from cryptography.fernet import Fernet, InvalidToken
+import jwt
 
 logger = logging.getLogger("openchatfunnel.security")
 
@@ -175,3 +180,91 @@ def get_security_overview() -> Dict[str, Any]:
         },
         "standards": ["LGPD (Lei 13.709/2018)", "GDPR Art. 32", "NIST SP 800-38A"],
     }
+
+
+# =====================================================================
+# Autenticação, Senhas e Tokens JWT
+# =====================================================================
+
+_JWT_SECRET = os.getenv("OPENCHATFUNNEL_SECRET_KEY") or _MASTER_KEY.decode("utf-8")
+JWT_ALGORITHM = "HS256"
+JWT_DEFAULT_EXPIRE_HOURS = 24
+
+
+def hash_password(password: str) -> str:
+    """Gera hash seguro de senha utilizando bcrypt com salt dinâmico."""
+    if not password:
+        raise ValueError("A senha não pode ser vazia.")
+    pw_bytes = password.encode("utf-8")
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(pw_bytes, salt).decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifica se a senha em texto puro corresponde ao hash bcrypt armazenado."""
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception as exc:
+        logger.warning("Falha na validação de hash de senha: %s", exc)
+        return False
+
+
+def generate_secure_password(length: int = 12) -> str:
+    """
+    Gera uma senha temporária aleatória e segura contendo:
+    letras maiúsculas, minúsculas, números e caracteres especiais.
+    """
+    if length < 8:
+        length = 12
+
+    upper = string.ascii_uppercase
+    lower = string.ascii_lowercase
+    digits = string.digits
+    symbols = "!@#$%^&*"
+    all_chars = upper + lower + digits + symbols
+
+    # Garante pelo menos um caractere de cada categoria
+    pwd = [
+        secrets.choice(upper),
+        secrets.choice(lower),
+        secrets.choice(digits),
+        secrets.choice(symbols),
+    ]
+    for _ in range(length - 4):
+        pwd.append(secrets.choice(all_chars))
+
+    # Embaralha a lista para não previsibilidade
+    secrets.SystemRandom().shuffle(pwd)
+    return "".join(pwd)
+
+
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Cria um token JWT assinado criptograficamente com HMAC-SHA256."""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + timedelta(hours=JWT_DEFAULT_EXPIRE_HOURS)
+
+    to_encode.update({"exp": expire, "iat": now})
+    encoded_jwt = jwt.encode(to_encode, _JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+
+def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+    """Decodifica e valida a assinatura e expiração de um token JWT."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, _JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token JWT expirado.")
+        return None
+    except jwt.InvalidTokenError as exc:
+        logger.warning("Token JWT inválido: %s", exc)
+        return None
+

@@ -2,9 +2,20 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from core.db import (
@@ -17,9 +28,17 @@ from core.db import (
     Pipeline,
     QuickReply,
     Stage,
+    User,
     WorkflowRule,
 )
-from core.security import get_security_overview, mask_pii
+from core.security import (
+    create_access_token,
+    decode_access_token,
+    get_security_overview,
+    hash_password,
+    mask_pii,
+    verify_password,
+)
 from engine.agent import ConversationalAgent
 from engine.debouncer import MessageDebouncer
 from engine.mcp import MCPServer
@@ -195,6 +214,72 @@ class MCPExecuteRequest(BaseModel):
 
 
 # =====================================================================
+# Schemas e Dependências de Autenticação & Controle de Acesso
+# =====================================================================
+
+SUSPENSION_MESSAGE = (
+    "Acesso temporariamente suspenso por pendência administrativa ou financeira. "
+    "Entre em contato com o suporte."
+)
+
+oauth2_scheme = HTTPBearer(auto_error=False)
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+def get_current_user(
+    request: Request,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme),
+) -> User:
+    """Extrai e valida o token JWT, buscando o usuário correspondente no banco de dados."""
+    if not creds or not creds.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticação necessária: token Bearer ausente ou inválido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = decode_access_token(creds.credentials)
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido ou expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    db: Database = request.app.state.db
+    user = db.get_user(payload["sub"])
+    if not user:
+        user = db.get_user_by_email(payload["sub"])
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário associado ao token não encontrado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+def get_current_active_user(user: User = Depends(get_current_user)) -> User:
+    """
+    Verifica se o usuário está ativo no banco de dados.
+    Se estiver inativo ou com status 'suspended', aborta imediatamente com HTTP 403.
+    """
+    if not user.is_active or user.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=SUSPENSION_MESSAGE,
+        )
+    return user
+
+
+# =====================================================================
 # Factory de Aplicação e Rotas
 # =====================================================================
 
@@ -231,6 +316,26 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     if seed_demo:
         db.seed_demo_data()
 
+    @app.middleware("http")
+    async def enforce_active_client_middleware(request: Request, call_next):
+        """
+        Interrompe imediatamente requisições de clientes suspensos ou inativos,
+        mesmo se já possuírem um token JWT válido ativo ou com o navegador aberto.
+        """
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            if token:
+                payload = decode_access_token(token)
+                if payload and "sub" in payload:
+                    user = db.get_user(payload["sub"]) or db.get_user_by_email(payload["sub"])
+                    if user and (not user.is_active or user.status == "suspended"):
+                        return JSONResponse(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            content={"detail": SUSPENSION_MESSAGE},
+                        )
+        return await call_next(request)
+
     workflow = WorkflowEngine(db)
     agent = ConversationalAgent(db, workflow)
     mcp_server = MCPServer(db, agent)
@@ -265,6 +370,80 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             ws_manager.disconnect(websocket)
 
     router = APIRouter(prefix="/api")
+
+    # -----------------------------------------------------------------
+    # Autenticação, Troca de Senha e Status de Acesso do Cliente
+    # -----------------------------------------------------------------
+
+    @router.post("/auth/login")
+    def login(req: LoginRequest):
+        """Autentica cliente via email e senha, retornando token JWT e dados do usuário."""
+        email_clean = req.email.strip().lower()
+        user = db.get_user_by_email(email_clean)
+        if not user or not verify_password(req.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Credenciais inválidas: e-mail ou senha incorretos",
+            )
+        if not user.is_active or user.status == "suspended":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=SUSPENSION_MESSAGE,
+            )
+        token = create_access_token(
+            {"sub": user.id, "email": user.email, "client_name": user.client_name}
+        )
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "client_name": user.client_name,
+                "company_name": user.company_name,
+                "is_active": user.is_active,
+                "status": user.status,
+                "must_change_password": user.must_change_password,
+            },
+        }
+
+    @router.get("/auth/me")
+    def get_me(user: User = Depends(get_current_active_user)):
+        """Retorna os dados do cliente autenticado e ativo."""
+        return {
+            "id": user.id,
+            "email": user.email,
+            "client_name": user.client_name,
+            "company_name": user.company_name,
+            "is_active": user.is_active,
+            "status": user.status,
+            "must_change_password": user.must_change_password,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at,
+        }
+
+    @router.post("/auth/change-password")
+    def change_password(
+        req: ChangePasswordRequest,
+        user: User = Depends(get_current_active_user),
+    ):
+        """Permite que o cliente altere sua senha no primeiro acesso ou a qualquer momento."""
+        if not verify_password(req.current_password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Senha atual informada está incorreta",
+            )
+        new_hash = hash_password(req.new_password)
+        updated = db.update_user_password(user.email, new_hash)
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Não foi possível atualizar a senha no banco de dados",
+            )
+        return {
+            "status": "success",
+            "message": "Senha atualizada com sucesso. must_change_password redefinido para False.",
+        }
 
     @router.get("/stats")
     def get_stats():

@@ -138,6 +138,24 @@ class BroadcastCampaign(BaseModel):
     created_at: str = Field(default_factory=utc_now_iso)
 
 
+class User(BaseModel):
+    """
+    Modelo de Usuário / Tenant para provisionamento manual e controle
+    de adimplência/bloqueio imediato.
+    """
+    id: str = Field(default_factory=new_uuid)
+    email: str
+    password_hash: str
+    client_name: str
+    company_name: Optional[str] = None
+    is_active: bool = True
+    status: str = "active"  # "active", "suspended", "canceled"
+    must_change_password: bool = True
+    created_at: str = Field(default_factory=utc_now_iso)
+    updated_at: str = Field(default_factory=utc_now_iso)
+
+
+
 # =====================================================================
 # Camada de Persistência SQLite
 # =====================================================================
@@ -294,6 +312,22 @@ class Database:
                     sent_count INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    client_name TEXT NOT NULL,
+                    company_name TEXT,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    must_change_password INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+                CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
                 """
             )
 
@@ -1424,3 +1458,142 @@ class Database:
                 )
                 for r in rows
             ]
+
+    # -----------------------------------------------------------------
+    # Gestão de Clientes / Usuários & Bloqueio por Inadimplência
+    # -----------------------------------------------------------------
+
+    def create_user(self, user: User) -> User:
+        user.email = user.email.strip().lower()
+        now = utc_now_iso()
+        user.created_at = user.created_at or now
+        user.updated_at = now
+        with self.connection() as conn:
+            row = conn.execute("SELECT id FROM users WHERE lower(email) = lower(?)", (user.email,)).fetchone()
+            if row:
+                raise ValueError(f"Já existe um cliente cadastrado com o e-mail '{user.email}'.")
+            conn.execute(
+                """
+                INSERT INTO users (
+                    id, email, password_hash, client_name, company_name,
+                    is_active, status, must_change_password, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user.id,
+                    user.email,
+                    user.password_hash,
+                    user.client_name,
+                    user.company_name or user.client_name,
+                    1 if user.is_active else 0,
+                    user.status,
+                    1 if user.must_change_password else 0,
+                    user.created_at,
+                    user.updated_at,
+                ),
+            )
+        return user
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        if not email:
+            return None
+        with self.connection() as conn:
+            row = conn.execute("SELECT * FROM users WHERE lower(email) = lower(?)", (email.strip(),)).fetchone()
+            if not row:
+                return None
+            return User(
+                id=row["id"],
+                email=row["email"],
+                password_hash=row["password_hash"],
+                client_name=row["client_name"],
+                company_name=row["company_name"],
+                is_active=bool(row["is_active"]),
+                status=row["status"],
+                must_change_password=bool(row["must_change_password"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
+    def get_user(self, user_id: str) -> Optional[User]:
+        if not user_id:
+            return None
+        with self.connection() as conn:
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if not row:
+                return None
+            return User(
+                id=row["id"],
+                email=row["email"],
+                password_hash=row["password_hash"],
+                client_name=row["client_name"],
+                company_name=row["company_name"],
+                is_active=bool(row["is_active"]),
+                status=row["status"],
+                must_change_password=bool(row["must_change_password"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
+    def update_user_status(self, email: str, is_active: bool, status: str) -> Optional[User]:
+        email_clean = email.strip().lower()
+        now = utc_now_iso()
+        with self.connection() as conn:
+            row = conn.execute("SELECT id FROM users WHERE lower(email) = lower(?)", (email_clean,)).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                """
+                UPDATE users
+                SET is_active = ?, status = ?, updated_at = ?
+                WHERE lower(email) = lower(?)
+                """,
+                (1 if is_active else 0, status, now, email_clean),
+            )
+        return self.get_user_by_email(email_clean)
+
+    def update_user_password(self, email: str, new_password_hash: str) -> Optional[User]:
+        email_clean = email.strip().lower()
+        now = utc_now_iso()
+        with self.connection() as conn:
+            row = conn.execute("SELECT id FROM users WHERE lower(email) = lower(?)", (email_clean,)).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, must_change_password = 0, updated_at = ?
+                WHERE lower(email) = lower(?)
+                """,
+                (new_password_hash, now, email_clean),
+            )
+        return self.get_user_by_email(email_clean)
+
+    def list_users(self) -> List[User]:
+        with self.connection() as conn:
+            rows = conn.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
+            return [
+                User(
+                    id=row["id"],
+                    email=row["email"],
+                    password_hash=row["password_hash"],
+                    client_name=row["client_name"],
+                    company_name=row["company_name"],
+                    is_active=bool(row["is_active"]),
+                    status=row["status"],
+                    must_change_password=bool(row["must_change_password"]),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+                for row in rows
+            ]
+
+    def delete_user_by_email(self, email: str) -> bool:
+        email_clean = email.strip().lower()
+        with self.connection() as conn:
+            row = conn.execute("SELECT id FROM users WHERE lower(email) = lower(?)", (email_clean,)).fetchone()
+            if not row:
+                return False
+            conn.execute("DELETE FROM users WHERE lower(email) = lower(?)", (email_clean,))
+            return True
+
