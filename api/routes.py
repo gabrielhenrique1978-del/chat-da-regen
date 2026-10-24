@@ -27,6 +27,7 @@ from core.db import (
     Message,
     Pipeline,
     QuickReply,
+    Seller,
     Stage,
     User,
     WorkflowRule,
@@ -100,6 +101,20 @@ class HandoffRequest(BaseModel):
     assignee: Optional[str] = None
 
 
+class AssignContactRequest(BaseModel):
+    assignee: str
+    ai_enabled: bool = False
+    attendance_status: str = "human"
+    operator_name: Optional[str] = None
+    transfer_reason: Optional[str] = None
+
+
+class CreateSellerRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
 class TemperatureRequest(BaseModel):
     temperature: str  # hot, warm, cold
     lead_score: Optional[int] = None
@@ -124,6 +139,7 @@ class OutboundMessageRequest(BaseModel):
     contact_id: str
     content: str
     sender: str = "human"
+    sender_name: Optional[str] = None
     is_internal: bool = False
     media_type: str = "text"
     media_url: Optional[str] = None
@@ -233,6 +249,16 @@ class LoginRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+class AdminCreateClientRequest(BaseModel):
+    name: str
+    email: str
+    company: Optional[str] = None
+
+
+class AdminClientEmailRequest(BaseModel):
+    email: str
 
 
 def get_current_user(
@@ -445,6 +471,117 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             "message": "Senha atualizada com sucesso. must_change_password redefinido para False.",
         }
 
+    # -----------------------------------------------------------------
+    # Painel Administrativo de Clientes & Inadimplência (B2B)
+    # -----------------------------------------------------------------
+
+    @router.get("/admin/clients")
+    def list_clients():
+        """Retorna todos os clientes cadastrados com status de liberação de acesso."""
+        users = db.list_users()
+        return {
+            "clients": [
+                {
+                    "id": u.id,
+                    "email": u.email,
+                    "client_name": u.client_name,
+                    "company_name": u.company_name or u.client_name,
+                    "is_active": u.is_active,
+                    "status": u.status,
+                    "must_change_password": u.must_change_password,
+                    "created_at": u.created_at,
+                    "updated_at": u.updated_at,
+                }
+                for u in users
+            ]
+        }
+
+    @router.post("/admin/clients")
+    def create_client(req: AdminCreateClientRequest):
+        """Cria cliente manualmente, gera senha temporária e formata mensagem para WhatsApp."""
+        email_clean = req.email.strip().lower()
+        if not email_clean or "@" not in email_clean:
+            raise HTTPException(status_code=400, detail="E-mail inválido")
+        existing = db.get_user_by_email(email_clean)
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Já existe um cliente cadastrado com o e-mail '{email_clean}'")
+
+        from core.security import generate_secure_password, hash_password
+        temp_pwd = generate_secure_password(12)
+        pwd_hash = hash_password(temp_pwd)
+        company = (req.company or req.name).strip()
+
+        user = User(
+            email=email_clean,
+            password_hash=pwd_hash,
+            client_name=req.name.strip(),
+            company_name=company,
+            is_active=True,
+            status="active",
+            must_change_password=True,
+        )
+        created = db.create_user(user)
+
+        whatsapp_text = (
+            "-------------------------------------------\n"
+            "Cliente criado com sucesso!\n"
+            f"Empresa: {company}\n"
+            f"Login: {email_clean}\n"
+            f"Senha Provisória: {temp_pwd}\n"
+            "Status: Ativo\n"
+            "-------------------------------------------"
+        )
+        return {
+            "client": {
+                "id": created.id,
+                "email": created.email,
+                "client_name": created.client_name,
+                "company_name": created.company_name,
+                "is_active": created.is_active,
+                "status": created.status,
+            },
+            "temporary_password": temp_pwd,
+            "whatsapp_message": whatsapp_text,
+        }
+
+    @router.post("/admin/clients/block")
+    def block_client(req: AdminClientEmailRequest):
+        """Bloqueia imediatamente o cliente por inadimplência."""
+        email_clean = req.email.strip().lower()
+        user = db.get_user_by_email(email_clean)
+        if not user:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        updated = db.update_user_status(email_clean, is_active=False, status="suspended")
+        return {
+            "status": "suspended",
+            "message": f"Cliente {email_clean} bloqueado imediatamente por inadimplência.",
+            "client": {
+                "id": updated.id,
+                "email": updated.email,
+                "is_active": updated.is_active,
+                "status": updated.status,
+            },
+        }
+
+    @router.post("/admin/clients/unblock")
+    def unblock_client(req: AdminClientEmailRequest):
+        """Reativa o acesso do cliente após quitação."""
+        email_clean = req.email.strip().lower()
+        user = db.get_user_by_email(email_clean)
+        if not user:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        updated = db.update_user_status(email_clean, is_active=True, status="active")
+        return {
+            "status": "active",
+            "message": f"Cliente {email_clean} reativado com sucesso. Acesso liberado.",
+            "client": {
+                "id": updated.id,
+                "email": updated.email,
+                "is_active": updated.is_active,
+                "status": updated.status,
+            },
+        }
+
     @router.get("/stats")
     def get_stats():
         contacts = db.list_contacts()
@@ -554,6 +691,83 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         )
         await ws_manager.broadcast_event("handoff_updated", updated.model_dump())
         return updated.model_dump()
+
+    # -----------------------------------------------------------------
+    # Vendedores & Atribuição de Atendimento Multi-Operador (Loja / WhatsApp)
+    # -----------------------------------------------------------------
+
+    @router.get("/sellers")
+    def list_store_sellers():
+        """Retorna a lista de vendedores ativos da loja para distribuição e posse de conversas."""
+        sellers = db.list_sellers()
+        return {"sellers": [s.model_dump() for s in sellers]}
+
+    @router.post("/sellers")
+    def create_store_seller(req: CreateSellerRequest):
+        """Cadastra um novo vendedor na equipe da loja."""
+        if not req.name.strip():
+            raise HTTPException(status_code=400, detail="Nome do vendedor é obrigatório")
+        try:
+            seller = db.create_seller(name=req.name, email=req.email, phone=req.phone)
+            return seller.model_dump()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Erro ao cadastrar vendedor: {exc}")
+
+    @router.patch("/contacts/{contact_id}/assign")
+    async def assign_contact_to_seller(contact_id: str, req: AssignContactRequest):
+        """
+        Fixa ou transfere um cliente para um vendedor da loja,
+        atualizando o status, registrando nota de auditoria e notificando toda a equipe em tempo real.
+        """
+        contact = db.get_contact(contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+        old_assignee = contact.assignee or "Fila de Espera"
+        new_assignee = req.assignee.strip()
+
+        updated = db.set_contact_handoff(
+            contact_id=contact_id,
+            ai_enabled=req.ai_enabled,
+            attendance_status=req.attendance_status,
+            assignee=new_assignee,
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Erro ao atribuir vendedor")
+
+        # Mensagem de auditoria no histórico de notas da equipe
+        if old_assignee in ("Agente IA", "Fila de Espera", "Fila de Espera Humana", None, ""):
+            note_content = (
+                f"🎧 [Atendimento Assumido] O vendedor {new_assignee} assumiu a conversa deste cliente no canal {updated.channel.upper()} da loja. "
+                f"Cliente fixado com este vendedor."
+            )
+        elif old_assignee == new_assignee:
+            note_content = f"👤 [Atendimento Confirmado] Cliente mantido em atendimento com {new_assignee}."
+        else:
+            op = req.operator_name or new_assignee
+            reason = f" Motivo: {req.transfer_reason}" if req.transfer_reason else ""
+            note_content = (
+                f"🔄 [Transferência de Atendimento] Conversa transferida de {old_assignee} para {new_assignee} por {op}.{reason}"
+            )
+
+        db.create_message(
+            Message(
+                contact_id=contact_id,
+                sender="internal",
+                channel=updated.channel,
+                content=note_content,
+                is_internal=True,
+            )
+        )
+
+        # Dispara eventos em tempo real para todos os navegadores da loja conectados via WebSocket
+        payload = updated.model_dump()
+        payload["previous_assignee"] = old_assignee
+        payload["assigned_by"] = req.operator_name or new_assignee
+        await ws_manager.broadcast_event("contact_assigned", payload)
+        await ws_manager.broadcast_event("handoff_updated", payload)
+
+        return payload
 
     @router.patch("/contacts/{contact_id}/temperature")
     async def update_contact_temperature(contact_id: str, req: TemperatureRequest):
@@ -665,6 +879,19 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 media_url=req.media_url,
             )
         )
+
+        # Se um vendedor responder manualmente, fixa o atendimento humano com o vendedor
+        if not req.is_internal and req.sender == "human":
+            seller_to_assign = req.sender_name or contact.assignee
+            if contact.ai_enabled or (contact.assignee in ("Agente IA", "Fila de Espera Humana", "Fila de Espera", None) and seller_to_assign):
+                updated_c = db.set_contact_handoff(
+                    contact_id=req.contact_id,
+                    ai_enabled=False,
+                    attendance_status="human",
+                    assignee=seller_to_assign or "Vendedor",
+                )
+                if updated_c:
+                    await ws_manager.broadcast_event("handoff_updated", updated_c.model_dump())
 
         # Envio em segundo plano para o WhatsApp real se o canal for WhatsApp
         if contact.channel == "whatsapp" and not req.is_internal and contact.phone:
@@ -1161,7 +1388,14 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     @app.get("/", response_class=HTMLResponse)
     def serve_dashboard():
         if web_index_path.exists():
-            return FileResponse(web_index_path)
+            return FileResponse(
+                web_index_path,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         return HTMLResponse("<h1>Chat da Regen API Online</h1>")
 
     return app

@@ -155,6 +155,19 @@ class User(BaseModel):
     updated_at: str = Field(default_factory=utc_now_iso)
 
 
+class Seller(BaseModel):
+    """
+    Modelo de Vendedor / Atendente da Loja para distribuição,
+    posse de conversas e atendimento multi-operador.
+    """
+    id: str = Field(default_factory=new_uuid)
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    active: bool = True
+    created_at: str = Field(default_factory=utc_now_iso)
+
+
 
 # =====================================================================
 # Camada de Persistência SQLite
@@ -328,6 +341,17 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
                 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+                CREATE TABLE IF NOT EXISTS sellers (
+                    id TEXT PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    email TEXT,
+                    phone TEXT,
+                    active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_sellers_name ON sellers(name);
                 """
             )
 
@@ -1596,4 +1620,69 @@ class Database:
                 return False
             conn.execute("DELETE FROM users WHERE lower(email) = lower(?)", (email_clean,))
             return True
+
+    # -----------------------------------------------------------------
+    # Vendedores & Atendentes da Loja (Multi-Operador)
+    # -----------------------------------------------------------------
+
+    def list_sellers(self) -> List[Seller]:
+        """Retorna todos os vendedores ativos da loja, populando a equipe inicial se vazia."""
+        with self.connection() as conn:
+            rows = conn.execute("SELECT * FROM sellers WHERE active = 1 ORDER BY name ASC").fetchall()
+            if not rows:
+                default_team = [
+                    "Lucas Silva",
+                    "Camila Santos",
+                    "Matheus Oliveira",
+                    "Juliana Costa",
+                    "Gabriel Henrique",
+                ]
+                now = utc_now_iso()
+                for name in default_team:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO sellers (id, name, active, created_at) VALUES (?, ?, 1, ?)",
+                        (new_uuid(), name, now),
+                    )
+                rows = conn.execute("SELECT * FROM sellers WHERE active = 1 ORDER BY name ASC").fetchall()
+
+            return [
+                Seller(
+                    id=row["id"],
+                    name=row["name"],
+                    email=row["email"],
+                    phone=row["phone"],
+                    active=bool(row["active"]),
+                    created_at=row["created_at"],
+                )
+                for row in rows
+            ]
+
+    def create_seller(self, name: str, email: Optional[str] = None, phone: Optional[str] = None) -> Seller:
+        """Cadastra um novo vendedor na loja."""
+        clean_name = name.strip()
+        seller = Seller(name=clean_name, email=email, phone=phone)
+        with self.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO sellers (id, name, email, phone, active, created_at)
+                VALUES (?, ?, ?, ?, 1, ?)
+                """,
+                (seller.id, seller.name, seller.email, seller.phone, seller.created_at),
+            )
+        return seller
+
+    def get_seller_by_name(self, name: str) -> Optional[Seller]:
+        """Busca vendedor por nome."""
+        with self.connection() as conn:
+            row = conn.execute("SELECT * FROM sellers WHERE lower(name) = lower(?)", (name.strip(),)).fetchone()
+            if not row:
+                return None
+            return Seller(
+                id=row["id"],
+                name=row["name"],
+                email=row["email"],
+                phone=row["phone"],
+                active=bool(row["active"]),
+                created_at=row["created_at"],
+            )
 

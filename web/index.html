@@ -86,14 +86,14 @@
 
       <!-- Ícones de Navegação Vertical com Tooltips -->
       <nav class="flex flex-col items-center gap-2.5 w-full px-3">
-        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition bg-[#365945] text-white shadow-sm">
-          <i class="fa-solid fa-chart-pie text-[17px]"></i>
-          <span class="nav-tooltip">📊 Dashboard & Métricas</span>
-        </button>
-
-        <button onclick="switchTab('inbox')" id="nav-inbox" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+        <button onclick="switchTab('inbox')" id="nav-inbox" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition bg-[#365945] text-white shadow-sm">
           <i class="fa-regular fa-comments text-[18px]"></i>
           <span class="nav-tooltip">💬 Inbox & Atendimento</span>
+        </button>
+
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-solid fa-chart-pie text-[17px]"></i>
+          <span class="nav-tooltip">📊 Dashboard & Métricas</span>
         </button>
 
         <button onclick="switchTab('kanban')" id="nav-kanban" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
@@ -114,6 +114,11 @@
         <button onclick="switchTab('mcp')" id="nav-mcp" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
           <i class="fa-solid fa-robot text-[17px]"></i>
           <span class="nav-tooltip">🤖 MCP Tools</span>
+        </button>
+
+        <button onclick="openClientsAdminModal()" id="nav-clients" class="nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60">
+          <i class="fa-solid fa-users-gear text-[17px]"></i>
+          <span class="nav-tooltip">👥 Clientes & Inadimplência (B2B)</span>
         </button>
       </nav>
     </div>
@@ -142,13 +147,58 @@
   <div class="flex-1 flex flex-col h-full overflow-hidden">
 
     <!-- Cabeçalho Superior Limpo (#FFFFFF com borda #E3E8E5) -->
-    <header class="h-16 bg-white border-b border-[#E3E8E5] px-8 flex items-center justify-between shrink-0">
-      <div>
-        <h1 id="header-title" class="text-lg font-bold text-[#1A2B21] tracking-tight">Visão Geral & Métricas</h1>
-        <p id="header-subtitle" class="text-xs text-[#63756A]">Acompanhamento executivo de atendimento, pipeline comercial e inteligência</p>
+    <header class="h-16 bg-white border-b border-[#E3E8E5] px-6 lg:px-8 flex items-center justify-between shrink-0 gap-4">
+      <div class="flex items-center gap-6">
+        <div>
+          <h1 id="header-title" class="text-base lg:text-lg font-bold text-[#1A2B21] tracking-tight">Central de Atendimento Omnichannel</h1>
+          <p id="header-subtitle" class="text-[11px] lg:text-xs text-[#63756A]">Atendimento ao cliente com fixação de vendedor, notas internas e simulador</p>
+        </div>
+
+        <!-- Abas Principais no Topo (Acesso Imediato) -->
+        <div class="hidden md:flex items-center gap-1 bg-[#F6F8F7] p-1 rounded-xl border border-[#E3E8E5]">
+          <button onclick="switchTab('inbox')" id="top-tab-inbox" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-[#243E30] text-white shadow-xs">
+            <i class="fa-regular fa-comments text-xs"></i>
+            <span>Atendimento & Vendedores</span>
+          </button>
+          <button onclick="switchTab('dashboard')" id="top-tab-dashboard" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#63756A] hover:text-[#1A2B21] transition flex items-center gap-1.5">
+            <i class="fa-solid fa-chart-pie text-xs"></i>
+            <span>Dashboard</span>
+          </button>
+          <button onclick="switchTab('kanban')" id="top-tab-kanban" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#63756A] hover:text-[#1A2B21] transition flex items-center gap-1.5">
+            <i class="fa-solid fa-table-columns text-xs"></i>
+            <span>Funil</span>
+          </button>
+        </div>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2.5">
+        <!-- Seletor do Vendedor Ativo da Loja (Multi-Operador) -->
+        <div class="flex items-center gap-2 bg-[#EAF2ED] border border-[#cbe1d3] px-3 py-1.5 rounded-lg shadow-xs">
+          <div class="w-6 h-6 rounded-full bg-[#243E30] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+            <span id="active-seller-initials">LS</span>
+          </div>
+          <div class="flex flex-col text-left">
+            <span class="text-[8px] text-[#365945] uppercase font-bold tracking-wider leading-none">Você está como</span>
+            <select id="active-seller-select" onchange="changeActiveSeller(this.value)" class="bg-transparent text-xs font-bold text-[#1A2B21] focus:outline-none cursor-pointer">
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+          <button onclick="promptNewSeller()" title="Adicionar novo vendedor à equipe da loja" class="text-[#365945] hover:text-[#243E30] text-xs p-1 rounded hover:bg-white transition">
+            <i class="fa-solid fa-user-plus"></i>
+          </button>
+        </div>
+
+        <!-- Botão Gestão de Clientes & Inadimplência (B2B) -->
+        <button
+          onclick="openClientsAdminModal()"
+          id="btn-clients-admin"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-950 transition shadow-sm"
+          title="Gerenciamento de Clientes B2B, Senhas Provisórias e Bloqueio de Inadimplência"
+        >
+          <i class="fa-solid fa-users-gear text-emerald-700 text-sm"></i>
+          <span class="inline">Clientes & Inadimplência</span>
+        </button>
+
         <!-- Status & Conexão WhatsApp Real (Evolution API) -->
         <button
           onclick="openWhatsAppModal()"
@@ -283,7 +333,43 @@
       <!-- ================================================================= -->
       <!-- VIEW 1: DASHBOARD EXECUTIVO                                       -->
       <!-- ================================================================= -->
-      <section id="view-dashboard" class="view-section space-y-6">
+      <section id="view-dashboard" class="view-section hidden space-y-6">
+
+        <!-- Destaques Operacionais: Vendedores & Gestão de Clientes B2B -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-gradient-to-r from-[#EAF2ED] to-white p-5 rounded-xl border border-[#cbe1d3] flex items-center justify-between">
+            <div class="flex items-center gap-3.5">
+              <div class="w-11 h-11 rounded-xl bg-[#243E30] text-white flex items-center justify-center text-lg shadow-sm">
+                <i class="fa-solid fa-users-viewfinder"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-[#1A2B21]">Equipe de Vendedores da Loja</h3>
+                <p class="text-xs text-[#63756A]">Multi-atendentes operando no mesmo WhatsApp com posse e badges</p>
+              </div>
+            </div>
+            <button onclick="switchTab('inbox')" class="px-4 py-2 rounded-lg bg-[#243E30] hover:bg-[#365945] text-white text-xs font-bold transition flex items-center gap-2 shadow-sm">
+              <i class="fa-regular fa-comments"></i>
+              <span>Abrir Fila & Chat</span>
+            </button>
+          </div>
+
+          <div class="bg-gradient-to-r from-emerald-50 to-white p-5 rounded-xl border border-emerald-300 flex items-center justify-between">
+            <div class="flex items-center gap-3.5">
+              <div class="w-11 h-11 rounded-xl bg-emerald-700 text-white flex items-center justify-center text-lg shadow-sm">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-[#1A2B21]">Clientes B2B & Inadimplência</h3>
+                <p class="text-xs text-[#63756A]">Provisionamento manual, senhas WhatsApp e bloqueio HTTP 403</p>
+              </div>
+            </div>
+            <button onclick="openClientsAdminModal()" class="px-4 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold transition flex items-center gap-2 shadow-sm">
+              <i class="fa-solid fa-users-gear"></i>
+              <span>Gerenciar Clientes</span>
+            </button>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div class="lg:col-span-7 bg-white rounded-xl border border-[#E3E8E5] p-6 flex flex-col justify-between">
             <div>
@@ -336,7 +422,7 @@
       <!--   2) Notas Internas da Equipe (Thread Privada)                    -->
       <!--   3) Simulador do Cliente (Inbound + Debouncer)                   -->
       <!-- ================================================================= -->
-      <section id="view-inbox" class="view-section hidden">
+      <section id="view-inbox" class="view-section">
         <div class="grid grid-cols-12 gap-5 h-[calc(100vh-15.5rem)] min-h-[560px]">
 
           <!-- Coluna Esquerda: Lista de Leads -->
@@ -362,6 +448,21 @@
                 </div>
               </div>
 
+              <!-- Atendente Ativo da Loja (Cartão Visível na Fila de Atendimento) -->
+              <div class="bg-[#EAF2ED] p-2.5 rounded-lg border border-[#cbe1d3] flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-[#243E30] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                    <span id="active-seller-initials-inbox">LS</span>
+                  </div>
+                  <div class="flex flex-col text-left">
+                    <span class="text-[9px] text-[#365945] font-bold uppercase tracking-wider">Atendente Operando:</span>
+                    <select id="active-seller-select-inbox" onchange="changeActiveSeller(this.value)" class="bg-transparent text-xs font-bold text-[#243E30] focus:outline-none cursor-pointer">
+                    </select>
+                  </div>
+                </div>
+                <button onclick="promptNewSeller()" class="text-[11px] text-[#243E30] font-bold hover:underline" title="Cadastrar novo vendedor">+ Equipe</button>
+              </div>
+
               <!-- Campo de Busca no Inbox -->
               <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-[#63756A] text-xs"></i>
@@ -374,26 +475,31 @@
                 />
               </div>
 
-              <!-- Chips Rápidos de Status da Fila (Prioridade 1) -->
+              <!-- Chips Rápidos de Status da Fila com Filtro de Vendedor -->
               <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[10px] font-semibold no-scrollbar">
                 <button onclick="filterByStatus('all')" id="status-all" class="status-chip px-2.5 py-1 rounded-full bg-[#243E30] text-white shrink-0 transition flex items-center gap-1 shadow-sm">
                   <span>Todos</span>
                   <span id="count-status-all" class="text-[9px] bg-white/20 px-1.5 rounded-full">0</span>
                 </button>
+                <button onclick="filterByStatus('mine')" id="status-mine" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-emerald-50 text-emerald-900 border border-emerald-300 shrink-0 transition flex items-center gap-1">
+                  <i class="fa-solid fa-user-check text-[9px]"></i>
+                  <span>Meus</span>
+                  <span id="count-status-mine" class="text-[9px] bg-emerald-100 text-emerald-900 px-1.5 rounded-full font-bold">0</span>
+                </button>
                 <button onclick="filterByStatus('waiting')" id="status-waiting" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-amber-50 text-amber-800 border border-amber-200 shrink-0 transition flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                  <span>Aguardando</span>
+                  <span>Fila (Livre)</span>
                   <span id="count-status-waiting" class="text-[9px] bg-amber-100 px-1.5 rounded-full">0</span>
                 </button>
-                <button onclick="filterByStatus('human')" id="status-human" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-blue-50 text-blue-800 border border-blue-200 shrink-0 transition flex items-center gap-1">
-                  <i class="fa-solid fa-user-check text-[9px]"></i>
-                  <span>Humano</span>
-                  <span id="count-status-human" class="text-[9px] bg-blue-100 px-1.5 rounded-full">0</span>
+                <button onclick="filterByStatus('others')" id="status-others" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-indigo-50 text-indigo-800 border border-indigo-200 shrink-0 transition flex items-center gap-1">
+                  <i class="fa-solid fa-user-tag text-[9px]"></i>
+                  <span>Outros</span>
+                  <span id="count-status-others" class="text-[9px] bg-indigo-100 px-1.5 rounded-full">0</span>
                 </button>
-                <button onclick="filterByStatus('bot')" id="status-bot" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0 transition flex items-center gap-1">
+                <button onclick="filterByStatus('bot')" id="status-bot" class="status-chip px-2.5 py-1 rounded-full bg-[#F6F8F7] hover:bg-zinc-100 text-[#63756A] border border-[#E3E8E5] shrink-0 transition flex items-center gap-1">
                   <i class="fa-solid fa-robot text-[9px]"></i>
-                  <span>IA Ativa</span>
-                  <span id="count-status-bot" class="text-[9px] bg-emerald-100 px-1.5 rounded-full">0</span>
+                  <span>IA</span>
+                  <span id="count-status-bot" class="text-[9px] bg-zinc-200 px-1.5 rounded-full">0</span>
                 </button>
               </div>
             </div>
@@ -416,17 +522,24 @@
                       <h3 id="chat-contact-name" class="font-bold text-sm text-[#1A2B21]">Selecione um contato</h3>
                       <span id="chat-channel-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#EAF2ED] text-[#243E30]"></span>
                     </div>
-                    <p id="chat-stage-banner" class="text-xs text-[#63756A]">Estágio no Funil: —</p>
+                    <div class="flex items-center gap-2 text-xs text-[#63756A]">
+                      <span id="chat-stage-banner">Estágio no Funil: —</span>
+                      <span class="text-[#E3E8E5]">•</span>
+                      <span id="chat-assignee-banner" class="font-medium text-[#243E30]">Vendedor: —</span>
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  onclick="toggleHumanHandoff()"
-                  id="btn-handoff"
-                  class="text-xs bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] font-semibold px-3 py-1.5 rounded-lg transition"
-                >
-                  <span id="btn-handoff-label">Assumir Atendimento</span>
-                </button>
+                <!-- Ações Dinâmicas de Atendimento / Posse de Conversa -->
+                <div id="chat-assignee-actions" class="flex items-center gap-2">
+                  <button
+                    onclick="toggleHumanHandoff()"
+                    id="btn-handoff"
+                    class="text-xs bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#1A2B21] border border-[#E3E8E5] font-semibold px-3 py-1.5 rounded-lg transition"
+                  >
+                    <span id="btn-handoff-label">Assumir Atendimento</span>
+                  </button>
+                </div>
               </div>
 
               <!-- Abas de Separação Estrita das 3 Conversas -->
@@ -563,6 +676,11 @@
                   <span>Responder</span>
                   <i class="fa-solid fa-paper-plane text-[10px]"></i>
                 </button>
+              </div>
+
+              <div class="px-5 py-1 text-[10px] text-[#63756A] flex items-center justify-between bg-white border-t border-[#F0F2F1]">
+                <span><i class="fa-solid fa-user-pen mr-1 text-[#243E30]"></i> Enviando como: <strong id="chat-sender-identity" class="text-[#243E30]">Lucas Silva</strong> (Vendedor) via WhatsApp da Loja</span>
+                <span class="text-[#63756A] hidden sm:inline"><i class="fa-solid fa-headset text-[9px] mr-1"></i> Atendimento Humano Direto</span>
               </div>
             </div>
 
@@ -1140,10 +1258,177 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL: TRANSFERÊNCIA DE CLIENTE ENTRE VENDEDORES                      -->
+  <!-- ===================================================================== -->
+  <div id="modal-transfer" class="hidden fixed inset-0 bg-[#1A2B21]/50 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center border border-indigo-200">
+            <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-[#1A2B21]">Transferir Atendimento</h3>
+            <p class="text-[11px] text-[#63756A]">Passar a responsabilidade deste cliente para outro colega</p>
+          </div>
+        </div>
+        <button onclick="closeTransferModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-[#1A2B21] mb-1">Cliente Selecionado</label>
+          <div id="transfer-modal-contact-name" class="p-2.5 bg-[#F6F8F7] rounded-lg border border-[#E3E8E5] font-bold text-[#243E30]">—</div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-[#1A2B21] mb-1">Transferir para o Vendedor</label>
+          <select id="transfer-target-seller" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]">
+            <!-- Preenchido dinamicamente com os colegas da loja -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-[#1A2B21] mb-1">Motivo / Recado Interno (Opcional)</label>
+          <textarea id="transfer-reason" rows="2" placeholder="Ex: Cliente solicitou orçamento presencial na loja com você..." class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-[#E3E8E5]">
+        <button onclick="closeTransferModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21] border border-[#E3E8E5]">
+          Cancelar
+        </button>
+        <button onclick="confirmTransfer()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-[#243E30] hover:bg-[#365945] text-white flex items-center gap-2 shadow-sm">
+          <i class="fa-solid fa-check text-xs"></i>
+          <span>Confirmar Transferência</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: GESTÃO DE CLIENTES B2B & INADIMPLÊNCIA                         -->
+  <!-- ===================================================================== -->
+  <div id="modal-clients-admin" class="hidden fixed inset-0 bg-[#1A2B21]/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-3xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[#EAF2ED] text-[#243E30] flex items-center justify-center border border-[#cbe1d3]">
+            <i class="fa-solid fa-users-gear text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#1A2B21]">Gestão de Clientes B2B & Controle de Inadimplência</h3>
+            <p class="text-xs text-[#63756A]">Provisionamento manual de contas, senhas provisórias e bloqueio imediato</p>
+          </div>
+        </div>
+        <button onclick="closeClientsAdminModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Abas Internas do Modal: 1) Lista de Clientes | 2) Novo Cliente | 3) Teste 403 -->
+      <div class="flex items-center gap-2 border-b border-[#E3E8E5] pb-2 text-xs font-semibold">
+        <button onclick="switchClientsModalTab('list')" id="tab-btn-client-list" class="px-3 py-1.5 rounded-lg bg-[#243E30] text-white">
+          <i class="fa-solid fa-list mr-1"></i> Clientes Cadastrados (<span id="clients-count-badge">0</span>)
+        </button>
+        <button onclick="switchClientsModalTab('create')" id="tab-btn-client-create" class="px-3 py-1.5 rounded-lg bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#1A2B21]">
+          <i class="fa-solid fa-user-plus mr-1"></i> Provisionar Novo Cliente
+        </button>
+        <button onclick="switchClientsModalTab('test')" id="tab-btn-client-test" class="px-3 py-1.5 rounded-lg bg-[#F6F8F7] hover:bg-amber-50 text-[#63756A] hover:text-amber-800">
+          <i class="fa-solid fa-shield-halved mr-1"></i> Simular Bloqueio 403
+        </button>
+      </div>
+
+      <!-- Conteúdo 1: Tabela de Clientes -->
+      <div id="clients-tab-list" class="flex-1 overflow-y-auto space-y-3">
+        <div class="overflow-x-auto border border-[#E3E8E5] rounded-xl">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-[#F6F8F7] text-[#63756A] uppercase font-bold text-[10px] border-b border-[#E3E8E5]">
+              <tr>
+                <th class="p-3">Empresa / Cliente</th>
+                <th class="p-3">E-mail (Login)</th>
+                <th class="p-3">Status de Acesso</th>
+                <th class="p-3 text-right">Ação Imediata</th>
+              </tr>
+            </thead>
+            <tbody id="clients-table-body" class="divide-y divide-[#E3E8E5]">
+              <tr><td colspan="4" class="p-6 text-center text-[#63756A]">Carregando clientes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Conteúdo 2: Formulário de Criação -->
+      <div id="clients-tab-create" class="hidden space-y-4">
+        <div class="bg-[#F6F8F7] p-4 rounded-xl border border-[#E3E8E5] space-y-3">
+          <h4 class="font-bold text-xs text-[#1A2B21]">Dados do Novo Cliente B2B</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-[#63756A] mb-1">Nome do Responsável</label>
+              <input id="new-client-name" type="text" placeholder="Ex: Roberto Silva" class="w-full bg-white border border-[#E3E8E5] rounded-lg p-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-[#63756A] mb-1">Nome da Empresa</label>
+              <input id="new-client-company" type="text" placeholder="Ex: Ótica Visão Ltda" class="w-full bg-white border border-[#E3E8E5] rounded-lg p-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-[#63756A] mb-1">E-mail de Login Único</label>
+            <input id="new-client-email" type="email" placeholder="cliente@empresa.com.br" class="w-full bg-white border border-[#E3E8E5] rounded-lg p-2.5 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+          </div>
+          <button onclick="submitCreateClient()" class="bg-[#243E30] hover:bg-[#365945] text-white font-bold py-2.5 px-4 rounded-lg text-xs transition flex items-center gap-2 shadow-sm">
+            <i class="fa-solid fa-key text-xs"></i>
+            <span>Gerar Senha e Cadastrar Cliente</span>
+          </button>
+        </div>
+
+        <!-- Card de Mensagem Pronta para WhatsApp -->
+        <div id="client-whatsapp-result" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-900 flex items-center gap-1.5"><i class="fa-brands fa-whatsapp text-emerald-600"></i> Texto Pronto para Enviar ao Cliente:</span>
+            <button onclick="copyClientWhatsAppMsg()" class="text-xs font-bold text-emerald-800 bg-white border border-emerald-300 px-2.5 py-1 rounded hover:bg-emerald-100 transition">
+              <i class="fa-regular fa-copy mr-1"></i> Copiar Mensagem
+            </button>
+          </div>
+          <pre id="client-whatsapp-text" class="text-xs font-mono bg-white p-3 rounded-lg border border-emerald-200 text-emerald-950 overflow-x-auto whitespace-pre-wrap"></pre>
+        </div>
+      </div>
+
+      <!-- Conteúdo 3: Simulação de Bloqueio 403 -->
+      <div id="clients-tab-test" class="hidden space-y-3">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs space-y-2">
+          <h4 class="font-bold text-amber-900 flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-amber-600"></i> Teste de Bloqueio Imediato por Inadimplência</h4>
+          <p class="text-amber-800 leading-relaxed">
+            Quando você bloqueia um cliente por atraso de pagamento, qualquer requisição dele ao sistema é imediatamente abortada pela API com HTTP 403 Forbidden.
+          </p>
+          <div class="pt-2 flex items-center gap-2">
+            <input id="test-block-email" type="email" placeholder="E-mail do cliente suspenso a testar" class="bg-white border border-amber-300 rounded-lg p-2 text-xs text-[#1A2B21] flex-1" />
+            <button onclick="runTestBlockCheck()" class="bg-amber-800 hover:bg-amber-900 text-white font-bold px-3 py-2 rounded-lg text-xs transition">
+              Disparar Requisição de Teste
+            </button>
+          </div>
+          <div id="test-block-output" class="hidden bg-white border border-amber-200 rounded-lg p-3 text-xs font-mono"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-[#E3E8E5]">
+        <span class="text-[11px] text-[#63756A] flex items-center gap-1">
+          <i class="fa-solid fa-terminal text-[10px]"></i> Também gerenciável via CLI: <code class="bg-[#F6F8F7] px-1.5 py-0.5 rounded text-[#243E30]">python manage_clients.py</code>
+        </span>
+        <button onclick="closeClientsAdminModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21] border border-[#E3E8E5]">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- LÓGICA DE INTEGRAÇÃO REST E ESTADO DA APLICAÇÃO                       -->
   <!-- ===================================================================== -->
   <script>
-    let currentTab = 'dashboard';
+    let currentTab = 'inbox';
     let currentInboxChannel = 'attendance'; // 'attendance' | 'notes' | 'simulator'
     let currentContactId = null;
     let currentContactObj = null;
@@ -1152,9 +1437,11 @@
     let searchFilterText = '';
     let allContacts = [];
     let allStages = [];
+    let allSellers = [];
+    let currentSellerName = localStorage.getItem('openchatfunnel_active_seller') || 'Lucas Silva';
     let quickRepliesCache = [];
     let draggedDealId = null;
-    let currentStatusFilter = 'all'; // 'all' | 'waiting' | 'human' | 'bot'
+    let currentStatusFilter = 'all'; // 'all' | 'mine' | 'waiting' | 'others' | 'bot'
     let selectedSlashIndex = 0;
     let filteredSlashReplies = [];
 
@@ -1224,6 +1511,17 @@
           btn.className = 'nav-item w-12 h-12 rounded-xl flex items-center justify-center transition bg-[#365945] text-white shadow-sm';
         } else {
           btn.className = 'nav-item w-12 h-12 rounded-xl flex items-center justify-center transition text-white/70 hover:text-white hover:bg-[#365945]/60';
+        }
+      });
+
+      ['inbox', 'dashboard', 'kanban'].forEach(t => {
+        const topBtn = document.getElementById(`top-tab-${t}`);
+        if (topBtn) {
+          if (t === tab) {
+            topBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-[#243E30] text-white shadow-xs';
+          } else {
+            topBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-[#63756A] hover:text-[#1A2B21] transition flex items-center gap-1.5';
+          }
         }
       });
 
@@ -1391,9 +1689,10 @@
       const activeBtn = document.getElementById(`status-${status}`);
       if (activeBtn) {
         if (status === 'all') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-[#243E30] text-white shrink-0 transition flex items-center gap-1 shadow-sm';
+        else if (status === 'mine') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-emerald-700 text-white border border-emerald-700 shrink-0 transition flex items-center gap-1 shadow-sm';
         else if (status === 'waiting') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-amber-600 text-white border border-amber-600 shrink-0 transition flex items-center gap-1 shadow-sm';
-        else if (status === 'human') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-blue-600 text-white border border-blue-600 shrink-0 transition flex items-center gap-1 shadow-sm';
-        else if (status === 'bot') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-emerald-700 text-white border border-emerald-700 shrink-0 transition flex items-center gap-1 shadow-sm';
+        else if (status === 'others') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-indigo-700 text-white border border-indigo-700 shrink-0 transition flex items-center gap-1 shadow-sm';
+        else if (status === 'bot') activeBtn.className = 'status-chip px-2.5 py-1 rounded-full bg-zinc-700 text-white border border-zinc-700 shrink-0 transition flex items-center gap-1 shadow-sm';
       }
       renderContactsList();
     }
@@ -1404,35 +1703,40 @@
 
       // Contadores dinâmicos dos chips
       const countAll = allContacts.length;
-      const countWaiting = allContacts.filter(c => c.attendance_status === 'waiting' || (c.tags && c.tags.includes('prioridade-alta'))).length;
-      const countHuman = allContacts.filter(c => c.attendance_status === 'human' || c.ai_enabled === false).length;
+      const countMine = allContacts.filter(c => (c.attendance_status === 'human' || c.ai_enabled === false) && c.assignee === currentSellerName).length;
+      const countWaiting = allContacts.filter(c => c.attendance_status === 'waiting' || c.assignee === 'Fila de Espera Humana' || (c.tags && c.tags.includes('prioridade-alta'))).length;
+      const countOthers = allContacts.filter(c => (c.attendance_status === 'human' || c.ai_enabled === false) && c.assignee && c.assignee !== currentSellerName && c.assignee !== 'Agente IA' && c.assignee !== 'Fila de Espera Humana').length;
       const countBot = allContacts.filter(c => (c.attendance_status === 'bot' || !c.attendance_status) && c.ai_enabled !== false).length;
 
       const elAll = document.getElementById('count-status-all');
+      const elMine = document.getElementById('count-status-mine');
       const elWait = document.getElementById('count-status-waiting');
-      const elHum = document.getElementById('count-status-human');
+      const elOthers = document.getElementById('count-status-others');
       const elBot = document.getElementById('count-status-bot');
       if (elAll) elAll.textContent = countAll;
+      if (elMine) elMine.textContent = countMine;
       if (elWait) elWait.textContent = countWaiting;
-      if (elHum) elHum.textContent = countHuman;
+      if (elOthers) elOthers.textContent = countOthers;
       if (elBot) elBot.textContent = countBot;
 
       const filtered = allContacts.filter(c => {
         // Filtro por Canal
         if (currentChannelFilter && c.channel !== currentChannelFilter) return false;
 
-        // Filtro por Status da Fila
-        if (currentStatusFilter === 'waiting') {
-          if (c.attendance_status !== 'waiting' && !(c.tags && c.tags.includes('prioridade-alta'))) return false;
-        } else if (currentStatusFilter === 'human') {
-          if (c.attendance_status !== 'human' && c.ai_enabled !== false) return false;
+        // Filtro por Status da Fila e Posse do Vendedor
+        if (currentStatusFilter === 'mine') {
+          if (!((c.attendance_status === 'human' || c.ai_enabled === false) && c.assignee === currentSellerName)) return false;
+        } else if (currentStatusFilter === 'waiting') {
+          if (c.attendance_status !== 'waiting' && c.assignee !== 'Fila de Espera Humana' && !(c.tags && c.tags.includes('prioridade-alta'))) return false;
+        } else if (currentStatusFilter === 'others') {
+          if (!((c.attendance_status === 'human' || c.ai_enabled === false) && c.assignee && c.assignee !== currentSellerName && c.assignee !== 'Agente IA' && c.assignee !== 'Fila de Espera Humana')) return false;
         } else if (currentStatusFilter === 'bot') {
           if ((c.attendance_status && c.attendance_status !== 'bot') || c.ai_enabled === false) return false;
         }
 
         // Busca textual
         if (!searchFilterText) return true;
-        const haystack = `${c.name} ${c.phone || ''} ${c.email || ''} ${(c.tags || []).join(' ')} ${c.stage_name || ''}`.toLowerCase();
+        const haystack = `${c.name} ${c.phone || ''} ${c.email || ''} ${c.assignee || ''} ${(c.tags || []).join(' ')} ${c.stage_name || ''}`.toLowerCase();
         return haystack.includes(searchFilterText);
       });
 
@@ -1449,12 +1753,18 @@
         const stageName = c.stage_name || 'Novo Lead';
 
         let statusBadge = '';
-        if (c.attendance_status === 'waiting' || (c.tags && c.tags.includes('prioridade-alta'))) {
-          statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Aguardando</span>`;
-        } else if (c.attendance_status === 'human' || c.ai_enabled === false) {
-          statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-800 border border-blue-200"><i class="fa-solid fa-user-check text-[8px]"></i>Humano</span>`;
+        const isMine = (c.attendance_status === 'human' || c.ai_enabled === false) && c.assignee === currentSellerName;
+        const isHumanOther = (c.attendance_status === 'human' || c.ai_enabled === false) && c.assignee && c.assignee !== currentSellerName && c.assignee !== 'Agente IA' && c.assignee !== 'Fila de Espera Humana';
+        const isWaiting = c.attendance_status === 'waiting' || c.assignee === 'Fila de Espera Humana' || (c.tags && c.tags.includes('prioridade-alta'));
+
+        if (isMine) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#243E30] text-white shadow-sm" title="Atendimento fixado com você"><i class="fa-solid fa-user-check text-[8px]"></i> Meu: ${c.assignee}</span>`;
+        } else if (isHumanOther) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-900 border border-indigo-200" title="Atendido por colega da loja"><i class="fa-solid fa-user-tag text-[8px]"></i> ${c.assignee}</span>`;
+        } else if (isWaiting) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-900 border border-amber-300 animate-pulse" title="Na fila livre da loja"><i class="fa-solid fa-clock text-[8px]"></i> Fila (Livre)</span>`;
         } else {
-          statusBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-robot text-[8px]"></i>IA</span>`;
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-robot text-[8px]"></i> IA</span>`;
         }
 
         return `
@@ -1463,8 +1773,8 @@
             class="p-3.5 cursor-pointer transition ${isSelected ? 'bg-[#EAF2ED] border-l-4 border-l-[#243E30]' : 'bg-white hover:bg-[#F6F8F7]'}"
           >
             <div class="flex items-center justify-between mb-1">
-              <span class="font-semibold text-xs text-[#1A2B21] truncate">${c.name}</span>
-              <div class="flex items-center gap-1.5">
+              <span class="font-semibold text-xs text-[#1A2B21] truncate max-w-[125px]">${c.name}</span>
+              <div class="flex items-center gap-1.5 shrink-0">
                 ${statusBadge}
                 <span class="text-[10px] font-medium text-[#63756A]">${channelLabel(c.channel)}</span>
               </div>
@@ -1583,8 +1893,59 @@
         ? `Estágio: <strong class="text-[#1A2B21]">${stage.name}</strong> • Valor: <strong class="text-[#243E30]">R$ ${(deal?.value || 0).toLocaleString('pt-BR')}</strong>`
         : 'Sem negócio vinculado';
 
-      const lblHandoff = document.getElementById('btn-handoff-label');
-      lblHandoff.textContent = contact.ai_enabled ? 'Assumir Atendimento' : 'Reativar Bot';
+      // Atualiza Banner de Atribuição e Posse do Vendedor no Cabeçalho
+      const isMine = (contact.attendance_status === 'human' || contact.ai_enabled === false) && contact.assignee === currentSellerName;
+      const isHumanOther = (contact.attendance_status === 'human' || contact.ai_enabled === false) && contact.assignee && contact.assignee !== currentSellerName && contact.assignee !== 'Agente IA' && contact.assignee !== 'Fila de Espera Humana';
+      const isWaiting = contact.attendance_status === 'waiting' || contact.assignee === 'Fila de Espera Humana';
+
+      const assigneeBanner = document.getElementById('chat-assignee-banner');
+      if (assigneeBanner) {
+        if (isMine) {
+          assigneeBanner.innerHTML = `<span class="text-emerald-700 font-bold flex items-center gap-1"><i class="fa-solid fa-user-check text-[10px]"></i> Fixado com Você (${contact.assignee})</span>`;
+        } else if (isHumanOther) {
+          assigneeBanner.innerHTML = `<span class="text-indigo-800 font-bold flex items-center gap-1"><i class="fa-solid fa-user-tag text-[10px]"></i> Atendente: ${contact.assignee}</span>`;
+        } else if (isWaiting) {
+          assigneeBanner.innerHTML = `<span class="text-amber-800 font-bold flex items-center gap-1"><i class="fa-solid fa-clock text-[10px] animate-pulse"></i> Na Fila (Sem Vendedor)</span>`;
+        } else {
+          assigneeBanner.innerHTML = `<span class="text-emerald-800 font-medium flex items-center gap-1"><i class="fa-solid fa-robot text-[10px]"></i> Robô / IA Ativa</span>`;
+        }
+      }
+
+      // Atualiza os Botões de Ação de Posse da Conversa
+      const actionsContainer = document.getElementById('chat-assignee-actions');
+      if (actionsContainer) {
+        if (isMine) {
+          actionsContainer.innerHTML = `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#EAF2ED] text-[#243E30] border border-[#243E30]/20 shadow-sm">
+              <i class="fa-solid fa-user-check text-emerald-700"></i>
+              <span>Seu Atendimento</span>
+            </span>
+            <button onclick="openTransferModal()" class="text-xs font-semibold text-[#1A2B21] bg-[#F6F8F7] hover:bg-[#EAF2ED] border border-[#E3E8E5] px-2.5 py-1.5 rounded-lg transition flex items-center gap-1" title="Transferir este cliente para outro colega da loja">
+              <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i> Transferir
+            </button>
+            <button onclick="releaseToBot()" class="text-xs font-semibold text-[#63756A] hover:text-[#1A2B21] bg-white hover:bg-[#F6F8F7] border border-[#E3E8E5] px-2.5 py-1.5 rounded-lg transition flex items-center gap-1" title="Devolver para o bot">
+              <i class="fa-solid fa-robot text-[10px]"></i> Devolver à IA
+            </button>
+          `;
+        } else if (isHumanOther) {
+          actionsContainer.innerHTML = `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-200">
+              <i class="fa-solid fa-lock text-indigo-600"></i>
+              <span>Com: ${contact.assignee}</span>
+            </span>
+            <button onclick="takeAttendance(true)" class="text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm" title="Assumir este atendimento do colega">
+              <i class="fa-solid fa-user-pen text-[11px]"></i> Assumir Atendimento
+            </button>
+          `;
+        } else {
+          actionsContainer.innerHTML = `
+            <button onclick="takeAttendance(false)" class="text-xs font-bold text-white bg-[#243E30] hover:bg-[#365945] px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-hand-holding-hand"></i>
+              <span>Pegar Conversa (Fixar Comigo)</span>
+            </button>
+          `;
+        }
+      }
 
       // Separa estritamente as mensagens externas das notas internas da equipe
       const externalMessages = (messages || []).filter(m => !m.is_internal && m.sender !== 'internal');
@@ -1634,7 +1995,7 @@
         <div class="flex justify-between"><span class="text-[#63756A]">E-mail</span><span class="font-medium text-[#1A2B21]">${contact.email || '—'}</span></div>
         <div class="flex justify-between"><span class="text-[#63756A]">Estágio</span><span class="font-semibold text-[#243E30]">${stage ? stage.name : '—'}</span></div>
         <div class="flex justify-between"><span class="text-[#63756A]">Temperatura</span><span class="font-semibold uppercase text-[#1A2B21]">${contact.temperature || 'warm'} (${contact.lead_score || 50} pts)</span></div>
-        <div class="flex justify-between"><span class="text-[#63756A]">Atendimento</span><span class="font-medium text-[#1A2B21]">${contact.ai_enabled ? 'Automático (IA)' : 'Humano (' + (contact.assignee || 'Equipe') + ')'}</span></div>
+        <div class="flex justify-between items-center"><span class="text-[#63756A]">Vendedor</span><span class="font-bold text-[#243E30] bg-[#EAF2ED] px-2 py-0.5 rounded text-[11px]">${contact.ai_enabled ? '🤖 Agente IA' : '👤 ' + (contact.assignee || 'Não atribuído')}</span></div>
       `;
 
       // Tags
@@ -1670,6 +2031,7 @@
           contact_id: currentContactId,
           content,
           sender: 'human',
+          sender_name: currentSellerName,
           is_internal: false
         })
       });
@@ -1799,22 +2161,385 @@
       await selectContact(currentContactId, true);
     }
 
+    // -------------------------------------------------------------
+    // Gestão de Vendedores, Posse de Conversas e Transferências
+    // -------------------------------------------------------------
+
+    async function loadSellers() {
+      try {
+        const res = await fetch('/api/sellers');
+        if (res.ok) {
+          const data = await res.json();
+          allSellers = data.sellers || [];
+          renderSellerSelector();
+        }
+      } catch (err) {
+        console.error('Erro ao carregar vendedores:', err);
+      }
+    }
+
+    function renderSellerSelector() {
+      const selectHeader = document.getElementById('active-seller-select');
+      const selectInbox = document.getElementById('active-seller-select-inbox');
+      const initialsHeader = document.getElementById('active-seller-initials');
+      const initialsInbox = document.getElementById('active-seller-initials-inbox');
+
+      if (!allSellers.some(s => s.name === currentSellerName) && currentSellerName) {
+        allSellers.unshift({ id: 'custom', name: currentSellerName });
+      }
+
+      const optionsHtml = allSellers.map(s => `
+        <option value="${s.name}" ${s.name === currentSellerName ? 'selected' : ''}>
+          ${s.name}
+        </option>
+      `).join('');
+
+      if (selectHeader) selectHeader.innerHTML = optionsHtml;
+      if (selectInbox) selectInbox.innerHTML = optionsHtml;
+
+      const parts = currentSellerName.trim().split(' ');
+      const ini = parts.length > 1 ? (parts[0][0] + parts[1][0]) : (currentSellerName.substring(0, 2));
+      if (initialsHeader) initialsHeader.textContent = ini.toUpperCase();
+      if (initialsInbox) initialsInbox.textContent = ini.toUpperCase();
+
+      const senderId = document.getElementById('chat-sender-identity');
+      if (senderId) {
+        senderId.textContent = currentSellerName;
+      }
+    }
+
+    function changeActiveSeller(newName) {
+      if (!newName) return;
+      currentSellerName = newName;
+      localStorage.setItem('openchatfunnel_active_seller', currentSellerName);
+      renderSellerSelector();
+      renderContactsList();
+      if (currentContactId) {
+        selectContact(currentContactId, false);
+      }
+      showEventToast(`Você agora está operando como: ${currentSellerName}`);
+    }
+
+    async function promptNewSeller() {
+      const name = prompt('Digite o nome do novo vendedor da equipe da loja:');
+      if (!name || !name.trim()) return;
+      try {
+        const res = await fetch('/api/sellers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() })
+        });
+        if (res.ok) {
+          await loadSellers();
+          changeActiveSeller(name.trim());
+          showEventToast(`Vendedor ${name.trim()} adicionado com sucesso!`);
+        }
+      } catch (e) {
+        alert('Erro ao cadastrar vendedor.');
+      }
+    }
+
+    async function takeAttendance(isTransfer = false) {
+      if (!currentContactId) return;
+      if (isTransfer) {
+        const confirmTransfer = confirm(`Este cliente está atualmente com ${currentContactObj?.assignee || 'outro colega'}. Deseja transferi-lo para você (${currentSellerName})?`);
+        if (!confirmTransfer) return;
+      }
+
+      try {
+        const res = await fetch(`/api/contacts/${currentContactId}/assign`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignee: currentSellerName,
+            ai_enabled: false,
+            attendance_status: 'human',
+            operator_name: currentSellerName
+          })
+        });
+        if (res.ok) {
+          showEventToast(`Atendimento assumido! Cliente fixado com ${currentSellerName}. Toda a equipe foi notificada.`);
+          await selectContact(currentContactId, true);
+          await refreshStats();
+        }
+      } catch (e) {
+        alert('Erro ao assumir atendimento.');
+      }
+    }
+
+    function openTransferModal() {
+      if (!currentContactObj) return;
+      const modal = document.getElementById('modal-transfer');
+      const nameEl = document.getElementById('transfer-modal-contact-name');
+      const selectEl = document.getElementById('transfer-target-seller');
+      if (!modal || !selectEl) return;
+
+      nameEl.textContent = `${currentContactObj.name} (${currentContactObj.phone || 'Sem telefone'})`;
+
+      const colleagues = allSellers.filter(s => s.name !== currentContactObj.assignee);
+      selectEl.innerHTML = colleagues.map(s => `
+        <option value="${s.name}">${s.name}</option>
+      `).join('');
+
+      document.getElementById('transfer-reason').value = '';
+      modal.classList.remove('hidden');
+    }
+
+    function closeTransferModal() {
+      const modal = document.getElementById('modal-transfer');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function confirmTransfer() {
+      const selectEl = document.getElementById('transfer-target-seller');
+      const reasonEl = document.getElementById('transfer-reason');
+      const targetSeller = selectEl ? selectEl.value : null;
+      const reason = reasonEl ? reasonEl.value.trim() : '';
+
+      if (!targetSeller || !currentContactId) return;
+
+      try {
+        const res = await fetch(`/api/contacts/${currentContactId}/assign`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignee: targetSeller,
+            ai_enabled: false,
+            attendance_status: 'human',
+            operator_name: currentSellerName,
+            transfer_reason: reason
+          })
+        });
+        if (res.ok) {
+          closeTransferModal();
+          showEventToast(`Atendimento transferido para ${targetSeller} com sucesso!`);
+          await selectContact(currentContactId, true);
+          await refreshStats();
+        }
+      } catch (e) {
+        alert('Erro ao transferir cliente.');
+      }
+    }
+
+    async function releaseToBot() {
+      if (!currentContactId) return;
+      const ok = confirm('Deseja devolver este cliente para a automação do robô (IA)?');
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`/api/contacts/${currentContactId}/assign`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignee: 'Agente IA',
+            ai_enabled: true,
+            attendance_status: 'bot',
+            operator_name: currentSellerName
+          })
+        });
+        if (res.ok) {
+          showEventToast('Atendimento devolvido ao assistente automático (IA).');
+          await selectContact(currentContactId, true);
+          await refreshStats();
+        }
+      } catch (e) {
+        alert('Erro ao devolver à IA.');
+      }
+    }
+
     async function toggleHumanHandoff() {
       if (!currentContactObj) return;
-      const newAiEnabled = !currentContactObj.ai_enabled;
-      const res = await fetch(`/api/contacts/${currentContactId}/handoff`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          ai_enabled: newAiEnabled,
-          attendance_status: newAiEnabled ? 'bot' : 'human',
-          assignee: newAiEnabled ? 'Agente IA' : 'Atendente Executivo'
-        })
+      if (currentContactObj.ai_enabled) {
+        await takeAttendance(false);
+      } else {
+        await releaseToBot();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Gestão de Clientes B2B & Controle de Inadimplência
+    // -------------------------------------------------------------
+    let allAdminClients = [];
+
+    async function openClientsAdminModal() {
+      const modal = document.getElementById('modal-clients-admin');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      switchClientsModalTab('list');
+      await loadAdminClients();
+    }
+
+    function closeClientsAdminModal() {
+      const modal = document.getElementById('modal-clients-admin');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function switchClientsModalTab(tab) {
+      ['list', 'create', 'test'].forEach(t => {
+        const content = document.getElementById(`clients-tab-${t}`);
+        const btn = document.getElementById(`tab-btn-client-${t}`);
+        if (content) content.classList.add('hidden');
+        if (btn) btn.className = 'px-3 py-1.5 rounded-lg bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#1A2B21]';
       });
-      const data = await res.json();
-      document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
-      showEventToast(newAiEnabled ? 'Assistente automático reativado.' : 'Atendimento assumido manualmente (nota registrada em Notas da Equipe).');
-      await selectContact(currentContactId, true);
+
+      const activeContent = document.getElementById(`clients-tab-${tab}`);
+      const activeBtn = document.getElementById(`tab-btn-client-${tab}`);
+      if (activeContent) activeContent.classList.remove('hidden');
+      if (activeBtn) activeBtn.className = 'px-3 py-1.5 rounded-lg bg-[#243E30] text-white shadow-xs';
+    }
+
+    async function loadAdminClients() {
+      const tbody = document.getElementById('clients-table-body');
+      const badge = document.getElementById('clients-count-badge');
+      try {
+        const res = await fetch('/api/admin/clients');
+        if (res.ok) {
+          const data = await res.json();
+          allAdminClients = data.clients || [];
+          if (badge) badge.textContent = allAdminClients.length;
+
+          if (!allAdminClients.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-[#63756A]">Nenhum cliente cadastrado no momento. Clique na aba 'Provisionar Novo Cliente' acima para criar o primeiro.</td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = allAdminClients.map(c => {
+            const isSuspended = !c.is_active || c.status === 'suspended';
+            const statusHtml = isSuspended
+              ? `<span class="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] bg-red-100 text-red-800 border border-red-300"><i class="fa-solid fa-ban text-[9px]"></i> Suspenso (Inadimplente)</span>`
+              : `<span class="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-check text-[9px]"></i> Ativo</span>`;
+
+            const actionBtn = isSuspended
+              ? `<button onclick="unblockAdminClient('${c.email}')" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition"><i class="fa-solid fa-lock-open mr-1"></i> Desbloquear</button>`
+              : `<button onclick="blockAdminClient('${c.email}')" class="px-2.5 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] shadow-xs transition"><i class="fa-solid fa-ban mr-1"></i> Bloquear (Inadimplência)</button>`;
+
+            return `
+              <tr class="hover:bg-[#F6F8F7]">
+                <td class="p-3 font-semibold text-[#1A2B21]">${c.company_name} <span class="text-[#63756A] font-normal">(${c.client_name})</span></td>
+                <td class="p-3 text-[#63756A] font-mono">${c.email}</td>
+                <td class="p-3">${statusHtml}</td>
+                <td class="p-3 text-right">${actionBtn}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-red-600">Erro ao carregar clientes.</td></tr>`;
+      }
+    }
+
+    async function submitCreateClient() {
+      const name = document.getElementById('new-client-name').value.trim();
+      const company = document.getElementById('new-client-company').value.trim();
+      const email = document.getElementById('new-client-email').value.trim();
+
+      if (!name || !email) {
+        alert('Por favor, informe ao menos o Nome e o E-mail do cliente.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, company, email })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showEventToast(`Cliente ${email} criado com sucesso!`);
+          document.getElementById('client-whatsapp-text').textContent = data.whatsapp_message;
+          document.getElementById('client-whatsapp-result').classList.remove('hidden');
+          document.getElementById('test-block-email').value = email;
+          await loadAdminClients();
+        } else {
+          alert(data.detail || 'Erro ao criar cliente.');
+        }
+      } catch (e) {
+        alert('Erro ao conectar ao servidor.');
+      }
+    }
+
+    function copyClientWhatsAppMsg() {
+      const text = document.getElementById('client-whatsapp-text').textContent;
+      navigator.clipboard.writeText(text);
+      showEventToast('Texto copiado! Pronto para colar no WhatsApp do cliente.');
+    }
+
+    async function blockAdminClient(email) {
+      const ok = confirm(`Bloquear imediatamente o acesso do cliente ${email} por inadimplência?`);
+      if (!ok) return;
+
+      try {
+        const res = await fetch('/api/admin/clients/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showEventToast(`Acesso revogado: ${email} suspenso.`);
+          await loadAdminClients();
+        } else {
+          alert(data.detail || 'Erro ao suspender cliente.');
+        }
+      } catch (e) {
+        alert('Erro ao conectar.');
+      }
+    }
+
+    async function unblockAdminClient(email) {
+      try {
+        const res = await fetch('/api/admin/clients/unblock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showEventToast(`Acesso restabelecido: ${email} reativado com sucesso!`);
+          await loadAdminClients();
+        } else {
+          alert(data.detail || 'Erro ao reativar cliente.');
+        }
+      } catch (e) {
+        alert('Erro ao conectar.');
+      }
+    }
+
+    async function runTestBlockCheck() {
+      const email = document.getElementById('test-block-email').value.trim();
+      const output = document.getElementById('test-block-output');
+      if (!email) {
+        alert('Digite o e-mail do cliente para testar.');
+        return;
+      }
+      output.classList.remove('hidden');
+      output.innerHTML = 'Disparando tentativa de autenticação com a API...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: 'QualquerSenhaOuInvalida' })
+        });
+        const data = await res.json();
+        if (res.status === 403) {
+          output.innerHTML = `
+            <div class="text-red-700 font-bold mb-1">❌ HTTP 403 Forbidden (BLOQUEIO REALIZADO COM SUCESSO)</div>
+            <div class="text-[#1A2B21] bg-red-50 p-2 rounded border border-red-200">${data.detail}</div>
+            <div class="text-[10px] text-[#63756A] mt-1">O cliente teve o acesso cortado e não consegue utilizar a plataforma.</div>
+          `;
+        } else if (res.status === 401) {
+          output.innerHTML = `
+            <div class="text-blue-700 font-bold mb-1">ℹ️ HTTP 401 Unauthorized</div>
+            <div>O cliente está ativo no banco, mas a senha informada não confere. Bloqueie-o primeiro para testar o 403.</div>
+          `;
+        } else {
+          output.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+      } catch (e) {
+        output.innerHTML = `<span class="text-red-600">Erro na requisição de teste.</span>`;
+      }
     }
 
     async function setLeadTemp(temperature) {
@@ -2021,6 +2746,13 @@
                     <div class="text-xs text-[#63756A] flex items-center justify-between">
                       <span>${c.name || 'Contato'}</span>
                       <span class="font-bold text-[#243E30]">R$ ${deal.value.toLocaleString('pt-BR')}</span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[10px] pt-1 border-t border-[#F0F2F1]">
+                      <span class="text-[#63756A]">Responsável:</span>
+                      <span class="inline-flex items-center gap-1 font-semibold text-[#243E30] bg-[#EAF2ED] px-2 py-0.5 rounded text-[10px]">
+                        <i class="fa-solid fa-user text-[8px]"></i> ${c.assignee || 'Agente IA'}
+                      </span>
                     </div>
 
                     ${tags.length ? `
@@ -2718,9 +3450,9 @@
     window.addEventListener('DOMContentLoaded', async () => {
       updateSoundIcon();
       connectWebSocket();
+      await loadSellers();
       await refreshStats();
-      await loadContacts(false);
-      await loadDashboardOverview();
+      await loadContacts(true); // Abre o Inbox e seleciona o primeiro lead com os botões e badges do vendedor!
       await checkWhatsAppStatus();
     });
   </script>
