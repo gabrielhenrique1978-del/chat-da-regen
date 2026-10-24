@@ -138,16 +138,30 @@ class BroadcastCampaign(BaseModel):
     created_at: str = Field(default_factory=utc_now_iso)
 
 
-class User(BaseModel):
+class Tenant(BaseModel):
     """
-    Modelo de Usuário / Tenant para provisionamento manual e controle
-    de adimplência/bloqueio imediato.
+    Modelo de Empresa Cliente (Tenant) na arquitetura SaaS Multi-Tenant.
+    is_active é a trava mestra de inadimplência/liberação.
     """
     id: str = Field(default_factory=new_uuid)
+    name: str
+    status: str = "active"  # "active", "suspended", "canceled"
+    is_active: bool = True
+    created_at: str = Field(default_factory=utc_now_iso)
+    updated_at: str = Field(default_factory=utc_now_iso)
+
+
+class User(BaseModel):
+    """
+    Modelo de Usuário vinculado a uma Empresa Cliente (Tenant) ou Super Admin Master.
+    """
+    id: str = Field(default_factory=new_uuid)
+    tenant_id: Optional[str] = None
     email: str
     password_hash: str
     client_name: str
     company_name: Optional[str] = None
+    role: str = "admin"  # "super_admin" (Master), "admin" (Dono da empresa cliente), "user" (Operador)
     is_active: bool = True
     status: str = "active"  # "active", "suspended", "canceled"
     must_change_password: bool = True
@@ -326,17 +340,31 @@ class Database:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS tenants (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
+                    tenant_id TEXT,
                     email TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     client_name TEXT NOT NULL,
                     company_name TEXT,
+                    role TEXT NOT NULL DEFAULT 'admin',
                     is_active INTEGER NOT NULL DEFAULT 1,
                     status TEXT NOT NULL DEFAULT 'active',
                     must_change_password INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -354,6 +382,16 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_sellers_name ON sellers(name);
                 """
             )
+
+            # Migração de colunas para suportar SaaS Multi-Tenant na tabela users
+            user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+            if "tenant_id" not in user_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN tenant_id TEXT REFERENCES tenants(id);")
+            if "role" not in user_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';")
+
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
 
     def encrypt_existing_unencrypted_records(self) -> int:
         """
@@ -1487,6 +1525,23 @@ class Database:
     # Gestão de Clientes / Usuários & Bloqueio por Inadimplência
     # -----------------------------------------------------------------
 
+    def _map_user_row(self, row) -> User:
+        cols = row.keys()
+        return User(
+            id=row["id"],
+            tenant_id=row["tenant_id"] if "tenant_id" in cols else None,
+            email=row["email"],
+            password_hash=row["password_hash"],
+            client_name=row["client_name"],
+            company_name=row["company_name"],
+            role=row["role"] if "role" in cols and row["role"] else "admin",
+            is_active=bool(row["is_active"]),
+            status=row["status"],
+            must_change_password=bool(row["must_change_password"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
     def create_user(self, user: User) -> User:
         user.email = user.email.strip().lower()
         now = utc_now_iso()
@@ -1499,17 +1554,19 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO users (
-                    id, email, password_hash, client_name, company_name,
-                    is_active, status, must_change_password, created_at, updated_at
+                    id, tenant_id, email, password_hash, client_name, company_name,
+                    role, is_active, status, must_change_password, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user.id,
+                    user.tenant_id,
                     user.email,
                     user.password_hash,
                     user.client_name,
                     user.company_name or user.client_name,
+                    user.role or "admin",
                     1 if user.is_active else 0,
                     user.status,
                     1 if user.must_change_password else 0,
@@ -1526,18 +1583,7 @@ class Database:
             row = conn.execute("SELECT * FROM users WHERE lower(email) = lower(?)", (email.strip(),)).fetchone()
             if not row:
                 return None
-            return User(
-                id=row["id"],
-                email=row["email"],
-                password_hash=row["password_hash"],
-                client_name=row["client_name"],
-                company_name=row["company_name"],
-                is_active=bool(row["is_active"]),
-                status=row["status"],
-                must_change_password=bool(row["must_change_password"]),
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-            )
+            return self._map_user_row(row)
 
     def get_user(self, user_id: str) -> Optional[User]:
         if not user_id:
@@ -1546,18 +1592,14 @@ class Database:
             row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
             if not row:
                 return None
-            return User(
-                id=row["id"],
-                email=row["email"],
-                password_hash=row["password_hash"],
-                client_name=row["client_name"],
-                company_name=row["company_name"],
-                is_active=bool(row["is_active"]),
-                status=row["status"],
-                must_change_password=bool(row["must_change_password"]),
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-            )
+            return self._map_user_row(row)
+
+    def get_super_admin(self) -> Optional[User]:
+        with self.connection() as conn:
+            row = conn.execute("SELECT * FROM users WHERE role = 'super_admin' LIMIT 1").fetchone()
+            if not row:
+                return None
+            return self._map_user_row(row)
 
     def update_user_status(self, email: str, is_active: bool, status: str) -> Optional[User]:
         email_clean = email.strip().lower()
@@ -1596,21 +1638,12 @@ class Database:
     def list_users(self) -> List[User]:
         with self.connection() as conn:
             rows = conn.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
-            return [
-                User(
-                    id=row["id"],
-                    email=row["email"],
-                    password_hash=row["password_hash"],
-                    client_name=row["client_name"],
-                    company_name=row["company_name"],
-                    is_active=bool(row["is_active"]),
-                    status=row["status"],
-                    must_change_password=bool(row["must_change_password"]),
-                    created_at=row["created_at"],
-                    updated_at=row["updated_at"],
-                )
-                for row in rows
-            ]
+            return [self._map_user_row(row) for row in rows]
+
+    def list_users_by_tenant(self, tenant_id: str) -> List[User]:
+        with self.connection() as conn:
+            rows = conn.execute("SELECT * FROM users WHERE tenant_id = ? ORDER BY created_at DESC", (tenant_id,)).fetchall()
+            return [self._map_user_row(row) for row in rows]
 
     def delete_user_by_email(self, email: str) -> bool:
         email_clean = email.strip().lower()
@@ -1618,6 +1651,101 @@ class Database:
             row = conn.execute("SELECT id FROM users WHERE lower(email) = lower(?)", (email_clean,)).fetchone()
             if not row:
                 return False
+            conn.execute("DELETE FROM users WHERE lower(email) = lower(?)", (email_clean,))
+            return True
+
+    # -----------------------------------------------------------------
+    # Gestão de Tenants (Empresas Clientes B2B - Multi-Tenant)
+    # -----------------------------------------------------------------
+
+    def create_tenant(self, tenant: Tenant) -> Tenant:
+        now = utc_now_iso()
+        tenant.created_at = tenant.created_at or now
+        tenant.updated_at = now
+        with self.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO tenants (id, name, status, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tenant.id,
+                    tenant.name.strip(),
+                    tenant.status,
+                    1 if tenant.is_active else 0,
+                    tenant.created_at,
+                    tenant.updated_at,
+                ),
+            )
+        return tenant
+
+    def get_tenant(self, tenant_id: str) -> Optional[Tenant]:
+        if not tenant_id:
+            return None
+        with self.connection() as conn:
+            row = conn.execute("SELECT * FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+            if not row:
+                return None
+            return Tenant(
+                id=row["id"],
+                name=row["name"],
+                status=row["status"],
+                is_active=bool(row["is_active"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
+    def get_tenant_by_name(self, name: str) -> Optional[Tenant]:
+        if not name:
+            return None
+        with self.connection() as conn:
+            row = conn.execute("SELECT * FROM tenants WHERE lower(name) = lower(?)", (name.strip(),)).fetchone()
+            if not row:
+                return None
+            return Tenant(
+                id=row["id"],
+                name=row["name"],
+                status=row["status"],
+                is_active=bool(row["is_active"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
+    def list_tenants(self) -> List[Tenant]:
+        with self.connection() as conn:
+            rows = conn.execute("SELECT * FROM tenants ORDER BY created_at DESC").fetchall()
+            return [
+                Tenant(
+                    id=row["id"],
+                    name=row["name"],
+                    status=row["status"],
+                    is_active=bool(row["is_active"]),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+                for row in rows
+            ]
+
+    def update_tenant_status(self, tenant_id: str, is_active: bool, status: str) -> Optional[Tenant]:
+        now = utc_now_iso()
+        with self.connection() as conn:
+            row = conn.execute("SELECT id FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                """
+                UPDATE tenants
+                SET is_active = ?, status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (1 if is_active else 0, status, now, tenant_id),
+            )
+        return self.get_tenant(tenant_id)
+
+    def count_tenant_users(self, tenant_id: str) -> int:
+        with self.connection() as conn:
+            row = conn.execute("SELECT COUNT(*) as cnt FROM users WHERE tenant_id = ?", (tenant_id,)).fetchone()
+            return int(row["cnt"]) if row else 0
             conn.execute("DELETE FROM users WHERE lower(email) = lower(?)", (email_clean,))
             return True
 

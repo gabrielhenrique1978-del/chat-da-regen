@@ -29,6 +29,7 @@ from core.db import (
     QuickReply,
     Seller,
     Stage,
+    Tenant,
     User,
     WorkflowRule,
 )
@@ -239,6 +240,19 @@ SUSPENSION_MESSAGE = (
     "Entre em contato com o suporte."
 )
 
+class CreateTenantRequest(BaseModel):
+    name: str
+    admin_name: str
+    admin_email: str
+
+
+TENANT_SUSPENSION_MESSAGE = (
+    "Acesso da empresa suspenso por pendência administrativa ou financeira. Entre em contato com o suporte."
+)
+SUSPENSION_MESSAGE = (
+    "Acesso temporariamente suspenso por pendência administrativa ou financeira. Entre em contato com o suporte."
+)
+
 oauth2_scheme = HTTPBearer(auto_error=False)
 
 
@@ -293,15 +307,46 @@ def get_current_user(
     return user
 
 
-def get_current_active_user(user: User = Depends(get_current_user)) -> User:
+def get_current_active_user(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> User:
     """
-    Verifica se o usuário está ativo no banco de dados.
-    Se estiver inativo ou com status 'suspended', aborta imediatamente com HTTP 403.
+    Verifica em tempo real se o usuário e sua empresa cliente (Tenant) estão ativos.
+    - Se user.role == "super_admin": acesso irrestrito ao painel master e rotas.
+    - Para os demais usuários:
+      * Se user.is_active for False ou user.status == "suspended": HTTP 403 Forbidden
+      * Se tenant.is_active for False ou tenant.status == "suspended":
+        HTTP 403 Forbidden com a mensagem:
+        "Acesso da empresa suspenso por pendência administrativa ou financeira. Entre em contato com o suporte."
     """
+    if user.role == "super_admin":
+        return user
+
     if not user.is_active or user.status == "suspended":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=SUSPENSION_MESSAGE,
+        )
+
+    if user.tenant_id:
+        db: Database = request.app.state.db
+        tenant = db.get_tenant(user.tenant_id)
+        if tenant and (not tenant.is_active or tenant.status == "suspended"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=TENANT_SUSPENSION_MESSAGE,
+            )
+
+    return user
+
+
+def require_super_admin(user: User = Depends(get_current_active_user)) -> User:
+    """Garante que a rota só pode ser acessada pelo Super Admin Master."""
+    if user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito ao Administrador Master (Super Admin).",
         )
     return user
 
@@ -412,22 +457,39 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciais inválidas: e-mail ou senha incorretos",
             )
-        if not user.is_active or user.status == "suspended":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=SUSPENSION_MESSAGE,
-            )
+        if user.role != "super_admin":
+            if not user.is_active or user.status == "suspended":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=SUSPENSION_MESSAGE,
+                )
+            if user.tenant_id:
+                tenant = db.get_tenant(user.tenant_id)
+                if tenant and (not tenant.is_active or tenant.status == "suspended"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=TENANT_SUSPENSION_MESSAGE,
+                    )
+
         token = create_access_token(
-            {"sub": user.id, "email": user.email, "client_name": user.client_name}
+            {
+                "sub": user.id,
+                "email": user.email,
+                "client_name": user.client_name,
+                "role": user.role,
+                "tenant_id": user.tenant_id,
+            }
         )
         return {
             "access_token": token,
             "token_type": "bearer",
             "user": {
                 "id": user.id,
+                "tenant_id": user.tenant_id,
                 "email": user.email,
                 "client_name": user.client_name,
                 "company_name": user.company_name,
+                "role": user.role,
                 "is_active": user.is_active,
                 "status": user.status,
                 "must_change_password": user.must_change_password,
@@ -439,9 +501,11 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         """Retorna os dados do cliente autenticado e ativo."""
         return {
             "id": user.id,
+            "tenant_id": user.tenant_id,
             "email": user.email,
             "client_name": user.client_name,
             "company_name": user.company_name,
+            "role": user.role,
             "is_active": user.is_active,
             "status": user.status,
             "must_change_password": user.must_change_password,
@@ -470,6 +534,148 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         return {
             "status": "success",
             "message": "Senha atualizada com sucesso. must_change_password redefinido para False.",
+        }
+
+    # =================================================================
+    # ROTAS DE GESTÃO DO SUPER ADMIN (PAINEL MASTER B2B MULTI-TENANT)
+    # =================================================================
+
+    @router.get("/admin/tenants")
+    def list_all_tenants(
+        current_admin: User = Depends(require_super_admin),
+    ):
+        """
+        Lista todas as empresas clientes (Tenants), status de adimplência e contagem de usuários.
+        Acessível exclusivamente pelo Super Admin Master.
+        """
+        tenants = db.list_tenants()
+        result = []
+        for t in tenants:
+            users_count = db.count_tenant_users(t.id)
+            tenant_users = db.list_users_by_tenant(t.id)
+            admin_user = next((u for u in tenant_users if u.role == "admin"), None)
+            result.append(
+                {
+                    "id": t.id,
+                    "name": t.name,
+                    "status": t.status,
+                    "is_active": t.is_active,
+                    "created_at": t.created_at,
+                    "updated_at": t.updated_at,
+                    "users_count": users_count,
+                    "admin_email": admin_user.email if admin_user else None,
+                    "admin_name": admin_user.client_name if admin_user else None,
+                }
+            )
+        return {"tenants": result}
+
+    @router.post("/admin/tenants")
+    def create_tenant_and_admin(
+        req: CreateTenantRequest,
+        current_admin: User = Depends(require_super_admin),
+    ):
+        """
+        Cadastra uma nova empresa cliente (Tenant) e provisiona o primeiro usuário Administrador dela
+        com senha provisória aleatória e mensagem formatada pronta para envio no WhatsApp.
+        """
+        tenant_name = req.name.strip()
+        admin_email = req.admin_email.strip().lower()
+        admin_name = req.admin_name.strip()
+
+        if not tenant_name:
+            raise HTTPException(status_code=400, detail="Nome da empresa cliente é obrigatório")
+        if not admin_email or "@" not in admin_email:
+            raise HTTPException(status_code=400, detail="E-mail de login inválido")
+
+        existing_user = db.get_user_by_email(admin_email)
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Já existe um usuário cadastrado com o e-mail '{admin_email}'",
+            )
+
+        from core.security import generate_secure_password, hash_password
+        temp_pwd = generate_secure_password(12)
+        pwd_hash = hash_password(temp_pwd)
+
+        # 1. Cria a Empresa Cliente (Tenant)
+        tenant = Tenant(
+            name=tenant_name,
+            status="active",
+            is_active=True,
+        )
+        created_tenant = db.create_tenant(tenant)
+
+        # 2. Cria o Usuário Administrador da Empresa
+        admin_user = User(
+            tenant_id=created_tenant.id,
+            email=admin_email,
+            password_hash=pwd_hash,
+            client_name=admin_name or tenant_name,
+            company_name=tenant_name,
+            role="admin",
+            is_active=True,
+            status="active",
+            must_change_password=True,
+        )
+        created_admin = db.create_user(admin_user)
+
+        whatsapp_text = (
+            "-------------------------------------------\n"
+            "Empresa Cliente cadastrada com sucesso!\n"
+            f"Empresa: {tenant_name}\n"
+            f"Responsável: {admin_name}\n"
+            f"Login: {admin_email}\n"
+            f"Senha Provisória: {temp_pwd}\n"
+            "Status: Ativo\n"
+            "-------------------------------------------"
+        )
+
+        return {
+            "tenant": {
+                "id": created_tenant.id,
+                "name": created_tenant.name,
+                "status": created_tenant.status,
+                "is_active": created_tenant.is_active,
+                "created_at": created_tenant.created_at,
+            },
+            "admin_user": {
+                "id": created_admin.id,
+                "email": created_admin.email,
+                "name": created_admin.client_name,
+                "role": created_admin.role,
+            },
+            "temporary_password": temp_pwd,
+            "whatsapp_message": whatsapp_text,
+        }
+
+    @router.patch("/admin/tenants/{tenant_id}/toggle-status")
+    def toggle_tenant_status(
+        tenant_id: str,
+        current_admin: User = Depends(require_super_admin),
+    ):
+        """
+        Alterna imediatamente o status da empresa cliente entre Ativo e Suspenso (TRAVA MESTRA DE INADIMPLÊNCIA).
+        Se a empresa for suspensa, QUALQUER usuário dela tem o acesso bloqueado imediatamente (HTTP 403 Forbidden).
+        """
+        tenant = db.get_tenant(tenant_id)
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Empresa cliente (Tenant) não encontrada")
+
+        new_is_active = not tenant.is_active
+        new_status = "active" if new_is_active else "suspended"
+        updated = db.update_tenant_status(tenant_id, is_active=new_is_active, status=new_status)
+
+        action_label = "liberada com sucesso" if new_is_active else "bloqueada imediatamente por inadimplência"
+        return {
+            "tenant": {
+                "id": updated.id,
+                "name": updated.name,
+                "status": updated.status,
+                "is_active": updated.is_active,
+                "updated_at": updated.updated_at,
+            },
+            "message": f"Empresa '{updated.name}' {action_label}.",
         }
 
     # -----------------------------------------------------------------
@@ -512,11 +718,18 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         pwd_hash = hash_password(temp_pwd)
         company = (req.company or req.name).strip()
 
+        # Garante vínculo com Tenant
+        tenant = db.get_tenant_by_name(company)
+        if not tenant:
+            tenant = db.create_tenant(Tenant(name=company, is_active=True, status="active"))
+
         user = User(
+            tenant_id=tenant.id,
             email=email_clean,
             password_hash=pwd_hash,
             client_name=req.name.strip(),
             company_name=company,
+            role="admin",
             is_active=True,
             status="active",
             must_change_password=True,
@@ -535,9 +748,11 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         return {
             "client": {
                 "id": created.id,
+                "tenant_id": created.tenant_id,
                 "email": created.email,
                 "client_name": created.client_name,
                 "company_name": created.company_name,
+                "role": created.role,
                 "is_active": created.is_active,
                 "status": created.status,
             },
@@ -547,17 +762,20 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
     @router.post("/admin/clients/block")
     def block_client(req: AdminClientEmailRequest):
-        """Bloqueia imediatamente o cliente por inadimplência."""
+        """Bloqueia imediatamente o cliente e a empresa dele por inadimplência."""
         email_clean = req.email.strip().lower()
         user = db.get_user_by_email(email_clean)
         if not user:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
         updated = db.update_user_status(email_clean, is_active=False, status="suspended")
+        if user.tenant_id:
+            db.update_tenant_status(user.tenant_id, is_active=False, status="suspended")
         return {
             "status": "suspended",
             "message": f"Cliente {email_clean} bloqueado imediatamente por inadimplência.",
             "client": {
                 "id": updated.id,
+                "tenant_id": updated.tenant_id,
                 "email": updated.email,
                 "is_active": updated.is_active,
                 "status": updated.status,
@@ -566,17 +784,20 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
     @router.post("/admin/clients/unblock")
     def unblock_client(req: AdminClientEmailRequest):
-        """Reativa o acesso do cliente após quitação."""
+        """Reativa o acesso do cliente e da empresa dele após quitação."""
         email_clean = req.email.strip().lower()
         user = db.get_user_by_email(email_clean)
         if not user:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
         updated = db.update_user_status(email_clean, is_active=True, status="active")
+        if user.tenant_id:
+            db.update_tenant_status(user.tenant_id, is_active=True, status="active")
         return {
             "status": "active",
             "message": f"Cliente {email_clean} reativado com sucesso. Acesso liberado.",
             "client": {
                 "id": updated.id,
+                "tenant_id": updated.tenant_id,
                 "email": updated.email,
                 "is_active": updated.is_active,
                 "status": updated.status,
