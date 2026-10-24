@@ -605,6 +605,9 @@
                 <div id="quick-replies-items" class="space-y-1.5"></div>
               </div>
 
+              <!-- Faixa de Bloqueio Exclusivo de Vendedor / Posse -->
+              <div id="chat-lock-bar" class="hidden"></div>
+
               <!-- Barra Exclusiva do Atendente -->
               <div class="p-3.5 bg-white border-t border-[#E3E8E5] flex items-center gap-2 relative">
                 <!-- Overlay de Gravação de Áudio Ativa (PTT) -->
@@ -636,6 +639,7 @@
                 </div>
 
                 <button
+                  id="btn-shortcuts-trigger"
                   onclick="toggleQuickRepliesPopup()"
                   title="Inserir resposta rápida (/)"
                   class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition shrink-0"
@@ -644,6 +648,7 @@
                 </button>
 
                 <button
+                  id="btn-attach-proposal"
                   onclick="sendProposalDocument()"
                   title="Enviar PDF de Proposta Comercial"
                   class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition shrink-0"
@@ -670,6 +675,7 @@
                 />
 
                 <button
+                  id="btn-send-attendance"
                   onclick="sendAttendanceReply()"
                   class="bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0"
                 >
@@ -679,8 +685,8 @@
               </div>
 
               <div class="px-5 py-1 text-[10px] text-[#63756A] flex items-center justify-between bg-white border-t border-[#F0F2F1]">
-                <span><i class="fa-solid fa-user-pen mr-1 text-[#243E30]"></i> Enviando como: <strong id="chat-sender-identity" class="text-[#243E30]">Lucas Silva</strong> (Vendedor) via WhatsApp da Loja</span>
-                <span class="text-[#63756A] hidden sm:inline"><i class="fa-solid fa-headset text-[9px] mr-1"></i> Atendimento Humano Direto</span>
+                <span id="chat-sender-identity-wrapper"><i class="fa-solid fa-user-pen mr-1 text-[#243E30]"></i> Enviando como: <strong id="chat-sender-identity" class="text-[#243E30]">Lucas Silva</strong> (Vendedor) via WhatsApp da Loja</span>
+                <span id="chat-sender-status-pill" class="text-[#63756A] hidden sm:inline"><i class="fa-solid fa-headset text-[9px] mr-1"></i> Atendimento Humano Direto</span>
               </div>
             </div>
 
@@ -1878,6 +1884,132 @@
       `;
     }
 
+    // -------------------------------------------------------------
+    // Controle de Bloqueio Estrito de Chat por Posse do Vendedor
+    // -------------------------------------------------------------
+    function updateChatInputLockState(contact) {
+      if (!contact) return;
+      const isHumanOther = (contact.attendance_status === 'human' || contact.ai_enabled === false)
+          && contact.assignee
+          && contact.assignee.toLowerCase() !== (currentSellerName || '').toLowerCase()
+          && contact.assignee !== 'Agente IA'
+          && contact.assignee !== 'Fila de Espera Humana';
+
+      const isMine = (contact.attendance_status === 'human' || contact.ai_enabled === false)
+          && contact.assignee
+          && contact.assignee.toLowerCase() === (currentSellerName || '').toLowerCase();
+
+      const inputAttendance = document.getElementById('input-attendance');
+      const btnSend = document.getElementById('btn-send-attendance');
+      const btnRecord = document.getElementById('btn-start-record');
+      const btnAttach = document.getElementById('btn-attach-proposal');
+      const btnShortcuts = document.getElementById('btn-shortcuts-trigger');
+      const lockBar = document.getElementById('chat-lock-bar');
+      const senderIdentity = document.getElementById('chat-sender-identity');
+      const statusPill = document.getElementById('chat-sender-status-pill');
+
+      if (isHumanOther) {
+        // CHAT TOTALMENTE BLOQUEADO PARA OUTROS VENDEDORES (OU VENDEDOR ANTERIOR QUE TRANSFERIU)
+        if (inputAttendance) {
+          inputAttendance.disabled = true;
+          inputAttendance.readOnly = true;
+          inputAttendance.value = '';
+          inputAttendance.placeholder = `🔒 Chat Bloqueado: Este cliente pertence a ${contact.assignee}. Você não pode enviar mensagens.`;
+          inputAttendance.className = 'flex-1 bg-zinc-100 border border-zinc-300 rounded-lg px-3.5 py-2.5 text-xs text-zinc-400 placeholder-zinc-400 cursor-not-allowed transition';
+        }
+        if (btnSend) {
+          btnSend.disabled = true;
+          btnSend.className = 'bg-zinc-300 text-zinc-500 font-semibold px-4 py-2.5 rounded-lg text-xs cursor-not-allowed flex items-center gap-1.5 shrink-0';
+        }
+        if (btnRecord) {
+          btnRecord.disabled = true;
+          btnRecord.className = 'bg-zinc-100 text-zinc-400 border border-zinc-200 px-3 py-2.5 rounded-lg text-xs cursor-not-allowed shrink-0 flex items-center gap-1.5';
+        }
+        if (btnAttach) {
+          btnAttach.disabled = true;
+          btnAttach.className = 'bg-zinc-100 text-zinc-400 border border-zinc-200 px-3 py-2.5 rounded-lg text-xs cursor-not-allowed shrink-0';
+        }
+        if (btnShortcuts) {
+          btnShortcuts.disabled = true;
+          btnShortcuts.className = 'bg-zinc-100 text-zinc-400 border border-zinc-200 px-3 py-2.5 rounded-lg text-xs font-bold cursor-not-allowed shrink-0';
+        }
+        if (lockBar) {
+          lockBar.classList.remove('hidden');
+          lockBar.className = 'bg-amber-50 border-t border-b border-amber-200 px-4 py-2.5 flex items-center justify-between text-xs text-amber-950 transition';
+          lockBar.innerHTML = `
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-lock text-amber-700 text-sm"></i>
+              <span>
+                <strong>Chat Bloqueado para você:</strong> Este cliente está sob atendimento exclusivo de <strong>${contact.assignee}</strong>. Envio de mensagens desabilitado.
+              </span>
+            </div>
+            <button onclick="takeAttendance(true)" class="px-3 py-1 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] shadow-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-hand-holding-hand"></i>
+              <span>Assumir Atendimento</span>
+            </button>
+          `;
+        }
+        if (senderIdentity) {
+          senderIdentity.innerHTML = `<span class="text-zinc-400 line-through">${currentSellerName}</span> <span class="text-amber-800 font-bold ml-1">(Envio Bloqueado • Responsável: ${contact.assignee})</span>`;
+        }
+        if (statusPill) {
+          statusPill.innerHTML = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"><i class="fa-solid fa-ban mr-1"></i>Envio Desabilitado</span>`;
+        }
+      } else {
+        // CHAT LIBERADO PARA QUEM POSSUI O CLIENTE (OU CONVERSA LIVRE NA FILA)
+        if (inputAttendance) {
+          inputAttendance.disabled = false;
+          inputAttendance.readOnly = false;
+          inputAttendance.placeholder = isMine 
+            ? "Responder ao cliente (digite '/' para respostas rápidas com autocomplete)..." 
+            : "Responder ao cliente (ao responder, o cliente será fixado com você)...";
+          inputAttendance.className = 'flex-1 bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg px-3.5 py-2.5 text-xs text-[#1A2B21] placeholder-[#63756A] focus:outline-none focus:border-[#243E30] focus:bg-white transition';
+        }
+        if (btnSend) {
+          btnSend.disabled = false;
+          btnSend.className = 'bg-[#243E30] hover:bg-[#365945] text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer';
+        }
+        if (btnRecord) {
+          btnRecord.disabled = false;
+          btnRecord.className = 'bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition shrink-0 flex items-center gap-1.5 cursor-pointer';
+        }
+        if (btnAttach) {
+          btnAttach.disabled = false;
+          btnAttach.className = 'bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#63756A] hover:text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs transition shrink-0 cursor-pointer';
+        }
+        if (btnShortcuts) {
+          btnShortcuts.disabled = false;
+          btnShortcuts.className = 'bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition shrink-0 cursor-pointer';
+        }
+        if (lockBar) {
+          if (isMine) {
+            lockBar.classList.remove('hidden');
+            lockBar.className = 'bg-emerald-50 border-t border-b border-[#cbe1d3] px-4 py-2 flex items-center justify-between text-xs text-emerald-950 transition';
+            lockBar.innerHTML = `
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-700 text-sm"></i>
+                <span class="text-xs text-emerald-950 font-medium">
+                  <strong>Atendimento exclusivo seu:</strong> Você está no controle desta conversa. Os outros vendedores da loja estão com o chat bloqueado para este cliente.
+                </span>
+              </div>
+              <button onclick="openTransferModal()" class="px-2.5 py-1 rounded-lg bg-white border border-[#cbe1d3] hover:bg-emerald-100 text-[#243E30] font-semibold text-[11px] shadow-xs flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
+                <span>Transferir</span>
+              </button>
+            `;
+          } else {
+            lockBar.classList.add('hidden');
+          }
+        }
+        if (senderIdentity) {
+          senderIdentity.innerHTML = `<strong class="text-[#243E30]">${currentSellerName}</strong> (Vendedor Responsável)`;
+        }
+        if (statusPill) {
+          statusPill.innerHTML = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300"><i class="fa-solid fa-check mr-1"></i>Envio Liberado</span>`;
+        }
+      }
+    }
+
     async function selectContact(contactId, reloadList = true) {
       currentContactId = contactId;
       const res = await fetch(`/api/contacts/${contactId}`);
@@ -2011,6 +2143,9 @@
         ? cfKeys.map(k => `<div class="flex justify-between"><span class="text-[#63756A]">${k}</span><span class="font-semibold text-[#1A2B21]">${cf[k]}</span></div>`).join('')
         : `<span class="text-xs text-[#63756A]">Nenhum campo extraído ainda.</span>`;
 
+      // Atualiza o estado de bloqueio estrito do chat (Regra de Posse Exclusiva)
+      updateChatInputLockState(contact);
+
       if (reloadList) {
         renderContactsList();
       }
@@ -2019,9 +2154,12 @@
     // 1) Envio exclusivo da aba de Atendimento (Atendente Humano)
     async function sendAttendanceReply() {
       const input = document.getElementById('input-attendance');
+      if (input && (input.disabled || input.readOnly)) {
+        showEventToast('🔒 Envio bloqueado: este cliente está com outro vendedor.');
+        return;
+      }
       const content = input.value.trim();
       if (!content || !currentContactId) return;
-      input.value = '';
       toggleQuickRepliesPopup(false);
 
       const res = await fetch('/api/messages/send', {
@@ -2035,6 +2173,15 @@
           is_internal: false
         })
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showEventToast(err.detail || 'Não foi possível enviar a mensagem.');
+        await selectContact(currentContactId, true);
+        return;
+      }
+
+      input.value = '';
       const data = await res.json();
       document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
       await selectContact(currentContactId, true);
@@ -2148,16 +2295,26 @@
 
     async function sendProposalDocument() {
       if (!currentContactId) return;
-      await fetch('/api/messages/send', {
+      const input = document.getElementById('input-attendance');
+      if (input && (input.disabled || input.readOnly)) {
+        showEventToast('🔒 Envio bloqueado: este cliente está com outro vendedor.');
+        return;
+      }
+      const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           contact_id: currentContactId,
           sender: 'human',
+          sender_name: currentSellerName,
           content: 'Olá {{nome}}, encaminhamos a proposta comercial detalhada para a {{empresa}}.',
           media_type: 'document'
         })
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showEventToast(err.detail || 'Não foi possível enviar a proposta.');
+      }
       await selectContact(currentContactId, true);
     }
 
@@ -3261,9 +3418,15 @@
                 contact_id: currentContactId,
                 audio_base64: base64Audio,
                 mime_type: mime,
-                caption: 'Mensagem de voz (PTT)'
+                caption: 'Mensagem de voz (PTT)',
+                sender_name: currentSellerName
               })
             });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              showEventToast(err.detail || 'Não foi possível enviar o áudio.');
+              return;
+            }
             const data = await res.json();
             document.getElementById('engine-telemetry').textContent = JSON.stringify(data, null, 2);
             showEventToast('Mensagem de voz enviada com sucesso');

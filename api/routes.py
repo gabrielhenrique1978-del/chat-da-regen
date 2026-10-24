@@ -216,6 +216,7 @@ class WhatsAppWebhookRequest(BaseModel):
 class WhatsAppSendAudioRequest(BaseModel):
     contact_id: str
     audio_base64: str
+    sender_name: Optional[str] = None
 
 
 class WhatsAppConfigRequest(BaseModel):
@@ -859,6 +860,37 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         if not contact:
             raise HTTPException(status_code=404, detail="Contato não encontrado")
 
+        # Regra de Bloqueio Estrito por Posse do Vendedor (Multi-Atendente):
+        # Quando um vendedor pega o cliente ou recebe por transferência,
+        # o chat fica bloqueado para todos os outros vendedores!
+        if not req.is_internal and req.sender == "human":
+            assigned_seller = (contact.assignee or "").strip()
+            is_assigned_human = (
+                (contact.attendance_status == "human" or not contact.ai_enabled)
+                and assigned_seller
+                and assigned_seller not in ("Agente IA", "Fila de Espera Humana", "Fila de Espera", "Fila", "")
+            )
+            sender_seller = (req.sender_name or "").strip()
+
+            if is_assigned_human:
+                if not sender_seller or sender_seller.lower() != assigned_seller.lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Chat bloqueado: este cliente está sendo atendido exclusivamente por '{assigned_seller}'. Você não tem permissão para enviar mensagens nesta conversa.",
+                    )
+            else:
+                # Se estava livre na fila ou com a IA, fixa com o vendedor que respondeu
+                seller_to_assign = sender_seller or assigned_seller or "Vendedor"
+                updated_c = db.set_contact_handoff(
+                    contact_id=req.contact_id,
+                    ai_enabled=False,
+                    attendance_status="human",
+                    assignee=seller_to_assign,
+                )
+                if updated_c:
+                    contact = updated_c
+                    await ws_manager.broadcast_event("handoff_updated", updated_c.model_dump())
+
         # Substitui variáveis dinâmicas {{nome}} e {{empresa}} se presentes
         first_name = contact.name.split()[0] if contact.name else "Cliente"
         empresa = contact.custom_fields.get("empresa", "sua empresa")
@@ -879,19 +911,6 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 media_url=req.media_url,
             )
         )
-
-        # Se um vendedor responder manualmente, fixa o atendimento humano com o vendedor
-        if not req.is_internal and req.sender == "human":
-            seller_to_assign = req.sender_name or contact.assignee
-            if contact.ai_enabled or (contact.assignee in ("Agente IA", "Fila de Espera Humana", "Fila de Espera", None) and seller_to_assign):
-                updated_c = db.set_contact_handoff(
-                    contact_id=req.contact_id,
-                    ai_enabled=False,
-                    attendance_status="human",
-                    assignee=seller_to_assign or "Vendedor",
-                )
-                if updated_c:
-                    await ws_manager.broadcast_event("handoff_updated", updated_c.model_dump())
 
         # Envio em segundo plano para o WhatsApp real se o canal for WhatsApp
         if contact.channel == "whatsapp" and not req.is_internal and contact.phone:
@@ -1183,6 +1202,21 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         contact = db.get_contact(req.contact_id)
         if not contact:
             raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+        # Regra de Bloqueio por Vendedor para Envio de Áudio
+        assigned_seller = (contact.assignee or "").strip()
+        is_assigned_human = (
+            (contact.attendance_status == "human" or not contact.ai_enabled)
+            and assigned_seller
+            and assigned_seller not in ("Agente IA", "Fila de Espera Humana", "Fila de Espera", "Fila", "")
+        )
+        if is_assigned_human:
+            sender_seller = (req.sender_name or "").strip()
+            if not sender_seller or sender_seller.lower() != assigned_seller.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Chat bloqueado: este cliente está sendo atendido exclusivamente por '{assigned_seller}'. Você não tem permissão para enviar áudios nesta conversa.",
+                )
 
         audio_uri = (
             req.audio_base64
