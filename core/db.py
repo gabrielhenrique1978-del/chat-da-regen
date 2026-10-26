@@ -63,8 +63,10 @@ class Message(BaseModel):
     channel: str = "whatsapp"
     content: str
     is_internal: bool = False  # Nota interna (Sussurro/Whisper visível só para equipe)
-    media_type: str = "text"  # text, audio, document
+    media_type: str = "text"  # text, audio, document, template
     media_url: Optional[str] = None
+    external_id: Optional[str] = None  # wamid / mid da API Oficial da Meta
+    delivery_status: str = "sent"  # sent, delivered, read, failed
     timestamp: str = Field(default_factory=utc_now_iso)
 
 
@@ -186,6 +188,23 @@ class Seller(BaseModel):
     phone: Optional[str] = None
     active: bool = True
     created_at: str = Field(default_factory=utc_now_iso)
+
+
+class MetaConfig(BaseModel):
+    """
+    Configuração da API Oficial da Meta (WhatsApp Cloud API & Instagram Graph API)
+    com suporte Multi-Tenant (por empresa cliente ou Master).
+    """
+    id: str = Field(default_factory=new_uuid)
+    tenant_id: str = "master"
+    phone_number_id: Optional[str] = None
+    waba_id: Optional[str] = None
+    ig_account_id: Optional[str] = None
+    access_token: Optional[str] = None
+    verify_token: str = "openchatfunnel_meta_verify_2026"
+    app_secret: Optional[str] = None
+    enabled: bool = True
+    updated_at: str = Field(default_factory=utc_now_iso)
 
 
 
@@ -369,8 +388,23 @@ class Database:
                     is_internal INTEGER NOT NULL DEFAULT 0,
                     media_type TEXT NOT NULL DEFAULT 'text',
                     media_url TEXT,
+                    external_id TEXT,
+                    delivery_status TEXT NOT NULL DEFAULT 'sent',
                     timestamp TEXT NOT NULL,
                     FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS meta_configs (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT UNIQUE NOT NULL,
+                    phone_number_id TEXT,
+                    waba_id TEXT,
+                    ig_account_id TEXT,
+                    access_token TEXT,
+                    verify_token TEXT NOT NULL DEFAULT 'openchatfunnel_meta_verify_2026',
+                    app_secret TEXT,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    updated_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS knowledge_items (
@@ -482,6 +516,8 @@ class Database:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
                 conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES sellers(id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
+                conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS external_id TEXT;")
+                conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'sent';")
             else:
                 # Migração de colunas para suportar SaaS Multi-Tenant na tabela users
                 user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -498,6 +534,12 @@ class Database:
                 if "seller_id" not in contact_cols:
                     conn.execute("ALTER TABLE contacts ADD COLUMN seller_id TEXT REFERENCES sellers(id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
+
+                msg_cols = [r["name"] for r in conn.execute("PRAGMA table_info(messages)").fetchall()]
+                if "external_id" not in msg_cols:
+                    conn.execute("ALTER TABLE messages ADD COLUMN external_id TEXT;")
+                if "delivery_status" not in msg_cols:
+                    conn.execute("ALTER TABLE messages ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'sent';")
 
     def encrypt_existing_unencrypted_records(self) -> int:
         """
@@ -1072,9 +1114,9 @@ class Database:
                 """
                 INSERT INTO messages (
                     id, contact_id, sender, channel, content,
-                    is_internal, media_type, media_url, timestamp
+                    is_internal, media_type, media_url, external_id, delivery_status, timestamp
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message.id,
@@ -1085,6 +1127,8 @@ class Database:
                     1 if message.is_internal else 0,
                     message.media_type,
                     message.media_url,
+                    message.external_id,
+                    message.delivery_status or "sent",
                     message.timestamp,
                 ),
             )
@@ -1120,10 +1164,44 @@ class Database:
                     is_internal=bool(r["is_internal"]) if "is_internal" in r.keys() else False,
                     media_type=r["media_type"] if "media_type" in r.keys() else "text",
                     media_url=r["media_url"] if "media_url" in r.keys() else None,
+                    external_id=r["external_id"] if "external_id" in r.keys() else None,
+                    delivery_status=(r["delivery_status"] if "delivery_status" in r.keys() and r["delivery_status"] else "sent"),
                     timestamp=r["timestamp"],
                 )
                 for r in rows
             ]
+
+    def update_message_delivery_status(
+        self, external_id: str, delivery_status: str
+    ) -> Optional[Message]:
+        """Atualiza o status de entrega/leitura de uma mensagem via external_id (wamid/mid da Meta) ou id."""
+        if not external_id:
+            return None
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM messages WHERE external_id = ? OR id = ? LIMIT 1",
+                (external_id, external_id),
+            ).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                "UPDATE messages SET delivery_status = ? WHERE id = ?",
+                (delivery_status, row["id"]),
+            )
+            updated = conn.execute("SELECT * FROM messages WHERE id = ?", (row["id"],)).fetchone()
+            return Message(
+                id=updated["id"],
+                contact_id=updated["contact_id"],
+                sender=updated["sender"],
+                channel=updated["channel"],
+                content=decrypt_field(updated["content"]) or "",
+                is_internal=bool(updated["is_internal"]),
+                media_type=updated["media_type"] or "text",
+                media_url=updated["media_url"],
+                external_id=updated["external_id"],
+                delivery_status=updated["delivery_status"] or "sent",
+                timestamp=updated["timestamp"],
+            )
 
     # -----------------------------------------------------------------
     # Operações de Funil Kanban (Pipelines, Stages, Deals)
@@ -2004,4 +2082,127 @@ class Database:
         if not seller:
             return None
         return self.update_seller(seller_id, active=not seller.active)
+
+    # -----------------------------------------------------------------
+    # Configuração da API Oficial da Meta (WhatsApp Cloud & Instagram)
+    # -----------------------------------------------------------------
+
+    def _row_to_meta_config(self, row) -> MetaConfig:
+        return MetaConfig(
+            id=row["id"],
+            tenant_id=row["tenant_id"],
+            phone_number_id=row["phone_number_id"],
+            waba_id=row["waba_id"],
+            ig_account_id=row["ig_account_id"],
+            access_token=decrypt_field(row["access_token"]) if row["access_token"] else None,
+            verify_token=row["verify_token"] or "openchatfunnel_meta_verify_2026",
+            app_secret=decrypt_field(row["app_secret"]) if row["app_secret"] else None,
+            enabled=bool(row["enabled"]),
+            updated_at=row["updated_at"],
+        )
+
+    def get_meta_config(self, tenant_id: str = "master") -> MetaConfig:
+        """Retorna a configuração da API Oficial da Meta para o tenant (ou cria padrão)."""
+        clean_tid = (tenant_id or "master").strip()
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM meta_configs WHERE tenant_id = ?", (clean_tid,)
+            ).fetchone()
+            if row:
+                return self._row_to_meta_config(row)
+
+            # Fallback para variáveis de ambiente se for master
+            default_cfg = MetaConfig(
+                tenant_id=clean_tid,
+                phone_number_id=os.getenv("META_PHONE_NUMBER_ID"),
+                waba_id=os.getenv("META_WABA_ID"),
+                ig_account_id=os.getenv("META_IG_ACCOUNT_ID"),
+                access_token=os.getenv("META_ACCESS_TOKEN"),
+                verify_token=os.getenv("META_VERIFY_TOKEN", "openchatfunnel_meta_verify_2026"),
+                app_secret=os.getenv("META_APP_SECRET"),
+                enabled=True,
+            )
+            return default_cfg
+
+    def save_meta_config(self, config: MetaConfig) -> MetaConfig:
+        """Salva ou atualiza as credenciais da API Oficial da Meta com criptografia AES-256."""
+        clean_tid = (config.tenant_id or "master").strip()
+        config.tenant_id = clean_tid
+        config.updated_at = utc_now_iso()
+        enc_token = encrypt_field(config.access_token) if config.access_token else None
+        enc_secret = encrypt_field(config.app_secret) if config.app_secret else None
+
+        with self.connection() as conn:
+            existing = conn.execute(
+                "SELECT id FROM meta_configs WHERE tenant_id = ?", (clean_tid,)
+            ).fetchone()
+            if existing:
+                config.id = existing["id"]
+                conn.execute(
+                    """
+                    UPDATE meta_configs
+                    SET phone_number_id = ?, waba_id = ?, ig_account_id = ?,
+                        access_token = ?, verify_token = ?, app_secret = ?,
+                        enabled = ?, updated_at = ?
+                    WHERE tenant_id = ?
+                    """,
+                    (
+                        config.phone_number_id,
+                        config.waba_id,
+                        config.ig_account_id,
+                        enc_token,
+                        config.verify_token,
+                        enc_secret,
+                        1 if config.enabled else 0,
+                        config.updated_at,
+                        clean_tid,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO meta_configs (
+                        id, tenant_id, phone_number_id, waba_id, ig_account_id,
+                        access_token, verify_token, app_secret, enabled, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        config.id,
+                        clean_tid,
+                        config.phone_number_id,
+                        config.waba_id,
+                        config.ig_account_id,
+                        enc_token,
+                        config.verify_token,
+                        enc_secret,
+                        1 if config.enabled else 0,
+                        config.updated_at,
+                    ),
+                )
+        return self.get_meta_config(clean_tid)
+
+    def find_meta_config_by_channel_id(
+        self,
+        phone_number_id: Optional[str] = None,
+        ig_account_id: Optional[str] = None,
+    ) -> MetaConfig:
+        """Localiza a configuração do Tenant correspondente ao phone_number_id ou ig_account_id do Webhook."""
+        with self.connection() as conn:
+            if phone_number_id:
+                row = conn.execute(
+                    "SELECT * FROM meta_configs WHERE phone_number_id = ? LIMIT 1",
+                    (phone_number_id,),
+                ).fetchone()
+                if row:
+                    return self._row_to_meta_config(row)
+            if ig_account_id:
+                row = conn.execute(
+                    "SELECT * FROM meta_configs WHERE ig_account_id = ? LIMIT 1",
+                    (ig_account_id,),
+                ).fetchone()
+                if row:
+                    return self._row_to_meta_config(row)
+        return self.get_meta_config("master")
+
 

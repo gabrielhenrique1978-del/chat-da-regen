@@ -14,7 +14,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -25,6 +25,7 @@ from core.db import (
     Deal,
     KnowledgeItem,
     Message,
+    MetaConfig,
     Pipeline,
     QuickReply,
     Seller,
@@ -33,6 +34,7 @@ from core.db import (
     User,
     WorkflowRule,
 )
+from core.meta_cloud_service import OFFICIAL_META_TEMPLATES, MetaCloudService
 from core.security import (
     create_access_token,
     decode_access_token,
@@ -239,6 +241,30 @@ class MCPExecuteRequest(BaseModel):
     arguments: Dict[str, Any] = Field(default_factory=dict)
 
 
+class SaveMetaConfigRequest(BaseModel):
+    tenant_id: Optional[str] = "master"
+    phone_number_id: Optional[str] = None
+    waba_id: Optional[str] = None
+    ig_account_id: Optional[str] = None
+    access_token: Optional[str] = None
+    verify_token: Optional[str] = "openchatfunnel_meta_verify_2026"
+    app_secret: Optional[str] = None
+    enabled: bool = True
+
+
+class SendMetaTemplateRequest(BaseModel):
+    contact_id: str
+    template_name: str
+    language_code: str = "pt_BR"
+    sender_name: Optional[str] = None
+
+
+class QuickSwitchProfileRequest(BaseModel):
+    target_role: str = "super_admin"  # "super_admin" ou "tenant"
+    tenant_id: Optional[str] = None
+    email: Optional[str] = None
+
+
 # =====================================================================
 # Schemas e Dependências de Autenticação & Controle de Acesso
 # =====================================================================
@@ -423,6 +449,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     mcp_server = MCPServer(db, agent)
     ws_manager = ConnectionManager()
     whatsapp_service = WhatsAppService()
+    meta_service = MetaCloudService()
 
     def _on_debounced_message(contact_id: str, combined_text: str, meta: Dict[str, Any]) -> Dict[str, Any]:
         return agent.process_incoming_message(
@@ -481,6 +508,9 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         detail=TENANT_SUSPENSION_MESSAGE,
                     )
 
+        tenant_obj = db.get_tenant(user.tenant_id) if user.tenant_id else None
+        tenant_name = tenant_obj.name if tenant_obj else ("Painel Master (Super Admin)" if user.role == "super_admin" else (user.company_name or "Workspace"))
+
         token = create_access_token(
             {
                 "sub": user.id,
@@ -496,10 +526,12 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             "user": {
                 "id": user.id,
                 "tenant_id": user.tenant_id,
+                "tenant_name": tenant_name,
                 "email": user.email,
                 "client_name": user.client_name,
                 "company_name": user.company_name,
                 "role": user.role,
+                "is_super_admin": user.role == "super_admin",
                 "is_active": user.is_active,
                 "status": user.status,
                 "must_change_password": user.must_change_password,
@@ -508,19 +540,133 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
     @router.get("/auth/me")
     def get_me(user: User = Depends(get_current_active_user)):
-        """Retorna os dados do cliente autenticado e ativo."""
+        """Retorna os dados do usuário autenticado, identificando se é Super Admin Master ou Tenant."""
+        tenant_obj = db.get_tenant(user.tenant_id) if user.tenant_id else None
+        tenant_name = tenant_obj.name if tenant_obj else ("Painel Master (Super Admin)" if user.role == "super_admin" else (user.company_name or "Workspace"))
         return {
             "id": user.id,
             "tenant_id": user.tenant_id,
+            "tenant_name": tenant_name,
             "email": user.email,
             "client_name": user.client_name,
             "company_name": user.company_name,
             "role": user.role,
+            "is_super_admin": user.role == "super_admin",
             "is_active": user.is_active,
             "status": user.status,
             "must_change_password": user.must_change_password,
             "created_at": user.created_at,
             "updated_at": user.updated_at,
+        }
+
+    @router.post("/auth/quick-switch")
+    def quick_switch_profile(req: QuickSwitchProfileRequest):
+        """
+        Permite alternar instantaneamente na interface entre o perfil Super Admin Master
+        e uma Empresa Cliente (Tenant) para demonstrar e testar o controle de acesso e bloqueio 403.
+        """
+        if req.target_role == "super_admin":
+            sa = db.get_super_admin()
+            if not sa:
+                sa = db.create_user(
+                    User(
+                        email="superadmin@master.com",
+                        password_hash=hash_password("Master@2026"),
+                        client_name="Proprietário Master (Super Admin)",
+                        company_name="OpenChatFunnel SaaS Master",
+                        role="super_admin",
+                        tenant_id=None,
+                        is_active=True,
+                        status="active",
+                        must_change_password=False,
+                    )
+                )
+            token = create_access_token(
+                {
+                    "sub": sa.id,
+                    "email": sa.email,
+                    "client_name": sa.client_name,
+                    "role": "super_admin",
+                    "tenant_id": None,
+                }
+            )
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "user": {
+                    "id": sa.id,
+                    "tenant_id": None,
+                    "tenant_name": "Painel Master (Super Admin)",
+                    "email": sa.email,
+                    "client_name": sa.client_name,
+                    "company_name": sa.company_name,
+                    "role": "super_admin",
+                    "is_super_admin": True,
+                    "is_active": True,
+                    "status": "active",
+                },
+            }
+
+        # Caso contrário, seleciona ou cria uma Empresa Cliente (Tenant) de teste
+        tenants = db.list_tenants()
+        target_tenant = None
+        if req.tenant_id:
+            target_tenant = db.get_tenant(req.tenant_id)
+        if not target_tenant and tenants:
+            target_tenant = tenants[0]
+        if not target_tenant:
+            target_tenant = db.create_tenant(
+                Tenant(name="Loja Exemplo (Cliente SaaS)", status="active", is_active=True)
+            )
+
+        tenant_users = db.list_users_by_tenant(target_tenant.id)
+        t_user = tenant_users[0] if tenant_users else None
+        if not t_user:
+            demo_email = f"admin.{target_tenant.id[:6]}@cliente.com"
+            t_user = db.create_user(
+                User(
+                    tenant_id=target_tenant.id,
+                    email=demo_email,
+                    password_hash=hash_password("Cliente@2026"),
+                    client_name=f"Gestor - {target_tenant.name}",
+                    company_name=target_tenant.name,
+                    role="admin",
+                    is_active=True,
+                    status="active",
+                    must_change_password=False,
+                )
+            )
+
+        if not target_tenant.is_active or target_tenant.status == "suspended":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=TENANT_SUSPENSION_MESSAGE,
+            )
+
+        token = create_access_token(
+            {
+                "sub": t_user.id,
+                "email": t_user.email,
+                "client_name": t_user.client_name,
+                "role": t_user.role,
+                "tenant_id": target_tenant.id,
+            }
+        )
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": t_user.id,
+                "tenant_id": target_tenant.id,
+                "tenant_name": target_tenant.name,
+                "email": t_user.email,
+                "client_name": t_user.client_name,
+                "company_name": target_tenant.name,
+                "role": t_user.role,
+                "is_super_admin": False,
+                "is_active": t_user.is_active,
+                "status": t_user.status,
+            },
         }
 
     @router.post("/auth/change-password")
@@ -1582,6 +1728,215 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 await ws_manager.broadcast_event("whatsapp_qr_updated", {"qrcode": qrcode})
 
         return {"status": "event_acknowledged"}
+
+    # -----------------------------------------------------------------
+    # API Oficial da Meta (Graph API v21.0 - WhatsApp Cloud & Instagram)
+    # -----------------------------------------------------------------
+
+    @router.get("/meta/config")
+    def get_meta_official_config(tenant_id: str = "master"):
+        """Retorna a configuração atual da API Oficial da Meta e templates disponíveis."""
+        cfg = db.get_meta_config(tenant_id)
+        data = cfg.model_dump()
+        data["has_access_token"] = bool(cfg.access_token)
+        data["has_app_secret"] = bool(cfg.app_secret)
+        data["templates"] = OFFICIAL_META_TEMPLATES
+        return data
+
+    @router.post("/meta/config")
+    def save_meta_official_config(req: SaveMetaConfigRequest):
+        """Salva as credenciais da API Oficial da Meta (WhatsApp Cloud API & Instagram Graph API)."""
+        current = db.get_meta_config(req.tenant_id or "master")
+        cfg = MetaConfig(
+            tenant_id=req.tenant_id or "master",
+            phone_number_id=req.phone_number_id.strip() if req.phone_number_id else current.phone_number_id,
+            waba_id=req.waba_id.strip() if req.waba_id else current.waba_id,
+            ig_account_id=req.ig_account_id.strip() if req.ig_account_id else current.ig_account_id,
+            access_token=req.access_token.strip() if req.access_token else current.access_token,
+            verify_token=(req.verify_token or "openchatfunnel_meta_verify_2026").strip(),
+            app_secret=req.app_secret.strip() if req.app_secret else current.app_secret,
+            enabled=req.enabled,
+        )
+        saved = db.save_meta_config(cfg)
+        res = saved.model_dump()
+        res["has_access_token"] = bool(saved.access_token)
+        res["has_app_secret"] = bool(saved.app_secret)
+        return res
+
+    @router.post("/meta/test-connection")
+    async def test_meta_official_connection(tenant_id: str = "master"):
+        """Testa as credenciais configuradas consultando a Graph API v21.0 da Meta."""
+        cfg = db.get_meta_config(tenant_id)
+        return await meta_service.test_graph_api_connection(cfg)
+
+    @router.get("/contacts/{contact_id}/window")
+    def get_contact_24h_window(contact_id: str):
+        """Verifica o status da Janela de 24 Horas da API Oficial da Meta para o contato."""
+        contact = db.get_contact(contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+        msgs = db.list_messages(contact_id, include_internal=False)
+        window_info = meta_service.check_24h_window(msgs)
+        window_info["templates"] = OFFICIAL_META_TEMPLATES
+        return window_info
+
+    @router.post("/messages/send-template")
+    async def send_official_meta_template(req: SendMetaTemplateRequest):
+        """
+        Dispara um Template Oficial da Meta (HSM) para reabrir a janela de 24h
+        ou iniciar atendimento ativo, registrando no histórico do cliente.
+        """
+        contact = db.get_contact(req.contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+        # Respeita a regra de posse exclusiva do vendedor se já atribuído
+        assigned_seller = (contact.assignee or "").strip()
+        is_assigned_human = (
+            (contact.attendance_status == "human" or not contact.ai_enabled)
+            and assigned_seller
+            and assigned_seller not in ("Agente IA", "Fila de Espera Humana", "Fila de Espera", "Fila", "")
+        )
+        sender_seller = (req.sender_name or "").strip()
+        if is_assigned_human and sender_seller and sender_seller.lower() != assigned_seller.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Chat bloqueado: este cliente está sendo atendido exclusivamente por '{assigned_seller}'.",
+            )
+
+        tpl_meta = next(
+            (t for t in OFFICIAL_META_TEMPLATES if t["name"] == req.template_name),
+            {
+                "name": req.template_name,
+                "title": req.template_name,
+                "language": req.language_code,
+                "preview": f"[Template Oficial Meta: {req.template_name}]",
+            },
+        )
+        first_name = contact.name.split()[0] if contact.name else "Cliente"
+        rendered_preview = tpl_meta["preview"].replace("{{1}}", first_name)
+
+        cfg = db.get_meta_config("master")
+        send_res = await meta_service.send_whatsapp_template(
+            cfg=cfg,
+            to_phone=contact.phone or "",
+            template_name=req.template_name,
+            language_code=tpl_meta.get("language", req.language_code),
+            customer_name=first_name,
+        )
+
+        msg = db.create_message(
+            Message(
+                contact_id=contact.id,
+                sender="human",
+                channel=contact.channel,
+                content=f"📋 [Template Oficial Meta: {tpl_meta['title']}]\n{rendered_preview}",
+                is_internal=False,
+                media_type="template",
+                external_id=send_res.get("external_id"),
+                delivery_status="sent" if send_res.get("status") != "failed" else "failed",
+            )
+        )
+        payload = {"message": msg.model_dump(), "meta_dispatch": send_res}
+        await ws_manager.broadcast_event("message_sent", payload)
+        return payload
+
+    @router.get("/webhooks/meta")
+    def verify_meta_webhook(
+        hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+        hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
+        hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
+    ):
+        """
+        Endpoint oficial de validação GET exigido pelo painel Meta for Developers
+        ao configurar o Webhook do WhatsApp Cloud API e Instagram Graph API.
+        """
+        cfg = db.get_meta_config("master")
+        challenge = meta_service.verify_webhook_challenge(
+            mode=hub_mode,
+            verify_token=hub_verify_token,
+            challenge=hub_challenge,
+            expected_token=cfg.verify_token,
+        )
+        if challenge is not None:
+            return PlainTextResponse(content=challenge, status_code=200)
+        raise HTTPException(status_code=403, detail="Falha na verificação do verify_token da Meta")
+
+    @router.post("/webhooks/meta")
+    async def receive_meta_official_webhook(request: Request):
+        """
+        Recebe eventos reais da API Oficial da Meta (Graph API v21.0):
+        1. Valida assinatura criptográfica X-Hub-Signature-256 (HMAC-SHA256).
+        2. Identifica o Tenant pelo phone_number_id / ig_account_id.
+        3. Processa novas mensagens de WhatsApp e Instagram Direct.
+        4. Atualiza recibos de entrega e leitura em tempo real (sent, delivered, read, failed).
+        """
+        raw_body = await request.body()
+        try:
+            payload = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Payload JSON inválido")
+
+        # Identifica configuração do Tenant se phone_number_id vier no payload
+        parsed = meta_service.parse_meta_webhook(payload)
+        first_msg = parsed["incoming_messages"][0] if parsed["incoming_messages"] else {}
+        cfg = db.find_meta_config_by_channel_id(
+            phone_number_id=first_msg.get("phone_number_id"),
+            ig_account_id=first_msg.get("ig_account_id"),
+        )
+
+        sig_header = request.headers.get("X-Hub-Signature-256")
+        if cfg.app_secret and not meta_service.verify_signature(raw_body, sig_header, cfg.app_secret):
+            raise HTTPException(status_code=401, detail="Assinatura X-Hub-Signature-256 inválida")
+
+        processed_messages = []
+        updated_statuses = []
+
+        # 1. Processa mensagens recebidas dos clientes
+        for item in parsed["incoming_messages"]:
+            sender_phone = item["sender_phone"]
+            channel = item["channel"]
+            contact = db.find_contact_by_phone(sender_phone)
+            if not contact:
+                contact = db.create_contact(
+                    Contact(
+                        name=item["sender_name"],
+                        phone=sender_phone if sender_phone.startswith("+") or sender_phone.startswith("ig_") else f"+{sender_phone}",
+                        channel=channel,
+                        tags=[f"{channel}-oficial-meta"],
+                    ),
+                    create_default_deal=True,
+                )
+
+            result = agent.process_incoming_message(
+                contact_id=contact.id,
+                content=item["content"],
+                channel=channel,
+                media_type=item["media_type"],
+            )
+            processed_messages.append(result)
+            await ws_manager.broadcast_event("message_processed", result)
+
+        # 2. Processa recibos de entrega e leitura (✓, ✓✓, ✓✓ azul)
+        for st in parsed["status_updates"]:
+            updated_msg = db.update_message_delivery_status(
+                external_id=st["external_id"],
+                delivery_status=st["delivery_status"],
+            )
+            status_payload = {
+                "external_id": st["external_id"],
+                "delivery_status": st["delivery_status"],
+                "message": updated_msg.model_dump() if updated_msg else None,
+                "error": st.get("error"),
+            }
+            updated_statuses.append(status_payload)
+            await ws_manager.broadcast_event("message_status_updated", status_payload)
+
+        return {
+            "status": "EVENT_RECEIVED",
+            "processed_messages": len(processed_messages),
+            "updated_statuses": len(updated_statuses),
+        }
 
     # -----------------------------------------------------------------
     # Base de Conhecimento (Knowledge Base)

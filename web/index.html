@@ -188,15 +188,37 @@
           </button>
         </div>
 
-        <!-- Botão Gestão de Clientes & Inadimplência (B2B) -->
+        <!-- Identidade de Acesso: Super Admin Master vs Empresa Cliente (Tenant) -->
+        <button
+          onclick="openAuthLoginModal()"
+          id="btn-auth-identity"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-amber-500 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-950 transition shadow-sm"
+          title="Identidade de Login Ativa: Super Admin Master vs Empresa Cliente (Tenant)"
+        >
+          <i id="auth-identity-icon" class="fa-solid fa-crown text-amber-600 text-xs"></i>
+          <span id="auth-identity-label">Super Admin Master</span>
+        </button>
+
+        <!-- Botão Gestão de Clientes & Inadimplência (B2B - Visível APENAS para Super Admin) -->
         <button
           onclick="openClientsAdminModal()"
           id="btn-clients-admin"
           class="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-950 transition shadow-sm"
-          title="Gerenciamento de Clientes B2B, Senhas Provisórias e Bloqueio de Inadimplência"
+          title="Exclusivo Super Admin: Gerenciamento de Empresas Clientes (Tenants) e Bloqueio de Inadimplência"
         >
           <i class="fa-solid fa-users-gear text-emerald-700 text-sm"></i>
           <span class="inline">Clientes & Inadimplência</span>
+        </button>
+
+        <!-- Botão API Oficial da Meta (Graph API v21.0 - Cloud API & Instagram) -->
+        <button
+          onclick="openMetaConfigModal()"
+          id="btn-meta-official"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-900 transition shadow-sm"
+          title="Configurar API Oficial da Meta (WhatsApp Cloud API & Instagram Graph API)"
+        >
+          <i class="fa-brands fa-meta text-blue-600 text-sm"></i>
+          <span class="hidden md:inline">API Oficial Meta</span>
         </button>
 
         <!-- Status & Conexão WhatsApp Real (Evolution API) -->
@@ -645,6 +667,16 @@
                   class="bg-[#F6F8F7] hover:bg-[#EAF2ED] text-[#243E30] border border-[#E3E8E5] px-3 py-2.5 rounded-lg text-xs font-bold transition shrink-0"
                 >
                   / Atalhos
+                </button>
+
+                <button
+                  id="btn-meta-template"
+                  onclick="openMetaTemplatesModal()"
+                  title="Enviar Template Oficial da Meta (HSM) — Reabrir Janela de 24h"
+                  class="bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 px-3 py-2.5 rounded-lg text-xs font-bold transition shrink-0 flex items-center gap-1.5"
+                >
+                  <i class="fa-brands fa-meta text-blue-600"></i>
+                  <span class="hidden sm:inline">Template HSM</span>
                 </button>
 
                 <button
@@ -1501,6 +1533,180 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL: IDENTIDADE DE LOGIN (SUPER ADMIN MASTER VS TENANT CLIENTE)     -->
+  <!-- ===================================================================== -->
+  <div id="modal-auth-login" class="hidden fixed inset-0 bg-[#1A2B21]/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
+            <i class="fa-solid fa-crown text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#1A2B21]">Identidade de Acesso (Super Admin vs Tenant)</h3>
+            <p class="text-xs text-[#63756A]">O sistema identifica pelo token JWT se você é o Proprietário Master ou uma Empresa Cliente</p>
+          </div>
+        </div>
+        <button onclick="closeAuthLoginModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Cartão da Sessão Atual -->
+      <div id="auth-current-session-box" class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-3.5 text-xs space-y-1">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-[#1A2B21]" id="auth-modal-role-title">👑 Logado como: SUPER ADMIN MASTER</span>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800" id="auth-modal-role-pill">role: super_admin</span>
+        </div>
+        <p class="text-[#63756A]" id="auth-modal-role-desc">Você possui acesso total ao Painel Master de Empresas Clientes e controle de inadimplência.</p>
+      </div>
+
+      <!-- Alternância Rápida em 1 Clique (Para Teste Imediato) -->
+      <div class="space-y-2">
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-[#63756A]">Alternar Visão em 1 Clique (Teste de Permissões):</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button onclick="quickSwitchRole('super_admin')" class="p-3 rounded-xl border-2 border-amber-500 bg-amber-50 hover:bg-amber-100 text-left transition">
+            <div class="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-crown text-amber-600"></i> Visão Super Admin (Você)
+            </div>
+            <p class="text-[10px] text-amber-800 mt-1">Libera o botão "Clientes & Inadimplência" e rotas /api/admin/tenants.</p>
+          </button>
+          <button onclick="quickSwitchRole('tenant')" class="p-3 rounded-xl border-2 border-indigo-400 bg-indigo-50 hover:bg-indigo-100 text-left transition">
+            <div class="font-bold text-xs text-indigo-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-building text-indigo-600"></i> Visão Empresa Cliente (Tenant)
+            </div>
+            <p class="text-[10px] text-indigo-800 mt-1">Oculta o painel Master B2B e aplica trava 403 se a empresa estiver suspensa.</p>
+          </button>
+        </div>
+      </div>
+
+      <!-- Login com Credenciais Reais (E-mail e Senha) -->
+      <div class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-4 space-y-3">
+        <h4 class="text-xs font-bold text-[#243E30] uppercase tracking-wider">Ou entrar com E-mail e Senha</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input id="login-input-email" type="email" placeholder="E-mail (ex: superadmin@master.com)" class="bg-white border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+          <input id="login-input-password" type="password" placeholder="Sua senha" class="bg-white border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+        </div>
+        <div class="flex justify-end">
+          <button onclick="submitRealLogin()" class="px-4 py-1.5 rounded-lg bg-[#243E30] hover:bg-[#365945] text-white text-xs font-bold transition">
+            Autenticar com JWT
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: CONFIGURAÇÃO DA API OFICIAL DA META (CLOUD API & INSTAGRAM)    -->
+  <!-- ===================================================================== -->
+  <div id="modal-meta-config" class="hidden fixed inset-0 bg-[#1A2B21]/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
+            <i class="fa-brands fa-meta text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#1A2B21]">API Oficial da Meta (Graph API v21.0)</h3>
+            <p class="text-xs text-[#63756A]">WhatsApp Business Cloud API & Instagram Direct Oficial com HMAC-SHA256 e Janela de 24h</p>
+          </div>
+        </div>
+        <button onclick="closeMetaConfigModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Dados do Webhook para colar no painel Meta for Developers -->
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs space-y-2">
+        <div class="font-bold text-blue-950 flex items-center gap-1.5">
+          <i class="fa-solid fa-link text-blue-600"></i> 1. Configurar Webhook no Painel Meta for Developers
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <span class="text-[10px] font-bold text-blue-800 uppercase">Callback URL Oficial:</span>
+            <div id="meta-webhook-url-display" class="bg-white border border-blue-200 rounded p-1.5 font-mono text-[11px] text-blue-950 select-all">http://localhost:8000/api/webhooks/meta</div>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold text-blue-800 uppercase">Verify Token (hub.verify_token):</span>
+            <input id="meta-cfg-verify-token" type="text" value="openchatfunnel_meta_verify_2026" class="w-full bg-white border border-blue-200 rounded p-1.5 font-mono text-[11px] text-blue-950" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Credenciais da Conta Meta -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-[#63756A] mb-1">Phone Number ID (WhatsApp)</label>
+          <input id="meta-cfg-phone-id" type="text" placeholder="Ex: 109283746512345" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-[#63756A] mb-1">WABA ID (Conta WhatsApp)</label>
+          <input id="meta-cfg-waba-id" type="text" placeholder="Ex: 987654321012345" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-[#63756A] mb-1">Instagram Business ID</label>
+          <input id="meta-cfg-ig-id" type="text" placeholder="Ex: 178414000000000" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-[#63756A] mb-1">Permanent Access Token (System User)</label>
+          <input id="meta-cfg-access-token" type="password" placeholder="EAAGm0PX4ZCps..." class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-[#63756A] mb-1">App Secret (Assinatura X-Hub-Signature-256)</label>
+          <input id="meta-cfg-app-secret" type="password" placeholder="Opcional: Chave Secreta do App Meta" class="w-full bg-[#F6F8F7] border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21]" />
+        </div>
+      </div>
+
+      <div id="meta-test-result" class="hidden rounded-xl p-3 text-xs font-medium border"></div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#E3E8E5]">
+        <div class="flex items-center gap-2">
+          <button onclick="testMetaOfficialConnection()" class="px-3 py-2 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-bold transition">
+            <i class="fa-solid fa-plug-circle-check mr-1"></i> Testar Graph API
+          </button>
+          <button onclick="simulateOfficialMetaWebhook()" class="px-3 py-2 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold transition" title="Dispara um payload oficial da Meta para testar recebimento e recibo azul (✓✓)">
+            <i class="fa-solid fa-bolt mr-1"></i> Simular Evento Oficial Meta
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="closeMetaConfigModal()" class="px-3 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] border border-[#E3E8E5]">
+            Fechar
+          </button>
+          <button onclick="saveMetaOfficialConfig()" class="px-4 py-2 rounded-lg text-xs font-bold bg-[#243E30] hover:bg-[#365945] text-white shadow-sm">
+            Salvar Credenciais Meta (AES-256)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: DISPARO DE TEMPLATES OFICIAIS DA META (HSM / JANELA DE 24H)     -->
+  <!-- ===================================================================== -->
+  <div id="modal-meta-templates" class="hidden fixed inset-0 bg-[#1A2B21]/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
+            <i class="fa-brands fa-meta"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-[#1A2B21]">Templates Oficiais Aprovados (HSM Meta)</h3>
+            <p id="meta-window-modal-status" class="text-[11px] text-[#63756A]">Utilize para iniciar conversas ou reabrir a janela de 24h da API Oficial</p>
+          </div>
+        </div>
+        <button onclick="closeMetaTemplatesModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="meta-templates-list" class="space-y-2 max-h-[320px] overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- LÓGICA DE INTEGRAÇÃO REST E ESTADO DA APLICAÇÃO                       -->
   <!-- ===================================================================== -->
   <script>
@@ -1947,11 +2153,25 @@
         `;
       }
 
+      let receiptHtml = '';
+      if (!isCustomer && !isSystem) {
+        const ds = m.delivery_status || 'sent';
+        if (ds === 'read') {
+          receiptHtml = '<span class="text-sky-500 font-bold ml-1" title="Lido pelo cliente (Meta Oficial)"><i class="fa-solid fa-check-double"></i></span>';
+        } else if (ds === 'delivered') {
+          receiptHtml = '<span class="text-[#63756A] font-bold ml-1" title="Entregue no aparelho do cliente"><i class="fa-solid fa-check-double"></i></span>';
+        } else if (ds === 'failed') {
+          receiptHtml = '<span class="text-red-600 font-bold ml-1" title="Falha no envio na API da Meta"><i class="fa-solid fa-triangle-exclamation"></i></span>';
+        } else {
+          receiptHtml = '<span class="text-[#63756A] ml-1" title="Enviado"><i class="fa-solid fa-check"></i></span>';
+        }
+      }
+
       return `
         <div class="max-w-[80%] rounded-xl px-4 py-3 border text-xs leading-relaxed shadow-[0_1px_2px_rgba(26,43,33,0.03)] ${bubbleStyle}">
           <div class="flex items-center justify-between gap-4 mb-1">
             <span class="text-[10px] font-bold text-[#63756A]">${senderTitle}</span>
-            <span class="text-[10px] text-[#63756A]">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+            <span class="text-[10px] text-[#63756A] flex items-center">${new Date(m.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}${receiptHtml}</span>
           </div>
           ${attachmentBlock}
           <div class="whitespace-pre-line">${m.content}</div>
@@ -3867,8 +4087,279 @@
       }
     }
 
+    // ===============================================================
+    // IDENTIDADE DE LOGIN (SUPER ADMIN MASTER VS TENANT) & API META
+    // ===============================================================
+    let currentAuthUser = JSON.parse(localStorage.getItem('openchatfunnel_auth_user') || 'null') || {
+      role: 'super_admin',
+      is_super_admin: true,
+      client_name: 'Proprietário Master (Super Admin)',
+      tenant_name: 'Painel Master (Super Admin)',
+      email: 'superadmin@master.com'
+    };
+
+    function applyAuthIdentityUI() {
+      const btnAuth = document.getElementById('btn-auth-identity');
+      const iconAuth = document.getElementById('auth-identity-icon');
+      const labelAuth = document.getElementById('auth-identity-label');
+      const btnClientsAdmin = document.getElementById('btn-clients-admin');
+
+      const isSuper = currentAuthUser && (currentAuthUser.role === 'super_admin' || currentAuthUser.is_super_admin);
+
+      if (isSuper) {
+        if (btnAuth) btnAuth.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-amber-500 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-950 transition shadow-sm';
+        if (iconAuth) iconAuth.className = 'fa-solid fa-crown text-amber-600 text-xs';
+        if (labelAuth) labelAuth.textContent = 'Super Admin Master';
+        // Super Admin vê o botão de Gestão de Clientes B2B & Inadimplência
+        if (btnClientsAdmin) btnClientsAdmin.classList.remove('hidden');
+      } else {
+        const tName = currentAuthUser?.tenant_name || currentAuthUser?.company_name || 'Empresa Cliente';
+        if (btnAuth) btnAuth.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-indigo-500 bg-indigo-50 hover:bg-indigo-100 text-xs font-bold text-indigo-950 transition shadow-sm';
+        if (iconAuth) iconAuth.className = 'fa-solid fa-building text-indigo-600 text-xs';
+        if (labelAuth) labelAuth.textContent = `Tenant: ${tName}`;
+        // Empresa Cliente (Tenant) NUNCA vê o botão de Gestão Master de Inadimplência!
+        if (btnClientsAdmin) btnClientsAdmin.classList.add('hidden');
+      }
+
+      const roleTitle = document.getElementById('auth-modal-role-title');
+      const rolePill = document.getElementById('auth-modal-role-pill');
+      const roleDesc = document.getElementById('auth-modal-role-desc');
+      if (roleTitle && rolePill && roleDesc) {
+        if (isSuper) {
+          roleTitle.textContent = `👑 Logado como: ${currentAuthUser.client_name}`;
+          rolePill.textContent = 'role: super_admin';
+          rolePill.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900';
+          roleDesc.textContent = 'Acesso irrestrito ao Painel Master (/api/admin/tenants) e controle global de inadimplência.';
+        } else {
+          roleTitle.textContent = `🏢 Logado como Tenant: ${currentAuthUser.tenant_name || currentAuthUser.company_name}`;
+          rolePill.textContent = `role: ${currentAuthUser.role} (tenant)`;
+          rolePill.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-900';
+          roleDesc.textContent = 'Visão de Empresa Cliente: sem acesso ao painel Master B2B e sujeito a bloqueio 403 se suspenso.';
+        }
+      }
+    }
+
+    function openAuthLoginModal() {
+      applyAuthIdentityUI();
+      document.getElementById('modal-auth-login').classList.remove('hidden');
+    }
+
+    function closeAuthLoginModal() {
+      document.getElementById('modal-auth-login').classList.add('hidden');
+    }
+
+    async function quickSwitchRole(targetRole) {
+      try {
+        const res = await fetch('/api/auth/quick-switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_role: targetRole })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`🚫 BLOQUEIO 403 FORBIDDEN:\n${data.detail}`);
+          return;
+        }
+        currentAuthUser = data.user;
+        localStorage.setItem('openchatfunnel_auth_token', data.access_token);
+        localStorage.setItem('openchatfunnel_auth_user', JSON.stringify(data.user));
+        applyAuthIdentityUI();
+        closeAuthLoginModal();
+        showEventToast(
+          currentAuthUser.is_super_admin
+            ? '👑 Você agora está autenticado como SUPER ADMIN MASTER!'
+            : `🏢 Você agora está visualizando como Empresa Cliente (Tenant): ${currentAuthUser.tenant_name}`
+        );
+      } catch (e) {
+        alert('Erro ao alternar perfil de acesso.');
+      }
+    }
+
+    async function submitRealLogin() {
+      const email = document.getElementById('login-input-email').value.trim();
+      const password = document.getElementById('login-input-password').value;
+      if (!email || !password) {
+        alert('Preencha e-mail e senha.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`🚫 Acesso Negado (${res.status}):\n${data.detail}`);
+          return;
+        }
+        currentAuthUser = data.user;
+        localStorage.setItem('openchatfunnel_auth_token', data.access_token);
+        localStorage.setItem('openchatfunnel_auth_user', JSON.stringify(data.user));
+        applyAuthIdentityUI();
+        closeAuthLoginModal();
+        showEventToast(`Autenticado com sucesso como ${currentAuthUser.client_name} (${currentAuthUser.role})!`);
+      } catch (e) {
+        alert('Erro ao realizar login.');
+      }
+    }
+
+    // ===============================================================
+    // INTEGRAÇÃO COM A API OFICIAL DA META (CLOUD API & INSTAGRAM)
+    // ===============================================================
+    async function openMetaConfigModal() {
+      document.getElementById('modal-meta-config').classList.remove('hidden');
+      const whDisplay = document.getElementById('meta-webhook-url-display');
+      if (whDisplay) whDisplay.textContent = `${location.origin}/api/webhooks/meta`;
+      try {
+        const res = await fetch('/api/meta/config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        document.getElementById('meta-cfg-phone-id').value = cfg.phone_number_id || '';
+        document.getElementById('meta-cfg-waba-id').value = cfg.waba_id || '';
+        document.getElementById('meta-cfg-ig-id').value = cfg.ig_account_id || '';
+        document.getElementById('meta-cfg-verify-token').value = cfg.verify_token || 'openchatfunnel_meta_verify_2026';
+      } catch (e) {}
+    }
+
+    function closeMetaConfigModal() {
+      document.getElementById('modal-meta-config').classList.add('hidden');
+    }
+
+    async function saveMetaOfficialConfig() {
+      const payload = {
+        phone_number_id: document.getElementById('meta-cfg-phone-id').value.trim(),
+        waba_id: document.getElementById('meta-cfg-waba-id').value.trim(),
+        ig_account_id: document.getElementById('meta-cfg-ig-id').value.trim(),
+        access_token: document.getElementById('meta-cfg-access-token').value.trim(),
+        verify_token: document.getElementById('meta-cfg-verify-token').value.trim(),
+        app_secret: document.getElementById('meta-cfg-app-secret').value.trim(),
+        enabled: true
+      };
+      const res = await fetch('/api/meta/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showEventToast('Credenciais da API Oficial da Meta salvas e criptografadas com sucesso!');
+      }
+    }
+
+    async function testMetaOfficialConnection() {
+      const box = document.getElementById('meta-test-result');
+      box.classList.remove('hidden');
+      box.className = 'rounded-xl p-3 text-xs font-medium border bg-zinc-50 border-zinc-200 text-zinc-700';
+      box.textContent = 'Testando conexão com https://graph.facebook.com/v21.0...';
+      await saveMetaOfficialConfig();
+      const res = await fetch('/api/meta/test-connection', { method: 'POST' });
+      const data = await res.json();
+      if (data.connected) {
+        box.className = 'rounded-xl p-3 text-xs font-bold border bg-emerald-50 border-emerald-300 text-emerald-900';
+        box.textContent = `✅ ${data.message} (Qualidade: ${data.quality_rating})`;
+      } else {
+        box.className = 'rounded-xl p-3 text-xs font-medium border bg-amber-50 border-amber-300 text-amber-900';
+        box.textContent = `ℹ️ ${data.message}`;
+      }
+    }
+
+    async function simulateOfficialMetaWebhook() {
+      const samplePayload = {
+        object: 'whatsapp_business_account',
+        entry: [{
+          id: 'WABA_OFFICIAL_01',
+          changes: [{
+            field: 'messages',
+            value: {
+              messaging_product: 'whatsapp',
+              metadata: { phone_number_id: '109283746512345' },
+              contacts: [{ profile: { name: 'Cliente Oficial Meta Cloud' }, wa_id: '5511998765432' }],
+              messages: [{
+                from: '5511998765432',
+                id: `wamid.meta_${Date.now()}`,
+                timestamp: String(Math.floor(Date.now() / 1000)),
+                type: 'text',
+                text: { body: 'Olá! Vim pelo número oficial da Meta Cloud API. Quero conhecer os planos!' }
+              }]
+            }
+          }]
+        }]
+      };
+      const res = await fetch('/api/webhooks/meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(samplePayload)
+      });
+      if (res.ok) {
+        closeMetaConfigModal();
+        showEventToast('⚡ Webhook Oficial da Meta recebido e processado em tempo real!');
+        await loadContacts(true);
+      }
+    }
+
+    async function openMetaTemplatesModal() {
+      if (!currentContactId) {
+        alert('Selecione um cliente na fila primeiro.');
+        return;
+      }
+      const modal = document.getElementById('modal-meta-templates');
+      const listEl = document.getElementById('meta-templates-list');
+      const statusEl = document.getElementById('meta-window-modal-status');
+      modal.classList.remove('hidden');
+
+      const res = await fetch(`/api/contacts/${currentContactId}/window`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (statusEl) {
+        statusEl.textContent = data.reason;
+        statusEl.className = data.window_open ? 'text-[11px] font-bold text-emerald-700' : 'text-[11px] font-bold text-amber-700';
+      }
+      const templates = data.templates || [];
+      listEl.innerHTML = templates.map(t => `
+        <div class="p-3 rounded-xl border border-[#E3E8E5] hover:bg-[#F6F8F7] flex items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-xs text-[#1A2B21]">${t.title}</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-50 text-blue-800 border border-blue-200">${t.name} (${t.language})</span>
+            </div>
+            <p class="text-[11px] text-[#63756A] mt-1">${t.preview}</p>
+          </div>
+          <button onclick="sendOfficialMetaTemplate('${t.name}', '${t.language}')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shrink-0">
+            Disparar HSM
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function closeMetaTemplatesModal() {
+      document.getElementById('modal-meta-templates').classList.add('hidden');
+    }
+
+    async function sendOfficialMetaTemplate(templateName, languageCode) {
+      if (!currentContactId) return;
+      const res = await fetch('/api/messages/send-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: currentContactId,
+          template_name: templateName,
+          language_code: languageCode,
+          sender_name: currentSellerName
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || 'Erro ao enviar template.');
+        return;
+      }
+      closeMetaTemplatesModal();
+      showEventToast(`📋 Template Oficial '${templateName}' enviado com sucesso!`);
+      await selectContact(currentContactId, true);
+    }
+
     // Inicialização
     window.addEventListener('DOMContentLoaded', async () => {
+      applyAuthIdentityUI();
       updateSoundIcon();
       connectWebSocket();
       await loadSellers();
