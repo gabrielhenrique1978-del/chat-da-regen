@@ -104,6 +104,7 @@ class HandoffRequest(BaseModel):
 
 class AssignContactRequest(BaseModel):
     assignee: str
+    seller_id: Optional[str] = None
     ai_enabled: bool = False
     attendance_status: str = "human"
     operator_name: Optional[str] = None
@@ -114,6 +115,13 @@ class CreateSellerRequest(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+
+
+class UpdateSellerRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    active: Optional[bool] = None
 
 
 class TemperatureRequest(BaseModel):
@@ -357,7 +365,9 @@ def require_super_admin(user: User = Depends(get_current_active_user)) -> User:
 
 
 def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI:
-    resolved_db_path = db_path or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+    from dotenv import load_dotenv
+    load_dotenv()
+    resolved_db_path = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "openchatfunnel.db")
     app = FastAPI(
         title="Chat da Regen CRM & MCP Server v2.0",
         description="Plataforma Executiva de Atendimento, CRM Conversacional, Kanban Drag & Drop, Handoff Humano, Broadcast e Servidor MCP",
@@ -919,21 +929,50 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     # -----------------------------------------------------------------
 
     @router.get("/sellers")
-    def list_store_sellers():
-        """Retorna a lista de vendedores ativos da loja para distribuição e posse de conversas."""
-        sellers = db.list_sellers()
+    def list_store_sellers(include_inactive: bool = False):
+        """Retorna a lista de vendedores da loja (apenas ativos por padrão, ou todos se include_inactive=True)."""
+        sellers = db.list_sellers(include_inactive=include_inactive)
         return {"sellers": [s.model_dump() for s in sellers]}
 
     @router.post("/sellers")
-    def create_store_seller(req: CreateSellerRequest):
-        """Cadastra um novo vendedor na equipe da loja."""
-        if not req.name.strip():
+    async def create_store_seller(req: CreateSellerRequest):
+        """Cadastra um novo vendedor na equipe da loja com validação."""
+        if not req.name or not req.name.strip():
             raise HTTPException(status_code=400, detail="Nome do vendedor é obrigatório")
         try:
             seller = db.create_seller(name=req.name, email=req.email, phone=req.phone)
-            return seller.model_dump()
+            payload = seller.model_dump()
+            await ws_manager.broadcast_event("seller_created", payload)
+            return payload
+        except ValueError as val_err:
+            raise HTTPException(status_code=400, detail=str(val_err))
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Erro ao cadastrar vendedor: {exc}")
+
+    @router.patch("/sellers/{seller_id}")
+    @router.put("/sellers/{seller_id}")
+    async def update_store_seller(seller_id: str, req: UpdateSellerRequest):
+        """Atualiza os dados do vendedor ou alterna seu estado de ativação (soft delete)."""
+        existing = db.get_seller(seller_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Vendedor não encontrado")
+        try:
+            updated = db.update_seller(
+                seller_id=seller_id,
+                name=req.name,
+                email=req.email,
+                phone=req.phone,
+                active=req.active,
+            )
+            if not updated:
+                raise HTTPException(status_code=404, detail="Vendedor não encontrado")
+            payload = updated.model_dump()
+            await ws_manager.broadcast_event("seller_updated", payload)
+            return payload
+        except ValueError as val_err:
+            raise HTTPException(status_code=400, detail=str(val_err))
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Erro ao atualizar vendedor: {exc}")
 
     @router.patch("/contacts/{contact_id}/assign")
     async def assign_contact_to_seller(contact_id: str, req: AssignContactRequest):
@@ -947,12 +986,28 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
         old_assignee = contact.assignee or "Fila de Espera"
         new_assignee = req.assignee.strip()
+        seller_id = req.seller_id
+
+        # Se seller_id não foi passado explicitamente, busca se new_assignee corresponde a um vendedor
+        if not seller_id and new_assignee not in ("Agente IA", "Fila de Espera", "Fila de Espera Humana", ""):
+            seller = db.get_seller_by_name(new_assignee)
+            if seller:
+                seller_id = seller.id
+        elif seller_id and (not new_assignee or new_assignee in ("Vendedor", "Fila de Espera")):
+            seller = db.get_seller(seller_id)
+            if seller:
+                new_assignee = seller.name
+
+        # Se for devolvido para IA ou Fila de Espera, limpa o seller_id
+        if req.ai_enabled or req.attendance_status in ("bot", "waiting") or new_assignee in ("Agente IA", "Fila de Espera", "Fila de Espera Humana"):
+            seller_id = None
 
         updated = db.set_contact_handoff(
             contact_id=contact_id,
             ai_enabled=req.ai_enabled,
             attendance_status=req.attendance_status,
             assignee=new_assignee,
+            seller_id=seller_id,
         )
         if not updated:
             raise HTTPException(status_code=500, detail="Erro ao atribuir vendedor")
@@ -1102,11 +1157,13 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             else:
                 # Se estava livre na fila ou com a IA, fixa com o vendedor que respondeu
                 seller_to_assign = sender_seller or assigned_seller or "Vendedor"
+                seller_obj = db.get_seller_by_name(seller_to_assign) if seller_to_assign else None
                 updated_c = db.set_contact_handoff(
                     contact_id=req.contact_id,
                     ai_enabled=False,
                     attendance_status="human",
                     assignee=seller_to_assign,
+                    seller_id=seller_obj.id if seller_obj else None,
                 )
                 if updated_c:
                     contact = updated_c

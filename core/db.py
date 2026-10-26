@@ -1,11 +1,16 @@
 import json
+import os
 import sqlite3
+import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+
+load_dotenv()
 
 from core.security import (
     CIPHER_PREFIX,
@@ -39,6 +44,7 @@ class Contact(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     channel: str = "whatsapp"  # whatsapp, instagram, web
+    seller_id: Optional[str] = None
     assignee: Optional[str] = "Agente IA"
     ai_enabled: bool = True
     attendance_status: str = "bot"  # bot, waiting, human, closed
@@ -184,28 +190,112 @@ class Seller(BaseModel):
 
 
 # =====================================================================
-# Camada de Persistência SQLite
+# Camada de Persistência Híbrida (PostgreSQL Neon / SQLite)
 # =====================================================================
 
 
-class Database:
-    """Gerenciador de persistência transacional SQLite para o OpenChatFunnel."""
+class _PostgresConnectionAdapter:
+    """Adaptador de conexão PostgreSQL (psycopg) compatível com a interface SQLite do Database."""
 
-    def __init__(self, db_path: str = "openchatfunnel.db", auto_seed: bool = True):
-        self.db_path = db_path
+    def __init__(self, pg_conn):
+        self._conn = pg_conn
+
+    @staticmethod
+    def _translate_sql(sql: str) -> str:
+        translated = sql.replace("?", "%s")
+        if "INSERT OR IGNORE INTO sellers" in translated:
+            translated = translated.replace("INSERT OR IGNORE INTO sellers", "INSERT INTO sellers")
+            translated = translated.rstrip().rstrip(";") + " ON CONFLICT (name) DO NOTHING"
+        return translated
+
+    def execute(self, sql: str, params: tuple = ()):
+        translated = self._translate_sql(sql)
+        return self._conn.execute(translated, params)
+
+    def executescript(self, script: str):
+        statements = [stmt.strip() for stmt in script.split(";") if stmt.strip()]
+        for stmt in statements:
+            self._conn.execute(stmt)
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+
+class Database:
+    """Gerenciador de persistência transacional (PostgreSQL Neon / SQLite) para o OpenChatFunnel."""
+
+    def __init__(self, db_path: Optional[str] = None, auto_seed: bool = True):
+        load_dotenv()
+        env_database_url = os.getenv("DATABASE_URL", "").strip()
+
+        if db_path is None or db_path == "openchatfunnel.db":
+            resolved_target = env_database_url or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+        else:
+            resolved_target = db_path
+
+        self.is_postgres = resolved_target.startswith(("postgresql://", "postgres://"))
+        self._pg_conn = None
+        self._pg_lock = threading.RLock()
         self._memory_conn: Optional[sqlite3.Connection] = None
-        if db_path == ":memory:":
-            self._memory_conn = sqlite3.connect(":memory:", check_same_thread=False)
-            self._memory_conn.row_factory = sqlite3.Row
-            self._memory_conn.execute("PRAGMA foreign_keys = ON;")
+
+        if self.is_postgres:
+            self.database_url = self._ensure_sslmode_require(resolved_target)
+            self.db_path = self.database_url
+        else:
+            self.database_url = None
+            self.db_path = resolved_target
+            if self.db_path == ":memory:":
+                self._memory_conn = sqlite3.connect(":memory:", check_same_thread=False)
+                self._memory_conn.row_factory = sqlite3.Row
+                self._memory_conn.execute("PRAGMA foreign_keys = ON;")
+
         self.init_schema()
         self.encrypt_existing_unencrypted_records()
         if auto_seed:
             self.ensure_default_pipeline_and_seed()
 
+    @staticmethod
+    def _ensure_sslmode_require(url: str) -> str:
+        """Garante que a conexão PostgreSQL utilize SSL obrigatório (sslmode=require)."""
+        if "sslmode=" not in url:
+            sep = "&" if "?" in url else "?"
+            return f"{url}{sep}sslmode=require"
+        return url
+
+    def _get_pg_connection(self):
+        import psycopg
+        from psycopg.rows import dict_row
+
+        if self._pg_conn is None or self._pg_conn.closed or self._pg_conn.broken:
+            self._pg_conn = psycopg.connect(
+                self.database_url,
+                row_factory=dict_row,
+                autocommit=False,
+            )
+        return self._pg_conn
+
     @contextmanager
     def connection(self):
-        if self._memory_conn is not None:
+        if self.is_postgres:
+            with self._pg_lock:
+                conn = self._get_pg_connection()
+                adapter = _PostgresConnectionAdapter(conn)
+                try:
+                    yield adapter
+                    conn.commit()
+                except Exception:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        self._pg_conn = None
+                    raise
+        elif self._memory_conn is not None:
             try:
                 yield self._memory_conn
                 self._memory_conn.commit()
@@ -229,12 +319,35 @@ class Database:
         with self.connection() as conn:
             conn.executescript(
                 """
+                CREATE TABLE IF NOT EXISTS tenants (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+
+                CREATE TABLE IF NOT EXISTS sellers (
+                    id TEXT PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    email TEXT,
+                    phone TEXT,
+                    active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_sellers_name ON sellers(name);
+
                 CREATE TABLE IF NOT EXISTS contacts (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     phone TEXT,
                     email TEXT,
                     channel TEXT NOT NULL DEFAULT 'whatsapp',
+                    seller_id TEXT,
                     assignee TEXT DEFAULT 'Agente IA',
                     ai_enabled INTEGER NOT NULL DEFAULT 1,
                     attendance_status TEXT NOT NULL DEFAULT 'bot',
@@ -243,7 +356,8 @@ class Database:
                     tags TEXT NOT NULL DEFAULT '[]',
                     custom_fields TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (seller_id) REFERENCES sellers(id)
                 );
 
                 CREATE TABLE IF NOT EXISTS messages (
@@ -340,17 +454,6 @@ class Database:
                     created_at TEXT NOT NULL
                 );
 
-                CREATE TABLE IF NOT EXISTS tenants (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'active',
-                    is_active INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
-
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     tenant_id TEXT,
@@ -369,29 +472,32 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
                 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
-
-                CREATE TABLE IF NOT EXISTS sellers (
-                    id TEXT PRIMARY KEY,
-                    name TEXT UNIQUE NOT NULL,
-                    email TEXT,
-                    phone TEXT,
-                    active INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_sellers_name ON sellers(name);
                 """
             )
 
-            # Migração de colunas para suportar SaaS Multi-Tenant na tabela users
-            user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-            if "tenant_id" not in user_cols:
-                conn.execute("ALTER TABLE users ADD COLUMN tenant_id TEXT REFERENCES tenants(id);")
-            if "role" not in user_cols:
-                conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';")
+            if self.is_postgres:
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id TEXT REFERENCES tenants(id);")
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'admin';")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+                conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES sellers(id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
+            else:
+                # Migração de colunas para suportar SaaS Multi-Tenant na tabela users
+                user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+                if "tenant_id" not in user_cols:
+                    conn.execute("ALTER TABLE users ADD COLUMN tenant_id TEXT REFERENCES tenants(id);")
+                if "role" not in user_cols:
+                    conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';")
 
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+
+                # Migração de colunas para suportar vinculação dinâmica de vendedores na tabela contacts
+                contact_cols = [r["name"] for r in conn.execute("PRAGMA table_info(contacts)").fetchall()]
+                if "seller_id" not in contact_cols:
+                    conn.execute("ALTER TABLE contacts ADD COLUMN seller_id TEXT REFERENCES sellers(id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
 
     def encrypt_existing_unencrypted_records(self) -> int:
         """
@@ -792,11 +898,11 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO contacts (
-                    id, name, phone, email, channel, assignee, ai_enabled,
+                    id, name, phone, email, channel, seller_id, assignee, ai_enabled,
                     attendance_status, temperature, lead_score, tags, custom_fields,
                     created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     contact.id,
@@ -804,6 +910,7 @@ class Database:
                     encrypt_field(contact.phone),
                     encrypt_field(contact.email),
                     contact.channel,
+                    contact.seller_id,
                     contact.assignee,
                     1 if contact.ai_enabled else 0,
                     contact.attendance_status,
@@ -859,7 +966,7 @@ class Database:
             conn.execute(
                 """
                 UPDATE contacts
-                SET name = ?, phone = ?, email = ?, channel = ?, assignee = ?,
+                SET name = ?, phone = ?, email = ?, channel = ?, seller_id = ?, assignee = ?,
                     ai_enabled = ?, attendance_status = ?, temperature = ?, lead_score = ?,
                     tags = ?, custom_fields = ?, updated_at = ?
                 WHERE id = ?
@@ -869,6 +976,7 @@ class Database:
                     encrypt_field(contact.phone),
                     encrypt_field(contact.email),
                     contact.channel,
+                    contact.seller_id,
                     contact.assignee,
                     1 if contact.ai_enabled else 0,
                     contact.attendance_status,
@@ -888,6 +996,7 @@ class Database:
         ai_enabled: bool,
         attendance_status: str,
         assignee: Optional[str] = None,
+        seller_id: Optional[str] = None,
     ) -> Optional[Contact]:
         contact = self.get_contact(contact_id)
         if not contact:
@@ -896,6 +1005,8 @@ class Database:
         contact.attendance_status = attendance_status
         if assignee is not None:
             contact.assignee = assignee
+        if seller_id is not None:
+            contact.seller_id = seller_id
         return self.update_contact(contact)
 
     def set_contact_temperature(
@@ -939,6 +1050,7 @@ class Database:
             phone=decrypt_field(row["phone"]),
             email=decrypt_field(row["email"]),
             channel=row["channel"],
+            seller_id=row["seller_id"] if "seller_id" in keys else None,
             assignee=row["assignee"],
             ai_enabled=bool(row["ai_enabled"]) if "ai_enabled" in keys else True,
             attendance_status=row["attendance_status"] if "attendance_status" in keys else "bot",
@@ -1746,18 +1858,21 @@ class Database:
         with self.connection() as conn:
             row = conn.execute("SELECT COUNT(*) as cnt FROM users WHERE tenant_id = ?", (tenant_id,)).fetchone()
             return int(row["cnt"]) if row else 0
-            conn.execute("DELETE FROM users WHERE lower(email) = lower(?)", (email_clean,))
-            return True
 
     # -----------------------------------------------------------------
     # Vendedores & Atendentes da Loja (Multi-Operador)
     # -----------------------------------------------------------------
 
-    def list_sellers(self) -> List[Seller]:
-        """Retorna todos os vendedores ativos da loja, populando a equipe inicial se vazia."""
+    def list_sellers(self, include_inactive: bool = False) -> List[Seller]:
+        """
+        Retorna os vendedores da loja para distribuição e posse de conversas.
+        Por padrão retorna apenas vendedores ativos (active = True).
+        Se include_inactive = True, inclui também os vendedores desativados (soft delete).
+        Popula a equipe inicial caso a tabela esteja vazia.
+        """
         with self.connection() as conn:
-            rows = conn.execute("SELECT * FROM sellers WHERE active = 1 ORDER BY name ASC").fetchall()
-            if not rows:
+            total_count = conn.execute("SELECT COUNT(*) as cnt FROM sellers").fetchone()["cnt"]
+            if total_count == 0:
                 default_team = [
                     "Lucas Silva",
                     "Camila Santos",
@@ -1771,6 +1886,10 @@ class Database:
                         "INSERT OR IGNORE INTO sellers (id, name, active, created_at) VALUES (?, ?, 1, ?)",
                         (new_uuid(), name, now),
                     )
+
+            if include_inactive:
+                rows = conn.execute("SELECT * FROM sellers ORDER BY name ASC").fetchall()
+            else:
                 rows = conn.execute("SELECT * FROM sellers WHERE active = 1 ORDER BY name ASC").fetchall()
 
             return [
@@ -1785,19 +1904,20 @@ class Database:
                 for row in rows
             ]
 
-    def create_seller(self, name: str, email: Optional[str] = None, phone: Optional[str] = None) -> Seller:
-        """Cadastra um novo vendedor na loja."""
-        clean_name = name.strip()
-        seller = Seller(name=clean_name, email=email, phone=phone)
+    def get_seller(self, seller_id: str) -> Optional[Seller]:
+        """Busca vendedor por ID."""
         with self.connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO sellers (id, name, email, phone, active, created_at)
-                VALUES (?, ?, ?, ?, 1, ?)
-                """,
-                (seller.id, seller.name, seller.email, seller.phone, seller.created_at),
+            row = conn.execute("SELECT * FROM sellers WHERE id = ?", (seller_id,)).fetchone()
+            if not row:
+                return None
+            return Seller(
+                id=row["id"],
+                name=row["name"],
+                email=row["email"],
+                phone=row["phone"],
+                active=bool(row["active"]),
+                created_at=row["created_at"],
             )
-        return seller
 
     def get_seller_by_name(self, name: str) -> Optional[Seller]:
         """Busca vendedor por nome."""
@@ -1813,4 +1933,75 @@ class Database:
                 active=bool(row["active"]),
                 created_at=row["created_at"],
             )
+
+    def create_seller(self, name: str, email: Optional[str] = None, phone: Optional[str] = None) -> Seller:
+        """Cadastra um novo vendedor na loja com validação e integridade de nome único."""
+        clean_name = name.strip()
+        if not clean_name:
+            raise ValueError("O nome do vendedor é obrigatório.")
+        existing = self.get_seller_by_name(clean_name)
+        if existing:
+            raise ValueError(f"Já existe um vendedor cadastrado com o nome '{clean_name}'.")
+
+        seller = Seller(
+            name=clean_name,
+            email=email.strip() if email and email.strip() else None,
+            phone=phone.strip() if phone and phone.strip() else None,
+            active=True,
+        )
+        with self.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO sellers (id, name, email, phone, active, created_at)
+                VALUES (?, ?, ?, ?, 1, ?)
+                """,
+                (seller.id, seller.name, seller.email, seller.phone, seller.created_at),
+            )
+        return seller
+
+    def update_seller(
+        self,
+        seller_id: str,
+        name: Optional[str] = None,
+        email: Optional[str] = None,
+        phone: Optional[str] = None,
+        active: Optional[bool] = None,
+    ) -> Optional[Seller]:
+        """Atualiza os dados de um vendedor ou altera seu estado ativo/inativo (soft delete)."""
+        seller = self.get_seller(seller_id)
+        if not seller:
+            return None
+
+        new_name = seller.name
+        if name is not None:
+            clean_name = name.strip()
+            if not clean_name:
+                raise ValueError("O nome do vendedor não pode ser vazio.")
+            if clean_name.lower() != seller.name.lower():
+                existing = self.get_seller_by_name(clean_name)
+                if existing and existing.id != seller_id:
+                    raise ValueError(f"Já existe outro vendedor cadastrado com o nome '{clean_name}'.")
+            new_name = clean_name
+
+        new_email = email.strip() if email is not None and email.strip() else (seller.email if email is None else None)
+        new_phone = phone.strip() if phone is not None and phone.strip() else (seller.phone if phone is None else None)
+        new_active = active if active is not None else seller.active
+
+        with self.connection() as conn:
+            conn.execute(
+                """
+                UPDATE sellers
+                SET name = ?, email = ?, phone = ?, active = ?
+                WHERE id = ?
+                """,
+                (new_name, new_email, new_phone, 1 if new_active else 0, seller_id),
+            )
+        return self.get_seller(seller_id)
+
+    def toggle_seller_active(self, seller_id: str) -> Optional[Seller]:
+        """Alterna o status de ativação (soft delete) de um vendedor."""
+        seller = self.get_seller(seller_id)
+        if not seller:
+            return None
+        return self.update_seller(seller_id, active=not seller.active)
 

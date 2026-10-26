@@ -49,7 +49,9 @@ from core.security import generate_secure_password, hash_password
 
 
 def get_db(db_path: Optional[str] = None) -> Database:
-    resolved_path = db_path or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+    from dotenv import load_dotenv
+    load_dotenv()
+    resolved_path = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "openchatfunnel.db")
     return Database(db_path=resolved_path, auto_seed=False)
 
 

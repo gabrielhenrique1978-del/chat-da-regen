@@ -183,8 +183,8 @@
               <!-- Populado dinamicamente -->
             </select>
           </div>
-          <button onclick="promptNewSeller()" title="Adicionar novo vendedor à equipe da loja" class="text-[#365945] hover:text-[#243E30] text-xs p-1 rounded hover:bg-white transition">
-            <i class="fa-solid fa-user-plus"></i>
+          <button onclick="openTeamAdminModal()" title="Gerenciar equipe de vendedores da loja" class="text-[#365945] hover:text-[#243E30] text-xs p-1 rounded hover:bg-white transition">
+            <i class="fa-solid fa-user-gear"></i>
           </button>
         </div>
 
@@ -460,7 +460,7 @@
                     </select>
                   </div>
                 </div>
-                <button onclick="promptNewSeller()" class="text-[11px] text-[#243E30] font-bold hover:underline" title="Cadastrar novo vendedor">+ Equipe</button>
+                <button onclick="openTeamAdminModal()" class="text-[11px] text-[#243E30] font-bold hover:underline" title="Gerenciar equipe de vendedores">+ Gerenciar Equipe</button>
               </div>
 
               <!-- Campo de Busca no Inbox -->
@@ -1315,6 +1315,76 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL: GESTÃO DA EQUIPE DE VENDEDORES (MULTI-OPERADOR)                -->
+  <!-- ===================================================================== -->
+  <div id="modal-team-admin" class="hidden fixed inset-0 bg-[#1A2B21]/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-[#E3E8E5] rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-[#E3E8E5]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[#EAF2ED] text-[#243E30] flex items-center justify-center border border-[#cbe1d3]">
+            <i class="fa-solid fa-users text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-[#1A2B21]">Gestão da Equipe de Vendedores</h3>
+            <p class="text-xs text-[#63756A]">Cadastre, edite e gerencie os vendedores da loja com soft delete</p>
+          </div>
+        </div>
+        <button onclick="closeTeamAdminModal()" class="text-[#63756A] hover:text-[#1A2B21] p-1.5 rounded-lg hover:bg-[#F6F8F7]">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Formulário de Criação / Edição de Vendedor -->
+      <div class="bg-[#F6F8F7] border border-[#E3E8E5] rounded-xl p-4 space-y-3">
+        <h4 id="team-form-title" class="text-xs font-bold text-[#243E30] uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-user-plus"></i> Novo Vendedor
+        </h4>
+        <input type="hidden" id="seller-form-id" value="" />
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-[#63756A] mb-1">Nome *</label>
+            <input id="seller-form-name" type="text" placeholder="Ex: Camila Santos" class="w-full bg-white border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-[#63756A] mb-1">E-mail (opcional)</label>
+            <input id="seller-form-email" type="email" placeholder="vendas@loja.com" class="w-full bg-white border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase font-bold text-[#63756A] mb-1">Telefone / WhatsApp (opcional)</label>
+            <input id="seller-form-phone" type="text" placeholder="(11) 99999-0000" class="w-full bg-white border border-[#E3E8E5] rounded-lg p-2 text-xs text-[#1A2B21] focus:outline-none focus:border-[#243E30]" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-1">
+          <button id="seller-form-cancel-btn" onclick="resetSellerForm()" class="hidden px-3 py-1.5 rounded-lg text-xs font-medium text-[#63756A] hover:text-[#1A2B21] bg-white border border-[#E3E8E5]">
+            Cancelar Edição
+          </button>
+          <button onclick="submitSellerForm()" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#243E30] hover:bg-[#365945] text-white flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-check text-xs"></i>
+            <span id="seller-form-submit-label">Cadastrar Vendedor</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabela / Lista de Vendedores -->
+      <div class="flex-1 overflow-y-auto space-y-2 border border-[#E3E8E5] rounded-xl p-3 bg-white min-h-[160px] max-h-[300px]">
+        <div class="flex items-center justify-between px-1 py-0.5 text-[11px] font-bold text-[#63756A]">
+          <span>Membros Cadastrados (<span id="team-sellers-count">0</span>)</span>
+          <span class="text-[10px] text-[#63756A]"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Soft delete preserva histórico</span>
+        </div>
+        <div id="team-sellers-list" class="space-y-1.5">
+          <!-- Renderizado via renderTeamSellersList() -->
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end pt-3 border-t border-[#E3E8E5]">
+        <button onclick="closeTeamAdminModal()" class="px-4 py-2 rounded-lg text-xs font-medium bg-[#F6F8F7] text-[#63756A] hover:text-[#1A2B21] border border-[#E3E8E5]">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- MODAL: GESTÃO DE CLIENTES B2B & INADIMPLÊNCIA                         -->
   <!-- ===================================================================== -->
   <div id="modal-clients-admin" class="hidden fixed inset-0 bg-[#1A2B21]/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
@@ -1445,6 +1515,7 @@
     let allStages = [];
     let allSellers = [];
     let currentSellerName = localStorage.getItem('openchatfunnel_active_seller') || 'Lucas Silva';
+    let currentSellerId = localStorage.getItem('openchatfunnel_active_seller_id') || '';
     let quickRepliesCache = [];
     let draggedDealId = null;
     let currentStatusFilter = 'all'; // 'all' | 'mine' | 'waiting' | 'others' | 'bot'
@@ -1571,6 +1642,10 @@
             const data = eventPayload.data;
             if (ev === 'whatsapp_status_updated' || ev === 'whatsapp_qr_updated') {
               updateWhatsAppUI(data);
+            }
+            if (ev === 'seller_created' || ev === 'seller_updated') {
+              await loadSellers();
+              if (typeof loadTeamAdminSellers === 'function') await loadTeamAdminSellers();
             }
             if (ev === 'message_created' || ev === 'webhook_received') {
               if (data && (data.sender === 'contact' || data.sender === 'customer' || ev === 'webhook_received')) {
@@ -2341,12 +2416,22 @@
       const initialsHeader = document.getElementById('active-seller-initials');
       const initialsInbox = document.getElementById('active-seller-initials-inbox');
 
-      if (!allSellers.some(s => s.name === currentSellerName) && currentSellerName) {
-        allSellers.unshift({ id: 'custom', name: currentSellerName });
+      if (!allSellers || allSellers.length === 0) return;
+
+      // Localiza o vendedor ativo atual por ID ou Nome
+      let activeSeller = allSellers.find(s => s.id === currentSellerId) || allSellers.find(s => s.name === currentSellerName);
+      if (!activeSeller && allSellers.length > 0) {
+        activeSeller = allSellers[0];
+      }
+      if (activeSeller) {
+        currentSellerId = activeSeller.id;
+        currentSellerName = activeSeller.name;
+        localStorage.setItem('openchatfunnel_active_seller_id', currentSellerId);
+        localStorage.setItem('openchatfunnel_active_seller', currentSellerName);
       }
 
       const optionsHtml = allSellers.map(s => `
-        <option value="${s.name}" ${s.name === currentSellerName ? 'selected' : ''}>
+        <option value="${s.id}" data-name="${s.name}" ${s.id === currentSellerId ? 'selected' : ''}>
           ${s.name}
         </option>
       `).join('');
@@ -2365,9 +2450,16 @@
       }
     }
 
-    function changeActiveSeller(newName) {
-      if (!newName) return;
-      currentSellerName = newName;
+    function changeActiveSeller(sellerIdOrName) {
+      if (!sellerIdOrName) return;
+      const found = allSellers.find(s => s.id === sellerIdOrName || s.name === sellerIdOrName);
+      if (found) {
+        currentSellerId = found.id;
+        currentSellerName = found.name;
+      } else {
+        currentSellerName = sellerIdOrName;
+      }
+      localStorage.setItem('openchatfunnel_active_seller_id', currentSellerId);
       localStorage.setItem('openchatfunnel_active_seller', currentSellerName);
       renderSellerSelector();
       renderContactsList();
@@ -2377,22 +2469,184 @@
       showEventToast(`Você agora está operando como: ${currentSellerName}`);
     }
 
-    async function promptNewSeller() {
-      const name = prompt('Digite o nome do novo vendedor da equipe da loja:');
-      if (!name || !name.trim()) return;
+    // ===============================================================
+    // ADMINISTRAÇÃO DA EQUIPE DE VENDEDORES (MODAL)
+    // ===============================================================
+    let teamAdminSellers = [];
+
+    async function openTeamAdminModal() {
+      resetSellerForm();
+      const modal = document.getElementById('modal-team-admin');
+      if (modal) modal.classList.remove('hidden');
+      await loadTeamAdminSellers();
+    }
+
+    function closeTeamAdminModal() {
+      const modal = document.getElementById('modal-team-admin');
+      if (modal) modal.classList.add('hidden');
+      resetSellerForm();
+    }
+
+    async function loadTeamAdminSellers() {
       try {
-        const res = await fetch('/api/sellers', {
-          method: 'POST',
+        const res = await fetch('/api/sellers?include_inactive=true');
+        if (res.ok) {
+          const data = await res.json();
+          teamAdminSellers = data.sellers || [];
+          renderTeamSellersList();
+        }
+      } catch (err) {
+        console.error('Erro ao carregar lista completa da equipe:', err);
+      }
+    }
+
+    function renderTeamSellersList() {
+      const container = document.getElementById('team-sellers-list');
+      const countEl = document.getElementById('team-sellers-count');
+      if (countEl) countEl.textContent = teamAdminSellers.length;
+      if (!container) return;
+
+      if (teamAdminSellers.length === 0) {
+        container.innerHTML = '<p class="text-xs text-[#63756A] text-center py-4">Nenhum vendedor cadastrado.</p>';
+        return;
+      }
+
+      container.innerHTML = teamAdminSellers.map(s => {
+        const isActive = s.active !== false;
+        const statusBadge = isActive
+          ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Ativo</span>'
+          : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-300">Desativado</span>';
+
+        const toggleBtnLabel = isActive
+          ? '<span class="text-amber-700 hover:text-amber-800 font-semibold"><i class="fa-solid fa-user-slash mr-1"></i>Desativar</span>'
+          : '<span class="text-emerald-700 hover:text-emerald-800 font-semibold"><i class="fa-solid fa-user-check mr-1"></i>Ativar</span>';
+
+        const contactDetails = [s.email, s.phone].filter(Boolean).join(' • ') || 'Sem telefone/e-mail informado';
+
+        return `
+          <div class="flex items-center justify-between p-2.5 rounded-lg border border-[#E3E8E5] hover:bg-[#F6F8F7] transition">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full ${isActive ? 'bg-[#243E30] text-white' : 'bg-zinc-300 text-zinc-600'} flex items-center justify-center text-xs font-bold shrink-0">
+                ${s.name.substring(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-xs text-[#1A2B21] ${!isActive ? 'line-through text-zinc-400' : ''}">${s.name}</span>
+                  ${statusBadge}
+                </div>
+                <p class="text-[11px] text-[#63756A]">${contactDetails}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <button onclick="startEditSeller('${s.id}')" class="px-2.5 py-1 rounded border border-[#E3E8E5] bg-white text-[#243E30] hover:bg-[#EAF2ED] font-semibold transition" title="Editar dados do vendedor">
+                <i class="fa-solid fa-pen-to-square mr-1"></i>Editar
+              </button>
+              <button onclick="toggleSellerStatus('${s.id}')" class="px-2.5 py-1 rounded border border-[#E3E8E5] bg-white hover:bg-zinc-50 transition" title="${isActive ? 'Desativar vendedor (soft delete)' : 'Reativar vendedor'}">
+                ${toggleBtnLabel}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function resetSellerForm() {
+      const idEl = document.getElementById('seller-form-id');
+      const nameEl = document.getElementById('seller-form-name');
+      const emailEl = document.getElementById('seller-form-email');
+      const phoneEl = document.getElementById('seller-form-phone');
+      const titleEl = document.getElementById('team-form-title');
+      const submitEl = document.getElementById('seller-form-submit-label');
+      const cancelBtn = document.getElementById('seller-form-cancel-btn');
+
+      if (idEl) idEl.value = '';
+      if (nameEl) nameEl.value = '';
+      if (emailEl) emailEl.value = '';
+      if (phoneEl) phoneEl.value = '';
+      if (titleEl) titleEl.innerHTML = '<i class="fa-solid fa-user-plus"></i> Novo Vendedor';
+      if (submitEl) submitEl.textContent = 'Cadastrar Vendedor';
+      if (cancelBtn) cancelBtn.classList.add('hidden');
+    }
+
+    function startEditSeller(sellerId) {
+      const seller = teamAdminSellers.find(s => s.id === sellerId);
+      if (!seller) return;
+      document.getElementById('seller-form-id').value = seller.id;
+      document.getElementById('seller-form-name').value = seller.name;
+      document.getElementById('seller-form-email').value = seller.email || '';
+      document.getElementById('seller-form-phone').value = seller.phone || '';
+      document.getElementById('team-form-title').innerHTML = '<i class="fa-solid fa-user-pen"></i> Editar Vendedor';
+      document.getElementById('seller-form-submit-label').textContent = 'Salvar Alterações';
+      const cancelBtn = document.getElementById('seller-form-cancel-btn');
+      if (cancelBtn) cancelBtn.classList.remove('hidden');
+      document.getElementById('seller-form-name').focus();
+    }
+
+    async function submitSellerForm() {
+      const id = document.getElementById('seller-form-id').value;
+      const name = document.getElementById('seller-form-name').value.trim();
+      const email = document.getElementById('seller-form-email').value.trim();
+      const phone = document.getElementById('seller-form-phone').value.trim();
+
+      if (!name) {
+        alert('Por favor, informe o nome do vendedor.');
+        return;
+      }
+
+      try {
+        const url = id ? `/api/sellers/${id}` : '/api/sellers';
+        const method = id ? 'PATCH' : 'POST';
+        const res = await fetch(url, {
+          method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() })
+          body: JSON.stringify({
+            name,
+            email: email || undefined,
+            phone: phone || undefined
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.detail || 'Erro ao salvar vendedor.');
+          return;
+        }
+
+        showEventToast(id ? `Vendedor '${name}' atualizado!` : `Vendedor '${name}' adicionado à equipe!`);
+        resetSellerForm();
+        await loadSellers();
+        await loadTeamAdminSellers();
+        if (!id) {
+          changeActiveSeller(data.id || data.name);
+        }
+      } catch (err) {
+        alert('Erro ao conectar com a API de vendedores.');
+      }
+    }
+
+    async function toggleSellerStatus(sellerId) {
+      const seller = teamAdminSellers.find(s => s.id === sellerId);
+      if (!seller) return;
+      const newActive = !seller.active;
+      const actionName = newActive ? 'ativar' : 'desativar (soft delete)';
+      if (!confirm(`Deseja realmente ${actionName} o vendedor '${seller.name}'?`)) return;
+
+      try {
+        const res = await fetch(`/api/sellers/${sellerId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: newActive })
         });
         if (res.ok) {
+          showEventToast(`Status do vendedor '${seller.name}': ${newActive ? 'Ativo' : 'Desativado'}`);
           await loadSellers();
-          changeActiveSeller(name.trim());
-          showEventToast(`Vendedor ${name.trim()} adicionado com sucesso!`);
+          await loadTeamAdminSellers();
+        } else {
+          const err = await res.json();
+          alert(err.detail || 'Erro ao alterar status.');
         }
-      } catch (e) {
-        alert('Erro ao cadastrar vendedor.');
+      } catch (err) {
+        alert('Erro ao conectar com o servidor.');
       }
     }
 
@@ -2409,6 +2663,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             assignee: currentSellerName,
+            seller_id: currentSellerId || undefined,
             ai_enabled: false,
             attendance_status: 'human',
             operator_name: currentSellerName
@@ -2433,9 +2688,9 @@
 
       nameEl.textContent = `${currentContactObj.name} (${currentContactObj.phone || 'Sem telefone'})`;
 
-      const colleagues = allSellers.filter(s => s.name !== currentContactObj.assignee);
+      const colleagues = allSellers.filter(s => s.name !== currentContactObj.assignee && (s.active !== false));
       selectEl.innerHTML = colleagues.map(s => `
-        <option value="${s.name}">${s.name}</option>
+        <option value="${s.id}" data-name="${s.name}">${s.name}</option>
       `).join('');
 
       document.getElementById('transfer-reason').value = '';
@@ -2450,17 +2705,20 @@
     async function confirmTransfer() {
       const selectEl = document.getElementById('transfer-target-seller');
       const reasonEl = document.getElementById('transfer-reason');
-      const targetSeller = selectEl ? selectEl.value : null;
+      const targetSellerId = selectEl ? selectEl.value : null;
+      const selectedOption = selectEl?.selectedOptions[0];
+      const targetSellerName = selectedOption ? (selectedOption.dataset.name || selectedOption.text.trim()) : targetSellerId;
       const reason = reasonEl ? reasonEl.value.trim() : '';
 
-      if (!targetSeller || !currentContactId) return;
+      if (!targetSellerId || !currentContactId) return;
 
       try {
         const res = await fetch(`/api/contacts/${currentContactId}/assign`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            assignee: targetSeller,
+            assignee: targetSellerName,
+            seller_id: targetSellerId,
             ai_enabled: false,
             attendance_status: 'human',
             operator_name: currentSellerName,
@@ -2469,7 +2727,7 @@
         });
         if (res.ok) {
           closeTransferModal();
-          showEventToast(`Atendimento transferido para ${targetSeller} com sucesso!`);
+          showEventToast(`Atendimento transferido para ${targetSellerName} com sucesso!`);
           await selectContact(currentContactId, true);
           await refreshStats();
         }

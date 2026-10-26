@@ -297,3 +297,70 @@ def test_chat_bloqueado_para_outros_vendedores_e_apos_transferencia(client):
     assert "Chat bloqueado" in resp_lucas_after_transfer.json()["detail"]
     assert "Camila Santos" in resp_lucas_after_transfer.json()["detail"]
 
+
+def test_dynamic_seller_management_soft_delete_and_seller_id(client):
+    c, db = client
+
+    # 1. Cadastra novo vendedor com validação
+    resp_create = c.post(
+        "/api/sellers",
+        json={"name": "Renata Mendes", "email": "renata@loja.com", "phone": "+55 11 98111-2233"},
+    )
+    assert resp_create.status_code == 200
+    seller_data = resp_create.json()
+    seller_id = seller_data["id"]
+    assert seller_data["name"] == "Renata Mendes"
+    assert seller_data["active"] is True
+
+    # Validação de nome vazio e duplicado
+    assert c.post("/api/sellers", json={"name": "   "}).status_code == 400
+    assert c.post("/api/sellers", json={"name": "Renata Mendes"}).status_code == 400
+
+    # 2. Associa atendimento salvando seller_id
+    contact = db.create_contact(
+        Contact(
+            name="Pedro Rocha",
+            phone="+55 11 93333-0009",
+            channel="whatsapp",
+            assignee="Agente IA",
+            ai_enabled=True,
+            attendance_status="bot",
+        )
+    )
+    resp_assign = c.patch(
+        f"/api/contacts/{contact.id}/assign",
+        json={
+            "assignee": "Renata Mendes",
+            "seller_id": seller_id,
+            "ai_enabled": False,
+            "attendance_status": "human",
+        },
+    )
+    assert resp_assign.status_code == 200
+    assert resp_assign.json()["seller_id"] == seller_id
+    assert resp_assign.json()["assignee"] == "Renata Mendes"
+
+    # 3. Atualiza dados da vendedora e faz soft delete (active = False)
+    resp_patch = c.patch(
+        f"/api/sellers/{seller_id}",
+        json={"name": "Renata Mendes Silva", "active": False},
+    )
+    assert resp_patch.status_code == 200
+    updated_seller = resp_patch.json()
+    assert updated_seller["name"] == "Renata Mendes Silva"
+    assert updated_seller["active"] is False
+
+    # 4. Filtro padrão GET /api/sellers retorna apenas ativos (não inclui Renata desativada)
+    active_ids = [s["id"] for s in c.get("/api/sellers").json()["sellers"]]
+    assert seller_id not in active_ids
+
+    # 5. GET /api/sellers?include_inactive=true retorna todos (incluindo Renata para o painel admin)
+    all_ids = [s["id"] for s in c.get("/api/sellers?include_inactive=true").json()["sellers"]]
+    assert seller_id in all_ids
+
+    # 6. Histórico do atendimento permanece intacto mesmo após soft delete da vendedora
+    persisted_contact = db.get_contact(contact.id)
+    assert persisted_contact.seller_id == seller_id
+    assert persisted_contact.assignee == "Renata Mendes"
+
+

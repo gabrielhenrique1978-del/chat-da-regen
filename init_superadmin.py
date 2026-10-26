@@ -50,7 +50,9 @@ from core.security import generate_secure_password, hash_password
 
 
 def init_superadmin(email: str, name: str, password: str = None, force: bool = False, db_path: str = None):
-    resolved_db = db_path or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+    from dotenv import load_dotenv
+    load_dotenv()
+    resolved_db = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "openchatfunnel.db")
     db = Database(db_path=resolved_db, auto_seed=False)
 
     email_clean = (email or os.getenv("SUPERADMIN_EMAIL", "superadmin@master.com")).strip().lower()
