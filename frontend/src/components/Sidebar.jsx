@@ -76,12 +76,12 @@ export default function Sidebar({
   return (
     <aside
       className={cn(
-        'h-screen flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-300 select-none shrink-0 z-20',
-        collapsed ? 'w-20' : 'w-68'
+        'h-full flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-300 select-none shrink-0 z-20',
+        collapsed ? 'w-20' : 'w-64'
       )}
     >
-      {/* Topo / Logo */}
-      <div className="h-16 px-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+      {/* Topo / Logo (Alinhado em h-16 com todas as colunas) */}
+      <div className="h-16 px-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="w-9 h-9 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-extrabold text-sm shadow-sm shrink-0">
             CR

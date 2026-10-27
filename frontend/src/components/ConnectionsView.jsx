@@ -118,7 +118,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
   };
 
   return (
-    <div className="flex-1 h-screen overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
+    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
       <div>
         <h1 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
           <Smartphone className="text-emerald-600" size={24} />

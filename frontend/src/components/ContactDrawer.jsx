@@ -45,10 +45,10 @@ export default function ContactDrawer({
   );
 
   return (
-    <aside className="w-80 h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 overflow-y-auto">
-      {/* Cabeçalho da Gaveta */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+    <aside className="w-72 xl:w-80 h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 overflow-y-auto">
+      {/* Cabeçalho da Gaveta (Alinhado em h-16 com as demais colunas) */}
+      <div className="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
           Detalhes do Lead & CRM
         </span>
         {onClose && (

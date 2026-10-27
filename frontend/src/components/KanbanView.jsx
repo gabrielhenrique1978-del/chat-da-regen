@@ -43,7 +43,7 @@ export default function KanbanView({ onOpenContactInInbox }) {
   const pipelines = board?.pipelines || [];
 
   return (
-    <div className="flex-1 h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 p-6">
+    <div className="flex-1 h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 p-6">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
         <div>

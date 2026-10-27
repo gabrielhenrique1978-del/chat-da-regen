@@ -79,7 +79,7 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
   };
 
   return (
-    <div className="flex-1 h-screen overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
+    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
       {/* Topo: Identidade Super Admin vs Tenant */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3.5">

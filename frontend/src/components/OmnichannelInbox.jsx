@@ -239,32 +239,33 @@ export default function OmnichannelInbox({
   };
 
   return (
-    <div className="flex-1 flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex-1 flex h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* =================================================================== */}
       {/* COLUNA 1: PAINEL DE CONVERSAS (FILA OMNICHANNEL)                     */}
       {/* =================================================================== */}
-      <div className="w-80 md:w-96 h-full border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
-        {/* Topo da Lista */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-sm text-slate-900 dark:text-white">
-                Conversas & Fila
-              </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                WhatsApp Oficial & Instagram Direct
-              </p>
-            </div>
-            <button
-              onClick={onOpenSellersModal}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold hover:bg-emerald-100 transition"
-              title="Gerenciar equipe de vendedores"
-            >
-              <Users size={13} />
-              <span>+ Equipe</span>
-            </button>
+      <div className="w-80 h-full border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
+        {/* Topo da Lista (Alinhado em h-16 com Sidebar, Chat e Gaveta) */}
+        <div className="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+          <div className="min-w-0">
+            <h2 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+              Conversas & Fila
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              WhatsApp Oficial & Instagram
+            </p>
           </div>
+          <button
+            onClick={onOpenSellersModal}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold hover:bg-emerald-100 transition shrink-0"
+            title="Gerenciar equipe de vendedores"
+          >
+            <Users size={13} />
+            <span>Equipe</span>
+          </button>
+        </div>
 
+        {/* Barra de Busca e Filtros */}
+        <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2 shrink-0 bg-slate-50/40 dark:bg-slate-900/50">
           {/* Busca Rápida */}
           <div className="relative">
             <Search
@@ -275,21 +276,21 @@ export default function OmnichannelInbox({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar cliente, telefone, vendedor ou #tag..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/70 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600"
+              placeholder="Buscar cliente, telefone ou #tag..."
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600"
             />
           </div>
 
           {/* Filtro Exclusivo de Supervisor: Inspecionar Carteira por Vendedor */}
           {isSupervisorMode && (
-            <div className="pt-0.5">
+            <div>
               <select
                 value={supervisorSellerFilter}
                 onChange={(e) => setSupervisorSellerFilter(e.target.value)}
-                className="w-full rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-1.5 text-[11px] font-bold text-amber-950 dark:text-amber-200 focus:outline-none"
+                className="w-full rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-950 dark:text-amber-200 focus:outline-none cursor-pointer"
               >
                 <option value="">
-                  👑 Visão Supervisor: Todos os Vendedores ({contacts.length})
+                  👑 Supervisor: Todas as Carteiras ({contacts.length})
                 </option>
                 {sellers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -301,27 +302,27 @@ export default function OmnichannelInbox({
           )}
 
           {/* Filtros de Status / Posse */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {[
               { id: 'all', label: `Todos (${contacts.length})` },
               {
                 id: 'mine',
                 label: impersonatedSeller
-                  ? `De ${impersonatedSeller.name.split(' ')[0]} (${countMine})`
+                  ? `Dele (${countMine})`
                   : `Meus (${countMine})`,
               },
               { id: 'waiting', label: `Fila (${countWaiting})` },
               { id: 'others', label: `Colegas (${countOthers})` },
-              { id: 'bot', label: 'Robô IA' },
+              { id: 'bot', label: 'IA' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setStatusFilter(tab.id)}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition',
+                  'px-2 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition',
                   statusFilter === tab.id
                     ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70 hover:bg-slate-100 dark:hover:bg-slate-700'
                 )}
               >
                 {tab.label}
@@ -330,7 +331,7 @@ export default function OmnichannelInbox({
           </div>
 
           {/* Filtro por Canal */}
-          <div className="flex items-center gap-1 text-[11px]">
+          <div className="grid grid-cols-3 gap-1 text-[11px]">
             {[
               { id: '', label: 'Todos Canais' },
               { id: 'whatsapp', label: 'WhatsApp' },
@@ -340,7 +341,7 @@ export default function OmnichannelInbox({
                 key={ch.id}
                 onClick={() => setChannelFilter(ch.id)}
                 className={cn(
-                  'flex-1 py-1 rounded-md font-semibold border transition',
+                  'py-1 rounded-lg font-semibold border transition text-center truncate',
                   channelFilter === ch.id
                     ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
                     : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -446,18 +447,18 @@ export default function OmnichannelInbox({
           </div>
         ) : (
           <>
-            {/* Cabeçalho do Chat */}
-            <header className="h-16 px-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white font-bold text-xs flex items-center justify-center shrink-0">
+            {/* Cabeçalho do Chat (Alinhado em h-16 com as demais colunas) */}
+            <header className="h-16 px-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-9 h-9 rounded-xl bg-emerald-700 text-white font-bold text-xs flex items-center justify-center shrink-0">
                   {getInitials(currentContact.name)}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
                     <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
                       {currentContact.name}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
                       {currentContact.channel}
                     </span>
                   </div>
@@ -465,14 +466,14 @@ export default function OmnichannelInbox({
                     {isMine
                       ? `🎧 Fixado com ${currentContact.assignee}`
                       : isLockedForMe
-                      ? `🔒 Em atendimento exclusivo por ${currentContact.assignee}`
-                      : '🤖 Em atendimento automático pela IA'}
+                      ? `🔒 Em atendimento por ${currentContact.assignee}`
+                      : '🤖 Qualificação Automática IA'}
                   </p>
                 </div>
               </div>
 
               {/* Botões de Posse, Espelhamento de Supervisor e Gaveta */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {isMine ? (
                   <>
                     <button
@@ -483,7 +484,7 @@ export default function OmnichannelInbox({
                         setTransferTargetId(colleagues[0]?.id || '');
                         setShowTransferModal(true);
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-xs font-semibold text-slate-700 dark:text-slate-200 transition"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap transition"
                     >
                       <ArrowRightLeft size={13} />
                       <span>Transferir</span>
@@ -498,16 +499,15 @@ export default function OmnichannelInbox({
                           operator_name: activeSellerName,
                         })
                       }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 text-xs font-semibold text-slate-600 dark:text-slate-300 transition"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap transition"
                     >
                       <Bot size={14} />
-                      <span>Devolver à IA</span>
+                      <span className="hidden xl:inline">Devolver à IA</span>
                     </button>
                   </>
                 ) : isLockedForMe ? (
                   isSupervisorMode ? (
                     <div className="flex items-center gap-1.5">
-                      {/* Botão para o Supervisor entrar direto na conta do vendedor dono desta conversa */}
                       <button
                         onClick={() => {
                           const ownerObj = sellers.find(
@@ -520,14 +520,13 @@ export default function OmnichannelInbox({
                             onImpersonateSeller?.(ownerObj);
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold whitespace-nowrap shadow-xs transition"
                         title={`Entrar na conta de ${currentContact.assignee} para operar como ele`}
                       >
                         <Eye size={13} />
-                        <span>Entrar na Conta de {currentContact.assignee}</span>
+                        <span>Espelhar Conta</span>
                       </button>
 
-                      {/* Supervisor pode forçar transferência */}
                       <button
                         onClick={() => {
                           const colleagues = sellers.filter(
@@ -536,18 +535,17 @@ export default function OmnichannelInbox({
                           setTransferTargetId(colleagues[0]?.id || '');
                           setShowTransferModal(true);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold whitespace-nowrap shadow-xs transition"
                         title="Como Supervisor, você pode reatribuir ou destravar este atendimento"
                       >
                         <ArrowRightLeft size={13} />
-                        <span>Forçar Transferência</span>
+                        <span>Transferir</span>
                       </button>
                     </div>
                   ) : (
-                    /* VENDEDOR COMUM: Bloqueado estritamente, não pode roubar o lead */
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold">
-                      <Lock size={13} />
-                      <span>Exclusivo de {currentContact.assignee}</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold whitespace-nowrap">
+                      <Lock size={12} />
+                      <span>Com {currentContact.assignee.split(' ')[0]}</span>
                     </span>
                   )
                 ) : (
@@ -561,16 +559,16 @@ export default function OmnichannelInbox({
                         operator_name: activeSellerName,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold whitespace-nowrap shadow-xs transition"
                   >
                     <UserCheck size={14} />
-                    <span>Pegar Conversa ({activeSellerName})</span>
+                    <span>Assumir Conversa</span>
                   </button>
                 )}
 
                 <button
                   onClick={() => setDrawerOpen(!drawerOpen)}
-                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white shrink-0"
                   title={
                     drawerOpen
                       ? 'Ocultar gaveta de detalhes'
@@ -587,22 +585,22 @@ export default function OmnichannelInbox({
             </header>
 
             {/* Sub-Abas do Chat (Atendimento Oficial / Notas Internas / Simulador) */}
-            <div className="px-5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="px-4 py-2 bg-slate-50/90 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                 {[
                   {
                     id: 'attendance',
-                    label: 'Atendimento Oficial',
+                    label: 'Atendimento',
                     icon: MessageCircle,
                   },
                   {
                     id: 'notes',
-                    label: 'Notas Internas (Equipe)',
+                    label: 'Notas da Equipe',
                     icon: StickyNote,
                   },
                   {
                     id: 'simulator',
-                    label: 'Simular Mensagem do Cliente',
+                    label: 'Simulador',
                     icon: FlaskConical,
                   },
                 ].map((t) => {
@@ -612,10 +610,10 @@ export default function OmnichannelInbox({
                       key={t.id}
                       onClick={() => setChatSubTab(t.id)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition',
+                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition',
                         chatSubTab === t.id
-                          ? 'bg-emerald-700 text-white'
-                          : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800'
                       )}
                     >
                       <Icon size={13} />
@@ -625,20 +623,27 @@ export default function OmnichannelInbox({
                 })}
               </div>
 
-              <span className="text-[11px] text-slate-400 hidden sm:inline">
+              <div className="flex items-center gap-2 shrink-0 text-[11px]">
                 {impersonatedSeller ? (
-                  <span className="text-amber-600 dark:text-amber-400 font-bold">
-                    👁️ Espelhando conta de: {impersonatedSeller.name}
-                  </span>
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold">
+                    <Eye size={12} />
+                    <span>Conta de: {impersonatedSeller.name}</span>
+                    <button
+                      onClick={onExitImpersonation}
+                      className="ml-1 px-1.5 py-0.5 rounded bg-amber-600 text-white text-[10px] hover:bg-amber-700 transition"
+                    >
+                      Sair
+                    </button>
+                  </div>
                 ) : (
-                  <>
-                    Operando como:{' '}
-                    <strong className="text-slate-700 dark:text-slate-200">
+                  <span className="text-slate-500 dark:text-slate-400 hidden md:inline">
+                    {isSupervisorMode ? '👑 Supervisor:' : '🔒 Vendedor:'}{' '}
+                    <strong className="text-slate-800 dark:text-slate-200">
                       {activeSellerName}
                     </strong>
-                  </>
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
 
             {/* Feed de Mensagens */}
