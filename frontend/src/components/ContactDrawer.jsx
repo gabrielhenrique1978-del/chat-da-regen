@@ -22,6 +22,7 @@ export default function ContactDrawer({
   stages = [],
   sellers = [],
   windowInfo,
+  canReassignSeller = true,
   onAssignSeller,
   onChangeTemperature,
   onAddTag,
@@ -96,6 +97,7 @@ export default function ContactDrawer({
           Vendedor Responsável (Posse)
         </label>
         <select
+          disabled={!canReassignSeller}
           value={currentSellerObj?.id || contact.assignee || 'Agente IA'}
           onChange={(e) => {
             const val = e.target.value;
@@ -118,7 +120,7 @@ export default function ContactDrawer({
               }
             }
           }}
-          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <option value="Agente IA">🤖 Agente IA (Automático)</option>
           {sellers.map((s) => (

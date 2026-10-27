@@ -19,6 +19,8 @@ import {
   MessageCircle,
   StickyNote,
   FlaskConical,
+  Eye,
+  Crown,
 } from 'lucide-react';
 import { cn, formatTime, getInitials } from '../lib/utils';
 import ContactDrawer from './ContactDrawer';
@@ -30,6 +32,10 @@ export default function OmnichannelInbox({
   contactDetail,
   sellers = [],
   activeSeller,
+  isSupervisorMode = true,
+  impersonatedSeller = null,
+  onImpersonateSeller,
+  onExitImpersonation,
   stages = [],
   quickReplies = [],
   windowInfo,
@@ -45,6 +51,7 @@ export default function OmnichannelInbox({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, mine, waiting, others, bot
   const [channelFilter, setChannelFilter] = useState(''); // '', whatsapp, instagram
+  const [supervisorSellerFilter, setSupervisorSellerFilter] = useState(''); // '', seller_id
   const [chatSubTab, setChatSubTab] = useState('attendance'); // attendance, notes, simulator
   const [messageText, setMessageText] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -53,6 +60,7 @@ export default function OmnichannelInbox({
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState('');
   const [transferReason, setTransferReason] = useState('');
+  const [supervisorIntervention, setSupervisorIntervention] = useState(false);
 
   const feedEndRef = useRef(null);
 
@@ -61,7 +69,8 @@ export default function OmnichannelInbox({
   const deal = contactDetail?.deal || null;
   const stage = contactDetail?.stage || null;
 
-  const activeSellerName = activeSeller?.name || 'Lucas Silva';
+  const effectiveSeller = impersonatedSeller || activeSeller;
+  const activeSellerName = effectiveSeller?.name || 'Lucas Silva';
 
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,17 +92,22 @@ export default function OmnichannelInbox({
 
   const isMine =
     isAssignedHuman &&
-    (currentContact.seller_id === activeSeller?.id ||
+    (currentContact.seller_id === effectiveSeller?.id ||
       currentContact.assignee?.toLowerCase() ===
         activeSellerName.toLowerCase());
 
   const isLockedForMe = isAssignedHuman && !isMine;
+  // Bloqueia o input se for outro vendedor E o supervisor não tiver ativado intervenção direta
+  const isInputBlocked =
+    isLockedForMe &&
+    chatSubTab === 'attendance' &&
+    !(isSupervisorMode && supervisorIntervention);
 
-  // Contadores de filtros
+  // Contadores de filtros baseados na conta ativa (ou conta espelhada pelo Supervisor)
   const countMine = contacts.filter(
     (c) =>
       (c.attendance_status === 'human' || c.ai_enabled === false) &&
-      (c.seller_id === activeSeller?.id || c.assignee === activeSellerName)
+      (c.seller_id === effectiveSeller?.id || c.assignee === activeSellerName)
   ).length;
 
   const countWaiting = contacts.filter(
@@ -115,9 +129,18 @@ export default function OmnichannelInbox({
   const filteredContacts = contacts.filter((c) => {
     if (channelFilter && c.channel !== channelFilter) return false;
 
+    if (isSupervisorMode && supervisorSellerFilter) {
+      const targetS = sellers.find((s) => s.id === supervisorSellerFilter);
+      const matchSeller =
+        c.seller_id === supervisorSellerFilter ||
+        (targetS &&
+          (c.assignee || '').toLowerCase() === targetS.name.toLowerCase());
+      if (!matchSeller) return false;
+    }
+
     const cIsMine =
       (c.attendance_status === 'human' || c.ai_enabled === false) &&
-      (c.seller_id === activeSeller?.id || c.assignee === activeSellerName);
+      (c.seller_id === effectiveSeller?.id || c.assignee === activeSellerName);
     const cIsWaiting =
       c.attendance_status === 'waiting' ||
       c.assignee === 'Fila de Espera Humana';
@@ -163,6 +186,12 @@ export default function OmnichannelInbox({
     const text = messageText;
     setMessageText('');
 
+    const senderLabel = impersonatedSeller
+      ? `${impersonatedSeller.name} (via Supervisor)`
+      : isSupervisorMode && supervisorIntervention && isLockedForMe
+      ? `Supervisor (${activeSellerName})`
+      : activeSellerName;
+
     if (chatSubTab === 'simulator') {
       await onSendSimulated({
         contact_id: currentContact.id,
@@ -172,7 +201,7 @@ export default function OmnichannelInbox({
     } else if (chatSubTab === 'notes') {
       await onSendMessage({
         contact_id: currentContact.id,
-        content: `🔒 [Nota de ${activeSellerName}]: ${text}`,
+        content: `🔒 [Nota de ${senderLabel}]: ${text}`,
         sender: 'internal',
         sender_name: activeSellerName,
         is_internal: true,
@@ -184,6 +213,9 @@ export default function OmnichannelInbox({
         sender: 'human',
         sender_name: activeSellerName,
         is_internal: false,
+        is_supervisor_override: Boolean(
+          isSupervisorMode && (supervisorIntervention || impersonatedSeller)
+        ),
       });
     }
   };
@@ -248,11 +280,36 @@ export default function OmnichannelInbox({
             />
           </div>
 
+          {/* Filtro Exclusivo de Supervisor: Inspecionar Carteira por Vendedor */}
+          {isSupervisorMode && (
+            <div className="pt-0.5">
+              <select
+                value={supervisorSellerFilter}
+                onChange={(e) => setSupervisorSellerFilter(e.target.value)}
+                className="w-full rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 px-2.5 py-1.5 text-[11px] font-bold text-amber-950 dark:text-amber-200 focus:outline-none"
+              >
+                <option value="">
+                  👑 Visão Supervisor: Todos os Vendedores ({contacts.length})
+                </option>
+                {sellers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    🎧 Carteira de: {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Filtros de Status / Posse */}
           <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
             {[
               { id: 'all', label: `Todos (${contacts.length})` },
-              { id: 'mine', label: `Meus (${countMine})` },
+              {
+                id: 'mine',
+                label: impersonatedSeller
+                  ? `De ${impersonatedSeller.name.split(' ')[0]} (${countMine})`
+                  : `Meus (${countMine})`,
+              },
               { id: 'waiting', label: `Fila (${countWaiting})` },
               { id: 'others', label: `Colegas (${countOthers})` },
               { id: 'bot', label: 'Robô IA' },
@@ -306,7 +363,7 @@ export default function OmnichannelInbox({
               const selected = c.id === selectedContactId;
               const cIsMine =
                 (c.attendance_status === 'human' || c.ai_enabled === false) &&
-                (c.seller_id === activeSeller?.id ||
+                (c.seller_id === effectiveSeller?.id ||
                   c.assignee === activeSellerName);
               const cIsOther =
                 (c.attendance_status === 'human' || c.ai_enabled === false) &&
@@ -349,7 +406,7 @@ export default function OmnichannelInbox({
                       </span>
                       {cIsMine ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200">
-                          ✓ Seu ({c.assignee})
+                          ✓ {impersonatedSeller ? 'Conta Espelhada' : 'Seu'} ({c.assignee})
                         </span>
                       ) : cIsOther ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200">
@@ -406,7 +463,7 @@ export default function OmnichannelInbox({
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                     {isMine
-                      ? `🎧 Fixado com você (${currentContact.assignee})`
+                      ? `🎧 Fixado com ${currentContact.assignee}`
                       : isLockedForMe
                       ? `🔒 Em atendimento exclusivo por ${currentContact.assignee}`
                       : '🤖 Em atendimento automático pela IA'}
@@ -414,14 +471,14 @@ export default function OmnichannelInbox({
                 </div>
               </div>
 
-              {/* Botões de Posse e Gaveta */}
+              {/* Botões de Posse, Espelhamento de Supervisor e Gaveta */}
               <div className="flex items-center gap-2 shrink-0">
                 {isMine ? (
                   <>
                     <button
                       onClick={() => {
                         const colleagues = sellers.filter(
-                          (s) => s.id !== activeSeller?.id
+                          (s) => s.id !== effectiveSeller?.id
                         );
                         setTransferTargetId(colleagues[0]?.id || '');
                         setShowTransferModal(true);
@@ -448,33 +505,57 @@ export default function OmnichannelInbox({
                     </button>
                   </>
                 ) : isLockedForMe ? (
-                  <button
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Este cliente está com ${currentContact.assignee}. Deseja puxar/assumir o atendimento para você (${activeSellerName})?`
-                        )
-                      ) {
-                        onAssignContact(currentContact.id, {
-                          assignee: activeSellerName,
-                          seller_id: activeSeller?.id,
-                          ai_enabled: false,
-                          attendance_status: 'human',
-                          operator_name: activeSellerName,
-                        });
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition"
-                  >
-                    <Hand size={14} />
-                    <span>Assumir de {currentContact.assignee}</span>
-                  </button>
+                  isSupervisorMode ? (
+                    <div className="flex items-center gap-1.5">
+                      {/* Botão para o Supervisor entrar direto na conta do vendedor dono desta conversa */}
+                      <button
+                        onClick={() => {
+                          const ownerObj = sellers.find(
+                            (s) =>
+                              s.id === currentContact.seller_id ||
+                              s.name.toLowerCase() ===
+                                (currentContact.assignee || '').toLowerCase()
+                          );
+                          if (ownerObj) {
+                            onImpersonateSeller?.(ownerObj);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition"
+                        title={`Entrar na conta de ${currentContact.assignee} para operar como ele`}
+                      >
+                        <Eye size={13} />
+                        <span>Entrar na Conta de {currentContact.assignee}</span>
+                      </button>
+
+                      {/* Supervisor pode forçar transferência */}
+                      <button
+                        onClick={() => {
+                          const colleagues = sellers.filter(
+                            (s) => s.name !== currentContact.assignee
+                          );
+                          setTransferTargetId(colleagues[0]?.id || '');
+                          setShowTransferModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition"
+                        title="Como Supervisor, você pode reatribuir ou destravar este atendimento"
+                      >
+                        <ArrowRightLeft size={13} />
+                        <span>Forçar Transferência</span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* VENDEDOR COMUM: Bloqueado estritamente, não pode roubar o lead */
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold">
+                      <Lock size={13} />
+                      <span>Exclusivo de {currentContact.assignee}</span>
+                    </span>
+                  )
                 ) : (
                   <button
                     onClick={() =>
                       onAssignContact(currentContact.id, {
                         assignee: activeSellerName,
-                        seller_id: activeSeller?.id,
+                        seller_id: effectiveSeller?.id,
                         ai_enabled: false,
                         attendance_status: 'human',
                         operator_name: activeSellerName,
@@ -483,7 +564,7 @@ export default function OmnichannelInbox({
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition"
                   >
                     <UserCheck size={14} />
-                    <span>Pegar Conversa (Fixar Comigo)</span>
+                    <span>Pegar Conversa ({activeSellerName})</span>
                   </button>
                 )}
 
@@ -545,7 +626,18 @@ export default function OmnichannelInbox({
               </div>
 
               <span className="text-[11px] text-slate-400 hidden sm:inline">
-                Operador ativo: <strong className="text-slate-700 dark:text-slate-200">{activeSellerName}</strong>
+                {impersonatedSeller ? (
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">
+                    👁️ Espelhando conta de: {impersonatedSeller.name}
+                  </span>
+                ) : (
+                  <>
+                    Operando como:{' '}
+                    <strong className="text-slate-700 dark:text-slate-200">
+                      {activeSellerName}
+                    </strong>
+                  </>
+                )}
               </span>
             </div>
 
@@ -615,32 +707,63 @@ export default function OmnichannelInbox({
               <div ref={feedEndRef} />
             </div>
 
-            {/* Banner de Bloqueio Estrito quando outro vendedor é dono da conversa */}
+            {/* Banner quando outro vendedor é dono da conversa: Diferencia Vendedor Comum vs Supervisor */}
             {isLockedForMe && chatSubTab === 'attendance' && (
-              <div className="px-5 py-3 bg-amber-50 dark:bg-amber-950/60 border-t border-amber-200 dark:border-amber-800 flex items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
+              <div
+                className={cn(
+                  'px-5 py-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs',
+                  isSupervisorMode
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800 text-indigo-950 dark:text-indigo-200'
+                    : 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-200'
+                )}
+              >
                 <div className="flex items-center gap-2">
-                  <Lock size={16} className="text-amber-600 shrink-0" />
+                  {isSupervisorMode ? (
+                    <Crown size={16} className="text-indigo-600 shrink-0" />
+                  ) : (
+                    <Lock size={16} className="text-amber-600 shrink-0" />
+                  )}
                   <span>
-                    <strong>Chat Bloqueado:</strong> Este cliente está fixado
-                    exclusivamente com <strong>{currentContact.assignee}</strong>
-                    . Você não pode enviar mensagens externas a menos que assuma
-                    o atendimento.
+                    {isSupervisorMode ? (
+                      <>
+                        <strong>Supervisão de Carteira:</strong> Este cliente
+                        está em atendimento por{' '}
+                        <strong>{currentContact.assignee}</strong>. Como
+                        Supervisor, você pode entrar na conta dele ou intervir
+                        diretamente.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Chat Bloqueado:</strong> Este cliente pertence
+                        exclusivamente à carteira de{' '}
+                        <strong>{currentContact.assignee}</strong>. Sua sessão
+                        está travada como <strong>{activeSellerName}</strong>{' '}
+                        (somente leitura).
+                      </>
+                    )}
                   </span>
                 </div>
-                <button
-                  onClick={() =>
-                    onAssignContact(currentContact.id, {
-                      assignee: activeSellerName,
-                      seller_id: activeSeller?.id,
-                      ai_enabled: false,
-                      attendance_status: 'human',
-                      operator_name: activeSellerName,
-                    })
-                  }
-                  className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] shrink-0"
-                >
-                  Assumir Atendimento
-                </button>
+
+                {isSupervisorMode && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSupervisorIntervention(!supervisorIntervention)
+                      }
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg font-bold text-[11px] transition',
+                        supervisorIntervention
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 text-indigo-800 dark:text-indigo-200'
+                      )}
+                    >
+                      {supervisorIntervention
+                        ? '✓ Intervenção Liberada'
+                        : 'Liberar Digitação (Supervisor)'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -683,7 +806,7 @@ export default function OmnichannelInbox({
             >
               <button
                 type="button"
-                disabled={isLockedForMe && chatSubTab === 'attendance'}
+                disabled={isInputBlocked}
                 onClick={() => setShowQuickReplies(!showQuickReplies)}
                 className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 disabled:opacity-40"
                 title="Respostas Rápidas (/)"
@@ -694,7 +817,7 @@ export default function OmnichannelInbox({
 
               <button
                 type="button"
-                disabled={isLockedForMe && chatSubTab === 'attendance'}
+                disabled={isInputBlocked}
                 onClick={() => setShowTemplateModal(true)}
                 className="px-3 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-xs font-bold text-blue-800 dark:text-blue-300 hover:bg-blue-100 disabled:opacity-40"
                 title="Disparar Template Oficial da Meta (HSM)"
@@ -705,16 +828,18 @@ export default function OmnichannelInbox({
 
               <input
                 type="text"
-                disabled={isLockedForMe && chatSubTab === 'attendance'}
+                disabled={isInputBlocked}
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 placeholder={
-                  isLockedForMe && chatSubTab === 'attendance'
-                    ? `Chat bloqueado — em atendimento por ${currentContact.assignee}`
+                  isInputBlocked
+                    ? `🔒 Chat bloqueado — em atendimento por ${currentContact.assignee}`
                     : chatSubTab === 'notes'
                     ? 'Escrever nota interna visível apenas para a equipe...'
                     : chatSubTab === 'simulator'
                     ? 'Simular mensagem enviada pelo cliente no WhatsApp...'
+                    : impersonatedSeller
+                    ? `Respondendo na conta de ${impersonatedSeller.name} (Modo Supervisor)...`
                     : `Responder como ${activeSellerName}...`
                 }
                 className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600 disabled:opacity-50"
@@ -722,10 +847,7 @@ export default function OmnichannelInbox({
 
               <button
                 type="submit"
-                disabled={
-                  !messageText.trim() ||
-                  (isLockedForMe && chatSubTab === 'attendance')
-                }
+                disabled={!messageText.trim() || isInputBlocked}
                 className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-40 transition"
               >
                 <Send size={14} />
@@ -747,6 +869,7 @@ export default function OmnichannelInbox({
           stages={stages}
           sellers={sellers}
           windowInfo={windowInfo}
+          canReassignSeller={Boolean(isSupervisorMode || !isLockedForMe)}
           onAssignSeller={(payload) =>
             onAssignContact(currentContact.id, {
               ...payload,

@@ -6,7 +6,18 @@ import KanbanView from './components/KanbanView';
 import ConnectionsView from './components/ConnectionsView';
 import SettingsView from './components/SettingsView';
 import { api, createRealtimeSocket } from './lib/api';
-import { CheckCircle2, AlertCircle, X, Users, ShieldAlert } from 'lucide-react';
+import {
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Users,
+  ShieldAlert,
+  Eye,
+  Lock,
+  KeyRound,
+  LogOut,
+  Crown,
+} from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inbox');
@@ -27,6 +38,20 @@ export default function App() {
       return null;
     }
   });
+
+  // Supervisor Mode vs Locked Seller Session + Impersonation ("Entrar na Conta")
+  const [isSupervisorMode, setIsSupervisorMode] = useState(() => {
+    const saved = localStorage.getItem('ocf_supervisor_mode');
+    return saved ? saved === 'true' : true;
+  });
+  const [impersonatedSeller, setImpersonatedSeller] = useState(null);
+
+  // PIN Login / Operator Switch Modal State
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinSellerId, setPinSellerId] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+
   const [contacts, setContacts] = useState([]);
   const [selectedContactId, setSelectedContactId] = useState(null);
   const selectedContactIdRef = useRef(null);
@@ -69,19 +94,10 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Persist active seller
-  const handleSelectSeller = useCallback(
-    (seller) => {
-      setActiveSeller(seller);
-      if (seller) {
-        localStorage.setItem('ocf_active_seller', JSON.stringify(seller));
-        showToast(`Operando como: ${seller.name}`, 'info');
-      } else {
-        localStorage.removeItem('ocf_active_seller');
-      }
-    },
-    [showToast]
-  );
+  // Persist Supervisor Mode
+  useEffect(() => {
+    localStorage.setItem('ocf_supervisor_mode', String(isSupervisorMode));
+  }, [isSupervisorMode]);
 
   // Load Active Sellers for Selectors
   const loadSellers = useCallback(async () => {
@@ -97,6 +113,10 @@ export default function App() {
           if (found) return found;
         }
         return list[0] || null;
+      });
+      setImpersonatedSeller((prev) => {
+        if (!prev) return null;
+        return list.find((s) => String(s.id) === String(prev.id)) || null;
       });
     } catch (err) {
       if (err.status === 403) setSuspendedDetail(err.detail);
@@ -187,6 +207,8 @@ export default function App() {
       if (
         ev === 'new_message' ||
         ev === 'seller_assigned' ||
+        ev === 'contact_assigned' ||
+        ev === 'handoff_updated' ||
         ev === 'human_handoff' ||
         ev === 'stage_changed' ||
         ev === 'meta_message_status'
@@ -196,7 +218,11 @@ export default function App() {
           loadContactDetail(selectedContactIdRef.current);
         }
       }
-      if (ev === 'sellers_updated') {
+      if (
+        ev === 'sellers_updated' ||
+        ev === 'seller_created' ||
+        ev === 'seller_updated'
+      ) {
         loadSellers();
         loadContacts();
       }
@@ -207,6 +233,96 @@ export default function App() {
       }
     };
   }, [loadContacts, loadContactDetail, loadSellers]);
+
+  // Supervisor: Impersonate Seller ("Entrar na Conta do Vendedor")
+  const handleImpersonateSeller = useCallback(
+    async (seller, jumpToInbox = false) => {
+      if (!seller) return;
+      try {
+        await api.impersonateSeller(seller.id, 'Supervisor');
+      } catch {
+        // fallback local
+      }
+      setIsSupervisorMode(true);
+      setImpersonatedSeller(seller);
+      setActiveSeller(seller);
+      localStorage.setItem('ocf_active_seller', JSON.stringify(seller));
+      showToast(
+        `👁️ Modo Supervisor: Você entrou na conta de ${seller.name}`,
+        'success'
+      );
+      if (jumpToInbox) {
+        setShowSellersModal(false);
+        setActiveTab('inbox');
+      }
+    },
+    [showToast]
+  );
+
+  const handleExitImpersonation = useCallback(async () => {
+    try {
+      await api.impersonateSeller(null, 'Supervisor');
+    } catch {
+      // ignore
+    }
+    setImpersonatedSeller(null);
+    showToast('👑 Retornou para a Visão Global de Supervisor');
+  }, [showToast]);
+
+  // Lock Session Exclusively to a Single Seller ("Garantir que cada vendedor use só seu nome")
+  const handleLockToSeller = useCallback(
+    (seller) => {
+      if (!seller) return;
+      setActiveSeller(seller);
+      setImpersonatedSeller(null);
+      setIsSupervisorMode(seller.role === 'supervisor');
+      localStorage.setItem('ocf_active_seller', JSON.stringify(seller));
+      localStorage.setItem(
+        'ocf_supervisor_mode',
+        String(seller.role === 'supervisor')
+      );
+      showToast(
+        seller.role === 'supervisor'
+          ? `👑 Sessão de Supervisor ativada: ${seller.name}`
+          : `🔒 Sessão travada exclusivamente no vendedor: ${seller.name}`
+      );
+    },
+    [showToast]
+  );
+
+  // Authenticate via PIN Modal
+  const handleAuthenticatePin = async (e) => {
+    e.preventDefault();
+    setPinError('');
+    if (!pinSellerId) {
+      setPinError('Selecione o colaborador.');
+      return;
+    }
+    if (pinSellerId === '__SUPERVISOR_MASTER__') {
+      // Master Supervisor PIN (0000 or 1234)
+      if (pinInput.trim() === '0000' || pinInput.trim() === '1234') {
+        setIsSupervisorMode(true);
+        setImpersonatedSeller(null);
+        setShowPinModal(false);
+        setPinInput('');
+        showToast('👑 Modo Supervisor Global desbloqueado com sucesso!');
+      } else {
+        setPinError('PIN de Supervisor incorreto (Padrão: 0000 ou 1234).');
+      }
+      return;
+    }
+
+    try {
+      const res = await api.authenticateSeller(pinSellerId, pinInput.trim());
+      if (res.authenticated && res.seller) {
+        handleLockToSeller(res.seller);
+        setShowPinModal(false);
+        setPinInput('');
+      }
+    } catch (err) {
+      setPinError(err.message || 'PIN incorreto para este vendedor.');
+    }
+  };
 
   // Action Handlers for OmnichannelInbox & ContactDrawer
   const handleSendMessage = async (payload) => {
@@ -339,7 +455,16 @@ export default function App() {
         setDarkMode={setDarkMode}
         sellers={sellers}
         activeSeller={activeSeller}
-        onSelectSeller={handleSelectSeller}
+        isSupervisorMode={isSupervisorMode}
+        impersonatedSeller={impersonatedSeller}
+        onImpersonateSeller={(s) => handleImpersonateSeller(s, true)}
+        onExitImpersonation={handleExitImpersonation}
+        onOpenPinModal={() => {
+          setPinSellerId(activeSeller?.id || sellers[0]?.id || '');
+          setPinError('');
+          setPinInput('');
+          setShowPinModal(true);
+        }}
         authUser={authUser}
         onOpenAuthModal={() => setActiveTab('settings')}
         wsConnected={wsConnected}
@@ -348,6 +473,43 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* Top Banner when Supervisor is Impersonating a Seller Account */}
+        {isSupervisorMode && impersonatedSeller && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold shadow-sm shrink-0 z-20">
+            <div className="flex items-center gap-2">
+              <Eye size={16} className="shrink-0" />
+              <span>
+                🕵️ MODO SUPERVISOR (ESPELHAMENTO DE CONTA): Você está dentro da
+                conta do vendedor{' '}
+                <strong className="underline">{impersonatedSeller.name}</strong>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={impersonatedSeller.id}
+                onChange={(e) => {
+                  const next = sellers.find((s) => s.id === e.target.value);
+                  if (next) handleImpersonateSeller(next, false);
+                }}
+                className="rounded-lg bg-slate-950/15 border border-slate-950/20 px-2.5 py-1 text-xs font-extrabold text-slate-950 focus:outline-none cursor-pointer"
+              >
+                {sellers.map((s) => (
+                  <option key={s.id} value={s.id} className="text-slate-900">
+                    Trocar para: {s.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleExitImpersonation}
+                className="px-3 py-1 rounded-lg bg-slate-950 text-white hover:bg-slate-800 text-[11px] font-bold flex items-center gap-1 transition"
+              >
+                <LogOut size={12} />
+                <span>Sair da Conta (Voltar ao Supervisor)</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Top Sub-bar with Quick Identity Badge & Seller Quick Modal Trigger */}
         <header className="h-11 px-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between shrink-0 z-10">
           <div className="flex items-center gap-2.5 text-xs">
@@ -355,17 +517,48 @@ export default function App() {
               OpenChatFunnel SaaS
             </span>
             <span className="text-slate-300 dark:text-slate-700">•</span>
-            <span className="text-slate-500 dark:text-slate-400 hidden sm:inline">
-              PostgreSQL Neon Cloud + Meta Graph API v21.0
-            </span>
+            {isSupervisorMode ? (
+              <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold">
+                <Crown size={13} />
+                Supervisor (Acesso a todos os vendedores)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold">
+                <Lock size={12} />
+                Vendedor Travado: {activeSeller?.name}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Quick Modal Trigger for Seller Management from anywhere */}
+            {/* Button to switch between Seller Lock and Supervisor Mode */}
+            <button
+              onClick={() => {
+                setPinSellerId(
+                  isSupervisorMode
+                    ? activeSeller?.id || sellers[0]?.id || ''
+                    : '__SUPERVISOR_MASTER__'
+                );
+                setPinError('');
+                setPinInput('');
+                setShowPinModal(true);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/70 dark:border-slate-700/70 transition"
+              title="Autenticar Vendedor por PIN ou Alternar Modo Supervisor"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+              <span>
+                {isSupervisorMode
+                  ? 'Travar em 1 Vendedor'
+                  : 'Entrar como Supervisor'}
+              </span>
+            </button>
+
+            {/* Quick Modal Trigger for Seller Management */}
             <button
               onClick={() => setShowSellersModal(true)}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 border border-slate-200/70 dark:border-slate-700/70 transition"
-              title="Abrir Gestão Rápida de Vendedores"
+              title="Abrir Gestão de Vendedores e Espelhamento de Contas"
             >
               <Users className="w-3.5 h-3.5 text-emerald-600" />
               <span>Equipe ({sellers.length} ativos)</span>
@@ -399,6 +592,10 @@ export default function App() {
               contactDetail={contactDetail}
               sellers={sellers}
               activeSeller={activeSeller}
+              isSupervisorMode={isSupervisorMode}
+              impersonatedSeller={impersonatedSeller}
+              onImpersonateSeller={(s) => handleImpersonateSeller(s, false)}
+              onExitImpersonation={handleExitImpersonation}
               stages={stages}
               quickReplies={quickReplies}
               windowInfo={windowInfo}
@@ -424,6 +621,18 @@ export default function App() {
 
           {activeTab === 'sellers' && (
             <SellersView
+              contacts={contacts}
+              activeSeller={activeSeller}
+              isSupervisorMode={isSupervisorMode}
+              impersonatedSeller={impersonatedSeller}
+              onImpersonateSeller={handleImpersonateSeller}
+              onLockToSeller={handleLockToSeller}
+              onOpenPinModal={() => {
+                setPinSellerId('__SUPERVISOR_MASTER__');
+                setPinError('');
+                setPinInput('');
+                setShowPinModal(true);
+              }}
               onSellersUpdated={() => {
                 loadSellers();
                 loadContacts();
@@ -450,6 +659,98 @@ export default function App() {
         </main>
       </div>
 
+      {/* Modal de Autenticação por PIN Individual (Vendedor Travado vs Supervisor) */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <form
+            onSubmit={handleAuthenticatePin}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center">
+                  <KeyRound size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    Identidade do Operador & PIN
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Garante que cada vendedor opere apenas no próprio nome
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPinModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {pinError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                {pinError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                  Selecionar Perfil / Conta
+                </label>
+                <select
+                  value={pinSellerId}
+                  onChange={(e) => setPinSellerId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="__SUPERVISOR_MASTER__">
+                    👑 MODO SUPERVISOR GLOBAL (Acessar todas as contas)
+                  </option>
+                  {sellers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      🔒 Vendedor Travado: {s.name} (
+                      {s.role === 'supervisor' ? 'Supervisor' : 'Vendedor'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                  PIN de Acesso Individual (Padrão: 1234)
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="Digite seu PIN (ex: 1234)"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPinModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold"
+              >
+                Confirmar e Travar Sessão
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Quick Sellers Management Modal */}
       {showSellersModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
@@ -461,10 +762,10 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Gestão Rápida de Vendedores (Equipa Dinâmica)
+                    Gestão de Vendedores, PIN Individual & Espelhamento de Contas
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Cadastre, edite ou desative vendedores (Soft Delete) com atualização imediata nos seletores
+                    Cadastre vendedores, defina o PIN individual ou clique em "Entrar na Conta" como Supervisor
                   </p>
                 </div>
               </div>
@@ -477,6 +778,22 @@ export default function App() {
             </div>
             <div className="flex-1 overflow-y-auto">
               <SellersView
+                contacts={contacts}
+                activeSeller={activeSeller}
+                isSupervisorMode={isSupervisorMode}
+                impersonatedSeller={impersonatedSeller}
+                onImpersonateSeller={handleImpersonateSeller}
+                onLockToSeller={(s) => {
+                  handleLockToSeller(s);
+                  setShowSellersModal(false);
+                }}
+                onOpenPinModal={() => {
+                  setShowSellersModal(false);
+                  setPinSellerId('__SUPERVISOR_MASTER__');
+                  setPinError('');
+                  setPinInput('');
+                  setShowPinModal(true);
+                }}
                 onSellersUpdated={() => {
                   loadSellers();
                   loadContacts();

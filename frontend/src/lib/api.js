@@ -81,7 +81,7 @@ export const api = {
     }),
   getQuickReplies: () => apiRequest('/quick-replies'),
 
-  // Gestão Dinâmica de Vendedores (Sellers)
+  // Gestão Dinâmica de Vendedores (Sellers), PIN Individual & Modo Supervisor
   getSellers: (includeInactive = false) =>
     apiRequest(`/sellers${includeInactive ? '?include_inactive=true' : ''}`),
   createSeller: (payload) =>
@@ -93,6 +93,19 @@ export const api = {
     apiRequest(`/sellers/${sellerId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
+    }),
+  authenticateSeller: (sellerId, pin) =>
+    apiRequest('/sellers/authenticate', {
+      method: 'POST',
+      body: JSON.stringify({ seller_id: sellerId, pin }),
+    }),
+  impersonateSeller: (targetSellerId, supervisorName = 'Supervisor') =>
+    apiRequest('/sellers/impersonate', {
+      method: 'POST',
+      body: JSON.stringify({
+        target_seller_id: targetSellerId,
+        supervisor_name: supervisorName,
+      }),
     }),
 
   // Funil CRM / Kanban

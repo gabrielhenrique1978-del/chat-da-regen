@@ -118,13 +118,27 @@ class CreateSellerRequest(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    pin: Optional[str] = "1234"
+    role: Optional[str] = "seller"  # "seller" ou "supervisor"
 
 
 class UpdateSellerRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    pin: Optional[str] = None
+    role: Optional[str] = None
     active: Optional[bool] = None
+
+
+class AuthenticateSellerRequest(BaseModel):
+    seller_id: str
+    pin: str
+
+
+class ImpersonateSellerRequest(BaseModel):
+    target_seller_id: Optional[str] = None  # None para voltar à Visão Global de Supervisor
+    supervisor_name: str = "Supervisor"
 
 
 class TemperatureRequest(BaseModel):
@@ -153,6 +167,7 @@ class OutboundMessageRequest(BaseModel):
     sender: str = "human"
     sender_name: Optional[str] = None
     is_internal: bool = False
+    is_supervisor_override: bool = False
     media_type: str = "text"
     media_url: Optional[str] = None
 
@@ -1089,13 +1104,20 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
     @router.post("/sellers")
     async def create_store_seller(req: CreateSellerRequest):
-        """Cadastra um novo vendedor na equipe da loja com validação."""
+        """Cadastra um novo vendedor ou supervisor na equipe da loja com validação e PIN individual."""
         if not req.name or not req.name.strip():
             raise HTTPException(status_code=400, detail="Nome do vendedor é obrigatório")
         try:
-            seller = db.create_seller(name=req.name, email=req.email, phone=req.phone)
+            seller = db.create_seller(
+                name=req.name,
+                email=req.email,
+                phone=req.phone,
+                pin=req.pin or "1234",
+                role=req.role or "seller",
+            )
             payload = seller.model_dump()
             await ws_manager.broadcast_event("seller_created", payload)
+            await ws_manager.broadcast_event("sellers_updated", payload)
             return payload
         except ValueError as val_err:
             raise HTTPException(status_code=400, detail=str(val_err))
@@ -1105,7 +1127,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     @router.patch("/sellers/{seller_id}")
     @router.put("/sellers/{seller_id}")
     async def update_store_seller(seller_id: str, req: UpdateSellerRequest):
-        """Atualiza os dados do vendedor ou alterna seu estado de ativação (soft delete)."""
+        """Atualiza os dados do vendedor, PIN, cargo ou alterna seu estado de ativação (soft delete)."""
         existing = db.get_seller(seller_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Vendedor não encontrado")
@@ -1115,17 +1137,74 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 name=req.name,
                 email=req.email,
                 phone=req.phone,
+                pin=req.pin,
+                role=req.role,
                 active=req.active,
             )
             if not updated:
                 raise HTTPException(status_code=404, detail="Vendedor não encontrado")
             payload = updated.model_dump()
             await ws_manager.broadcast_event("seller_updated", payload)
+            await ws_manager.broadcast_event("sellers_updated", payload)
             return payload
         except ValueError as val_err:
             raise HTTPException(status_code=400, detail=str(val_err))
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Erro ao atualizar vendedor: {exc}")
+
+    @router.post("/sellers/authenticate")
+    def authenticate_seller_session(req: AuthenticateSellerRequest):
+        """
+        Autentica um vendedor ou supervisor via PIN individual.
+        Garante que cada vendedor fique travado exclusivamente no seu próprio nome/conta.
+        """
+        seller = db.verify_seller_pin(req.seller_id, req.pin)
+        if not seller:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="PIN incorreto ou vendedor inativo. Cada vendedor só pode acessar sua própria conta.",
+            )
+        token = create_access_token(
+            {
+                "sub": seller.id,
+                "seller_name": seller.name,
+                "seller_role": seller.role,
+                "locked": seller.role != "supervisor",
+            }
+        )
+        return {
+            "authenticated": True,
+            "session_mode": "supervisor" if seller.role == "supervisor" else "seller",
+            "locked_to_seller": seller.role != "supervisor",
+            "seller": seller.model_dump(),
+            "token": token,
+        }
+
+    @router.post("/sellers/impersonate")
+    async def supervisor_impersonate_seller(req: ImpersonateSellerRequest):
+        """
+        Permite ao Supervisor entrar na conta de qualquer vendedor (Espelhamento / Impersonation)
+        sem precisar da senha do vendedor, ou retornar à Visão Global de Supervisor.
+        """
+        if not req.target_seller_id:
+            return {
+                "impersonating": False,
+                "session_mode": "supervisor",
+                "target_seller": None,
+                "message": "Retornou para a Visão Global de Supervisor.",
+            }
+
+        target = db.get_seller(req.target_seller_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="Vendedor alvo não encontrado")
+
+        return {
+            "impersonating": True,
+            "session_mode": "supervisor_impersonating",
+            "supervisor_name": req.supervisor_name,
+            "target_seller": target.model_dump(),
+            "message": f"Modo Supervisor: visualizando e operando na conta de '{target.name}'.",
+        }
 
     @router.patch("/contacts/{contact_id}/assign")
     async def assign_contact_to_seller(contact_id: str, req: AssignContactRequest):
@@ -1301,7 +1380,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             )
             sender_seller = (req.sender_name or "").strip()
 
-            if is_assigned_human:
+            if is_assigned_human and not req.is_supervisor_override:
                 if not sender_seller or sender_seller.lower() != assigned_seller.lower():
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,

@@ -13,6 +13,10 @@ import {
   Building2,
   ShieldCheck,
   Award,
+  Lock,
+  Eye,
+  KeyRound,
+  LogOut,
 } from 'lucide-react';
 import { cn, getInitials } from '../lib/utils';
 
@@ -23,9 +27,13 @@ export default function Sidebar({
   setCollapsed,
   darkMode,
   setDarkMode,
-  sellers,
+  sellers = [],
   activeSeller,
-  onSelectSeller,
+  isSupervisorMode,
+  impersonatedSeller,
+  onImpersonateSeller,
+  onExitImpersonation,
+  onOpenPinModal,
   authUser,
   onOpenAuthModal,
   wsConnected,
@@ -49,7 +57,7 @@ export default function Sidebar({
     },
     {
       id: 'sellers',
-      label: 'Vendedores',
+      label: 'Vendedores & Equipe',
       icon: Users,
       badge: sellers?.length || null,
     },
@@ -69,7 +77,7 @@ export default function Sidebar({
     <aside
       className={cn(
         'h-screen flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-300 select-none shrink-0 z-20',
-        collapsed ? 'w-20' : 'w-64'
+        collapsed ? 'w-20' : 'w-68'
       )}
     >
       {/* Topo / Logo */}
@@ -112,40 +120,114 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Seletor Rápido do Vendedor Operando */}
-      <div className="p-3 border-b border-slate-200 dark:border-slate-800">
-        <div
-          className={cn(
-            'rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 p-2.5 flex items-center gap-2.5',
-            collapsed && 'justify-center'
-          )}
-        >
-          <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center text-xs font-bold shrink-0">
-            {getInitials(activeSeller?.name || 'Vendedor')}
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                Operando como:
-              </span>
-              <select
-                value={activeSeller?.id || ''}
-                onChange={(e) => onSelectSeller(e.target.value)}
-                className="w-full bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer truncate"
-              >
-                {sellers.map((s) => (
-                  <option
-                    key={s.id}
-                    value={s.id}
-                    className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                  >
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+      {/* Identidade do Operador: Sessão Travada (Vendedor) vs Modo Supervisor (Espelhamento) */}
+      <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
+        {isSupervisorMode ? (
+          <div
+            className={cn(
+              'rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800/70 p-2.5 space-y-2',
+              collapsed && 'flex flex-col items-center p-2'
+            )}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center text-xs font-extrabold shrink-0">
+                  <Eye size={15} />
+                </div>
+                {!collapsed && (
+                  <div className="min-w-0">
+                    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                      {impersonatedSeller
+                        ? 'Espelhando Vendedor:'
+                        : 'Modo Supervisor Global'}
+                    </span>
+                    <span className="block text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {impersonatedSeller
+                        ? impersonatedSeller.name
+                        : 'Visão Geral da Equipe'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {!collapsed && (
+                <button
+                  onClick={onOpenPinModal}
+                  className="p-1.5 rounded-lg text-amber-800 dark:text-amber-300 hover:bg-amber-200/60 dark:hover:bg-amber-900/50 transition"
+                  title="Travar sessão em um único vendedor (Modo Vendedor)"
+                >
+                  <KeyRound size={14} />
+                </button>
+              )}
             </div>
-          )}
-        </div>
+
+            {!collapsed && (
+              <div className="space-y-1.5 pt-1 border-t border-amber-200/70 dark:border-amber-800/50">
+                <label className="block text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                  👁️ Entrar na conta de (Impersonation):
+                </label>
+                <select
+                  value={impersonatedSeller?.id || '__SUPERVISOR_ALL__'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__SUPERVISOR_ALL__') {
+                      onExitImpersonation?.();
+                    } else {
+                      const found = sellers.find(
+                        (s) => String(s.id) === String(val)
+                      );
+                      if (found) onImpersonateSeller?.(found);
+                    }
+                  }}
+                  className="w-full rounded-lg bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 px-2 py-1.5 text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                >
+                  <option value="__SUPERVISOR_ALL__">
+                    👑 Supervisor (Ver Todos)
+                  </option>
+                  {sellers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      🎧 Conta de: {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* MODO VENDEDOR TRAVADO: O vendedor só pode usar seu próprio nome */
+          <div
+            className={cn(
+              'rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 p-2.5 space-y-2',
+              collapsed && 'flex flex-col items-center p-2'
+            )}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {getInitials(activeSeller?.name || 'Vendedor')}
+              </div>
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
+                    <Lock size={10} /> Conta Travada:
+                  </span>
+                  <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                    {activeSeller?.name || 'Vendedor'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {!collapsed && (
+              <button
+                onClick={onOpenPinModal}
+                className="w-full py-1.5 px-2.5 rounded-lg bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 flex items-center justify-center gap-1.5 transition"
+                title="Exige PIN do vendedor ou credencial de Supervisor"
+              >
+                <KeyRound size={12} />
+                <span>Trocar Operador / Supervisor</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Navegação Principal */}
@@ -225,8 +307,14 @@ export default function Sidebar({
             className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
             title="Alternar tema Claro / Escuro"
           >
-            {darkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
-            {!collapsed && <span>{darkMode ? 'Modo Claro' : 'Modo Escuro'}</span>}
+            {darkMode ? (
+              <Sun size={15} className="text-amber-400" />
+            ) : (
+              <Moon size={15} />
+            )}
+            {!collapsed && (
+              <span>{darkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
+            )}
           </button>
         </div>
 

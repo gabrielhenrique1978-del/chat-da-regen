@@ -179,13 +179,15 @@ class User(BaseModel):
 
 class Seller(BaseModel):
     """
-    Modelo de Vendedor / Atendente da Loja para distribuição,
-    posse de conversas e atendimento multi-operador.
+    Modelo de Vendedor / Atendente / Supervisor da Loja para distribuição,
+    posse de conversas, autenticação individual por PIN e modo supervisor.
     """
     id: str = Field(default_factory=new_uuid)
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    pin: str = "1234"
+    role: str = "seller"  # "seller" ou "supervisor"
     active: bool = True
     created_at: str = Field(default_factory=utc_now_iso)
 
@@ -528,6 +530,8 @@ class Database:
                 conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'admin';")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+                conn.execute("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS pin TEXT NOT NULL DEFAULT '1234';")
+                conn.execute("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'seller';")
                 conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES sellers(id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
                 conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS external_id TEXT;")
@@ -542,6 +546,12 @@ class Database:
 
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+
+                seller_cols = [r["name"] for r in conn.execute("PRAGMA table_info(sellers)").fetchall()]
+                if "pin" not in seller_cols:
+                    conn.execute("ALTER TABLE sellers ADD COLUMN pin TEXT NOT NULL DEFAULT '1234';")
+                if "role" not in seller_cols:
+                    conn.execute("ALTER TABLE sellers ADD COLUMN role TEXT NOT NULL DEFAULT 'seller';")
 
                 # Migração de colunas para suportar vinculação dinâmica de vendedores na tabela contacts
                 contact_cols = [r["name"] for r in conn.execute("PRAGMA table_info(contacts)").fetchall()]
@@ -1990,6 +2000,8 @@ class Database:
                     name=row["name"],
                     email=row["email"],
                     phone=row["phone"],
+                    pin=row["pin"] if "pin" in row.keys() and row["pin"] else "1234",
+                    role=row["role"] if "role" in row.keys() and row["role"] else ("supervisor" if "gabriel" in (row["name"] or "").lower() or "otavio" in (row["name"] or "").lower() else "seller"),
                     active=bool(row["active"]),
                     created_at=row["created_at"],
                 )
@@ -2007,6 +2019,8 @@ class Database:
                 name=row["name"],
                 email=row["email"],
                 phone=row["phone"],
+                pin=row["pin"] if "pin" in row.keys() and row["pin"] else "1234",
+                role=row["role"] if "role" in row.keys() and row["role"] else "seller",
                 active=bool(row["active"]),
                 created_at=row["created_at"],
             )
@@ -2022,12 +2036,21 @@ class Database:
                 name=row["name"],
                 email=row["email"],
                 phone=row["phone"],
+                pin=row["pin"] if "pin" in row.keys() and row["pin"] else "1234",
+                role=row["role"] if "role" in row.keys() and row["role"] else "seller",
                 active=bool(row["active"]),
                 created_at=row["created_at"],
             )
 
-    def create_seller(self, name: str, email: Optional[str] = None, phone: Optional[str] = None) -> Seller:
-        """Cadastra um novo vendedor na loja com validação e integridade de nome único."""
+    def create_seller(
+        self,
+        name: str,
+        email: Optional[str] = None,
+        phone: Optional[str] = None,
+        pin: str = "1234",
+        role: str = "seller",
+    ) -> Seller:
+        """Cadastra um novo vendedor ou supervisor na loja com validação e integridade de nome único."""
         clean_name = name.strip()
         if not clean_name:
             raise ValueError("O nome do vendedor é obrigatório.")
@@ -2035,19 +2058,24 @@ class Database:
         if existing:
             raise ValueError(f"Já existe um vendedor cadastrado com o nome '{clean_name}'.")
 
+        clean_pin = (pin or "1234").strip() or "1234"
+        clean_role = role if role in ("seller", "supervisor") else "seller"
+
         seller = Seller(
             name=clean_name,
             email=email.strip() if email and email.strip() else None,
             phone=phone.strip() if phone and phone.strip() else None,
+            pin=clean_pin,
+            role=clean_role,
             active=True,
         )
         with self.connection() as conn:
             conn.execute(
                 """
-                INSERT INTO sellers (id, name, email, phone, active, created_at)
-                VALUES (?, ?, ?, ?, 1, ?)
+                INSERT INTO sellers (id, name, email, phone, pin, role, active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?)
                 """,
-                (seller.id, seller.name, seller.email, seller.phone, seller.created_at),
+                (seller.id, seller.name, seller.email, seller.phone, seller.pin, seller.role, seller.created_at),
             )
         return seller
 
@@ -2057,9 +2085,11 @@ class Database:
         name: Optional[str] = None,
         email: Optional[str] = None,
         phone: Optional[str] = None,
+        pin: Optional[str] = None,
+        role: Optional[str] = None,
         active: Optional[bool] = None,
     ) -> Optional[Seller]:
-        """Atualiza os dados de um vendedor ou altera seu estado ativo/inativo (soft delete)."""
+        """Atualiza os dados de um vendedor, PIN/cargo ou altera seu estado ativo/inativo (soft delete)."""
         seller = self.get_seller(seller_id)
         if not seller:
             return None
@@ -2077,18 +2107,29 @@ class Database:
 
         new_email = email.strip() if email is not None and email.strip() else (seller.email if email is None else None)
         new_phone = phone.strip() if phone is not None and phone.strip() else (seller.phone if phone is None else None)
+        new_pin = pin.strip() if pin is not None and pin.strip() else seller.pin
+        new_role = role if role in ("seller", "supervisor") else seller.role
         new_active = active if active is not None else seller.active
 
         with self.connection() as conn:
             conn.execute(
                 """
                 UPDATE sellers
-                SET name = ?, email = ?, phone = ?, active = ?
+                SET name = ?, email = ?, phone = ?, pin = ?, role = ?, active = ?
                 WHERE id = ?
                 """,
-                (new_name, new_email, new_phone, 1 if new_active else 0, seller_id),
+                (new_name, new_email, new_phone, new_pin, new_role, 1 if new_active else 0, seller_id),
             )
         return self.get_seller(seller_id)
+
+    def verify_seller_pin(self, seller_id: str, pin: str) -> Optional[Seller]:
+        """Valida o PIN individual do vendedor/supervisor para travar a sessão no nome dele."""
+        seller = self.get_seller(seller_id)
+        if not seller or not seller.active:
+            return None
+        if str(seller.pin).strip() == str(pin).strip():
+            return seller
+        return None
 
     def toggle_seller_active(self, seller_id: str) -> Optional[Seller]:
         """Alterna o status de ativação (soft delete) de um vendedor."""
