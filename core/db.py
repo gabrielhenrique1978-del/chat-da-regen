@@ -291,12 +291,26 @@ class Database:
         import psycopg
         from psycopg.rows import dict_row
 
-        if self._pg_conn is None or self._pg_conn.closed or self._pg_conn.broken:
-            self._pg_conn = psycopg.connect(
-                self.database_url,
-                row_factory=dict_row,
-                autocommit=False,
-            )
+        if self._pg_conn is not None and not self._pg_conn.closed and not self._pg_conn.broken:
+            try:
+                self._pg_conn.execute("SELECT 1")
+                return self._pg_conn
+            except Exception:
+                try:
+                    self._pg_conn.close()
+                except Exception:
+                    pass
+                self._pg_conn = None
+
+        self._pg_conn = psycopg.connect(
+            self.database_url,
+            row_factory=dict_row,
+            autocommit=False,
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=3,
+        )
         return self._pg_conn
 
     @contextmanager
