@@ -7,3 +7,9 @@ __pycache__/
 .encryption.key
 scratch/
 *.db
+node_modules/
+frontend/node_modules/
+whatsapp_bridge/node_modules/
+whatsapp_bridge/.wwebjs_auth/
+whatsapp_bridge/.wwebjs_cache/
+

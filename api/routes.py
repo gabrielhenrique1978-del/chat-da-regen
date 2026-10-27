@@ -16,6 +16,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from core.db import (
@@ -400,9 +401,15 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         version="2.0.0",
     )
 
+    allowed_origins_env = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000,*",
+    )
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -2050,10 +2057,26 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
     app.include_router(router)
 
-    web_index_path = Path(__file__).resolve().parent.parent / "web" / "index.html"
+    project_root = Path(__file__).resolve().parent.parent
+    react_dist_dir = project_root / "frontend" / "dist"
+    react_index_path = react_dist_dir / "index.html"
+    react_assets_dir = react_dist_dir / "assets"
+    web_index_path = project_root / "web" / "index.html"
+
+    if react_assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(react_assets_dir)), name="react_assets")
 
     @app.get("/", response_class=HTMLResponse)
     def serve_dashboard():
+        if react_index_path.exists():
+            return FileResponse(
+                react_index_path,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         if web_index_path.exists():
             return FileResponse(
                 web_index_path,
@@ -2063,6 +2086,6 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                     "Expires": "0",
                 },
             )
-        return HTMLResponse("<h1>Chat da Regen API Online</h1>")
+        return HTMLResponse("<h1>OpenChatFunnel SaaS API Online</h1>")
 
     return app

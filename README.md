@@ -1,98 +1,109 @@
-# 🌱 Chat da Regen — CRM Conversacional, Atendimento WhatsApp & Servidor MCP
+# 🚀 OpenChatFunnel — SaaS Omnichannel, CRM Conversacional & Meta Cloud API
 
-[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-243E30?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![React](https://img.shields.io/badge/React-18.3%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![WhatsApp Evolution](https://img.shields.io/badge/WhatsApp-Evolution%20v2-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://evolution-api.com)
-[![Security](https://img.shields.io/badge/Security-AES--256%20%2B%20HMAC-emerald?style=for-the-badge&logo=shield&logoColor=white)](https://cryptography.io)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![PostgreSQL Neon](https://img.shields.io/badge/Neon_PostgreSQL-Cloud_SSL-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
+[![Meta Graph API](https://img.shields.io/badge/Meta_Cloud_API-v21.0-0668E1?style=for-the-badge&logo=meta&logoColor=white)](https://developers.facebook.com)
 
-Plataforma executiva de **CRM Conversacional**, automação de vendas e atendimento omnichannel com **WhatsApp Real (Evolution API)**, **Fila Única com Anti-Fragmentação (Debouncer)**, **Kanban de Oportunidades Drag & Drop**, **Handoff Humano**, **Gravação de Áudio PTT**, **Base de Conhecimento (FAQ/IA)** e **Servidor Model Context Protocol (MCP)**.
-
----
-
-## 🚀 Principais Funcionalidades
-
-* 📱 **Integração Real com WhatsApp (Evolution API):** Conexão via QR Code oficial (Multi-Device Meta), sem desconectar o celular. Envio de texto, áudios gravados (PTT) e sincronização bidirecional.
-* 💬 **Central Omnichannel com Ambientes Separados:**
-  * **Atendimento Oficial:** Conversa direta com o cliente via WhatsApp/Instagram/Web.
-  * **Notas da Equipe (Whisper):** Canal privado interno para a equipe alinhar estratégias sem o cliente ver.
-  * **Simulador Inbound:** Ambiente para testar fluxos e automações antes de disparar para a base real.
-* ⚡ **Produtividade de Vendas com Slash Commands (`/`):** Menu flutuante de respostas rápidas com filtro em tempo real e navegação por teclado (`↑`, `↓`, `Enter`, `Tab`, `Esc`).
-* 🎧 **Player de Áudio com Velocímetro:** Reprodução de mensagens de voz com controle de velocidade em `1x`, `1.5x` e `2x`.
-* 📋 **Funil Kanban Drag & Drop:** Movimentação visual de negociações entre etapas com atualização de valor e status em tempo real.
-* 🛡️ **Segurança LGPD & Criptografia Militar:** Todos os telefones, e-mails e mensagens confidenciais são armazenados sob criptografia autenticada **AES-256 (Fernet) + HMAC-SHA256**.
-* 🤖 **Servidor MCP Nativo (8 Ferramentas):** Integração padronizada com Cursor, Claude Desktop e ChatGPT (`create_contact`, `move_deal_stage`, `schedule_appointment`, `query_knowledge_base`, etc.).
-* ☁️ **Deploy em 1 Clique no Render:** Blueprint pronto em [`render.yaml`](render.yaml) e suporte completo a contêineres Docker.
+Plataforma SaaS Executiva de **Atendimento Omnichannel & CRM Conversacional** com **Single Page Application (SPA) em React + Vite + Tailwind CSS**, backend assíncrono em **Python (FastAPI + WebSockets)**, banco de dados **PostgreSQL Serverless (Neon Cloud com SSL)**, **API Oficial da Meta (Graph API v21.0 + Evolution API QR Code)**, **Gestão Dinâmica de Vendedores com Soft Delete** e **Controle Multi-Tenant / Super Admin**.
 
 ---
 
-## 🛠️ Arquitetura do Projeto
+## ✨ Principais Funcionalidades
 
-```
+* 🎨 **SPA Moderna em React + Vite + Tailwind CSS:**
+  * **Sidebar Retrátil:** Navegação fluida entre Atendimento Omnichannel, Funil CRM Kanban, Gestão de Vendedores, Conexões WhatsApp/Meta e Super Admin, com suporte nativo a **Dark / Light Mode**.
+  * **Tela de Atendimento Omnichannel (3 Colunas):**
+    1. **Painel de Conversas:** Busca rápida, filtros por status (Fila/Meus/Todos) e por canal (WhatsApp/Instagram/Web), avatares e preview da última mensagem com horário.
+    2. **Área de Chat:** Cabeçalho do lead, balões diferenciados (Cliente vs. Vendedor/IA), recibos de leitura da Meta (`✓✓`), trava de exclusividade de carteira entre vendedores, atalhos rápidos (`/`) e disparador de Templates HSM Oficiais da Meta.
+    3. **Gaveta Lateral do Contato (Retrátil):** Dados criptografados do lead, etapa do funil de vendas e seletor dinâmico do vendedor responsável (`seller_id`).
+* 👥 **Gestão Dinâmica de Vendedores (`GET/POST/PATCH /api/sellers`):**
+  * Cadastro, edição e ativação/desativação via **Soft Delete (`active: true/false`)**, preservando 100% do histórico de conversas vinculadas a cada vendedor.
+* 📱 **Dupla Integração WhatsApp & Instagram:**
+  * **API Oficial da Meta (Graph API v21.0):** Validação HMAC-SHA256 (`X-Hub-Signature-256`), controle automático da janela de 24h (`meta_window_expires_at`) e envio de Templates HSM.
+  * **Evolution API v2 (QR Code):** Conexão rápida Multi-Device via QR Code.
+* 👑 **Arquitetura Multi-Tenant & Identidade Root (`Super Admin` vs `Tenant`):**
+  * Diferenciação nativa entre o proprietário da plataforma (`role = "superadmin"`) e empresas clientes (`Tenants`), com suspensão instantânea de inadimplentes (`HTTP 403`).
+* ☁️ **Banco de Dados na Nuvem (Neon PostgreSQL + Fallback SQLite):**
+  * Conexão automática via `DATABASE_URL` com `sslmode=require` e criptografia de campos sensíveis **AES-256 (Fernet) + HMAC-SHA256**.
+
+---
+
+## 🗂️ Estrutura de Pastas do Projeto
+
+```text
 cool-lovelace/
+├── frontend/                        # Single Page Application (React 18 + Vite + Tailwind CSS)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Sidebar.jsx          # Sidebar lateral retrátil + Seletor de Operador + Tema
+│   │   │   ├── OmnichannelInbox.jsx # Tela de Atendimento Omnichannel em 3 Colunas
+│   │   │   ├── ContactDrawer.jsx    # 3ª Coluna: Gaveta do Lead, Etapa do Funil e Vendedor
+│   │   │   ├── SellersView.jsx      # Tela/Modal de Gestão Dinâmica de Vendedores (Soft Delete)
+│   │   │   ├── KanbanView.jsx       # Funil CRM Kanban Drag & Drop
+│   │   │   ├── ConnectionsView.jsx  # Conexão WhatsApp QR Code & Meta Cloud API v21.0
+│   │   │   └── SettingsView.jsx     # Painel Root Super Admin (Tenants) & Segurança AES-256
+│   │   ├── lib/
+│   │   │   ├── api.js               # Cliente HTTP REST padronizado + Cliente WebSocket (/ws)
+│   │   │   └── utils.js             # Utilitários Tailwind (clsx + tailwind-merge) e formatação
+│   │   ├── App.jsx                  # Orquestrador global de estado, WebSocket e rotas SPA
+│   │   ├── main.jsx                 # Entrypoint React
+│   │   └── index.css                # Diretivas Tailwind CSS e estilos customizados
+│   ├── index.html
+│   ├── package.json                 # Scripts npm run dev / npm run build
+│   ├── tailwind.config.js
+│   └── vite.config.js               # Proxy automático de /api e /ws para http://localhost:8000
 ├── api/
-│   └── routes.py            # Endpoints REST FastAPI, WebSockets (/ws) e Segurança
+│   └── routes.py                    # Rotas FastAPI, CORS, WebSockets (/ws) e entrega do build React
 ├── core/
-│   ├── db.py                # Modelos Pydantic, transações SQLite e Seed executivo
-│   └── security.py          # Motor criptográfico AES-256 + HMAC e mascaramento PII
+│   ├── db.py                        # Camada de persistência híbrida (Neon PostgreSQL + SQLite)
+│   ├── meta_cloud_service.py        # Conector Oficial Meta Cloud API v21.0 (WhatsApp & Instagram)
+│   └── security.py                  # Criptografia AES-256 (Fernet) + HMAC-SHA256 e JWT
 ├── engine/
-│   ├── agent.py             # Agente conversacional e avanço automático de funil
-│   ├── debouncer.py         # Anti-fragmentação temporal de mensagens concorrentes
-│   ├── mcp.py               # Catálogo de 8 ferramentas do Model Context Protocol
-│   ├── whatsapp.py          # Conector Evolution API (WhatsApp real, QR Code e PTT)
-│   └── workflow.py          # Motor de regras declarativas por palavras-chave e tags
-├── web/
-│   └── index.html           # SPA executivo (Tailwind, Glassmorphism e Web Audio API)
-├── tests/
-│   └── test_engine.py       # Suíte de 8 testes automatizados (100% aprovados)
-├── Dockerfile               # Imagem Docker leve Python 3.11
-├── render.yaml              # Especificação de Blueprint para nuvem Render
-└── requirements.txt         # Dependências do projeto
+│   ├── agent.py                     # Agente conversacional IA e avanço de funil
+│   ├── debouncer.py                 # Anti-fragmentação temporal de mensagens
+│   ├── mcp.py                       # Servidor Model Context Protocol (8 ferramentas)
+│   ├── whatsapp.py                  # Conector Evolution API v2
+│   └── workflow.py                  # Motor de regras de automação
+├── LICENSE                          # Licença de Software e Direitos Autorais
+├── main.py                          # Inicializador do servidor Uvicorn / FastAPI (Porta 8000)
+└── requirements.txt                 # Dependências Python
 ```
 
 ---
 
-## 💻 Instalação e Execução Local
+## 💻 Como Executar o Projeto
 
-### 1. Clonar e Instalar Dependências
+### 1. Backend Python (FastAPI + Neon PostgreSQL)
 ```powershell
-git clone https://github.com/gabrielhenrique1978-del/chat-da-regen.git
-cd chat-da-regen
-
-# Criar e ativar ambiente virtual
-python -m venv .venv
+# Ativar ambiente virtual e instalar dependências
 .\.venv\Scripts\Activate.ps1
-
-# Instalar dependências
 pip install -r requirements.txt
-```
 
-### 2. Iniciar o Servidor
-```powershell
+# Iniciar o servidor FastAPI na porta 8000
 python main.py
 ```
-Acesse o painel executivo em: **http://localhost:8000**
 
----
-
-## 🧪 Testes Automatizados
-
-Para rodar a suíte completa de testes de integridade, debounce, regras de workflow, ferramentas MCP e criptografia:
-
+### 2. Frontend React (Vite + Tailwind CSS)
 ```powershell
-.\.venv\Scripts\pytest -v
+cd frontend
+npm install
+
+# Rodar servidor de desenvolvimento Vite (http://localhost:5173)
+npm run dev
+
+# Gerar build otimizado de produção (servido também pelo FastAPI em http://localhost:8000)
+npm run build
 ```
 
 ---
 
-## ☁️ Deploy na Nuvem (Render)
+## 📄 Licença e Autoria
 
-1. Conecte o repositório ao [Render Dashboard](https://dashboard.render.com).
-2. Selecione **New Blueprint** e aponte para este repositório.
-3. O Render configurará automaticamente a porta dinâmica `$PORT`, compilará os pacotes e colocará o serviço no ar com HTTPS ativo.
+Este projeto e toda a sua arquitetura full stack foram desenvolvidos por:
 
----
+* 👨‍💻 **Gabriel Henrique**
+* 👨‍💻 **Otavio Santana**
 
-## 📄 Licença
-Distribuído sob licença comercial e open-source para implementação corporativa.
-Desenvolvido por **Gabriel Henrique** — *Chat da Regen*.
+Copyright © 2026 **Gabriel Henrique e Otavio Santana**. Todos os direitos reservados conforme especificado no arquivo [`LICENSE`](LICENSE).
