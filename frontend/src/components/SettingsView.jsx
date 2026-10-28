@@ -19,6 +19,7 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
   const [adminEmail, setAdminEmail] = useState('');
   const [provisionResult, setProvisionResult] = useState(null);
   const [securityInfo, setSecurityInfo] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [feedback, setFeedback] = useState(null);
 
   const isSuperAdmin =
@@ -26,8 +27,12 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
 
   const loadTenantsAndSecurity = async () => {
     try {
-      const sec = await api.getSecurityStatus();
+      const [sec, logsRes] = await Promise.all([
+        api.getSecurityStatus(),
+        api.getAuditLogs(30),
+      ]);
       setSecurityInfo(sec);
+      setAuditLogs(logsRes?.logs || []);
     } catch {
       // ignore
     }
@@ -339,6 +344,60 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
             Licença MIT. Arquitetura Full Stack em React, Vite, Tailwind CSS,
             FastAPI e Neon PostgreSQL Cloud.
           </p>
+        </div>
+      </div>
+
+      {/* Trilha de Auditoria Imutável (LGPD Art. 37 & Governança de Equipe) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} className="text-emerald-600" />
+            <span className="font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Trilha de Auditoria Imutável & Operações LGPD (Art. 37)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={loadTenantsAndSecurity}
+            className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline"
+          >
+            ↻ Atualizar Logs
+          </button>
+        </div>
+
+        <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+          {auditLogs.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">
+              Nenhum evento de auditoria registrado ainda.
+            </div>
+          ) : (
+            auditLogs.map((log) => (
+              <div
+                key={log.id}
+                className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40"
+              >
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                      {log.action}
+                    </span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {log.actor}
+                    </span>
+                    <span className="text-[10px] text-slate-400 uppercase">
+                      ({log.actor_role})
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                    {log.details}
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                  {new Date(log.timestamp).toLocaleString('pt-BR')}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

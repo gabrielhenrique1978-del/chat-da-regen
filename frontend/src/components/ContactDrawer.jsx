@@ -12,6 +12,10 @@ import {
   Clock,
   Shield,
   ChevronRight,
+  Download,
+  Trash2,
+  ShieldAlert,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn, getInitials } from '../lib/utils';
 
@@ -27,9 +31,13 @@ export default function ContactDrawer({
   onChangeTemperature,
   onAddTag,
   onMoveStage,
+  onExportLgpd,
+  onAnonymizeLgpd,
+  onToggleConsent,
   onClose,
 }) {
   const [newTag, setNewTag] = useState('');
+  const [confirmErase, setConfirmErase] = useState(false);
 
   if (!contact) return null;
 
@@ -243,7 +251,7 @@ export default function ContactDrawer({
 
       {/* Status da Janela Oficial de 24h da Meta */}
       {windowInfo && (
-        <div className="p-4 space-y-1.5">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-1.5">
           <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <Clock size={14} className="text-blue-600" />
             Janela Oficial Meta (24h)
@@ -258,12 +266,120 @@ export default function ContactDrawer({
           >
             {windowInfo.reason}
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-slate-400 pt-1">
-            <Shield size={11} className="text-emerald-600" />
-            <span>Dados protegidos com AES-256 no Neon Cloud</span>
-          </div>
         </div>
       )}
+
+      {/* Governança LGPD & Direitos do Titular (Art. 18, Lei 13.709/2018) */}
+      <div className="p-4 space-y-3 bg-slate-50/60 dark:bg-slate-950/40">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+            <Shield size={14} className="text-emerald-600" />
+            Privacidade & LGPD (Art. 18)
+          </div>
+          <span
+            className={cn(
+              'px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase',
+              contact.consent_status === 'opted_out'
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                : contact.consent_status === 'anonymized'
+                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+            )}
+          >
+            {contact.consent_status === 'opted_out'
+              ? 'Opt-Out (Bloqueado)'
+              : contact.consent_status === 'anonymized'
+              ? 'Anonimizado'
+              : 'Consentimento Ativo'}
+          </span>
+        </div>
+
+        {/* Toggle de Consentimento (Opt-In / Opt-Out de Campanhas) */}
+        {onToggleConsent && contact.consent_status !== 'anonymized' && (
+          <button
+            type="button"
+            onClick={() =>
+              onToggleConsent(
+                contact.id,
+                contact.consent_status === 'opted_out'
+                  ? 'opted_in'
+                  : 'opted_out'
+              )
+            }
+            className="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 transition"
+          >
+            <CheckCircle2 size={13} className="text-emerald-600" />
+            <span>
+              {contact.consent_status === 'opted_out'
+                ? 'Reativar Consentimento (Opt-In)'
+                : 'Registrar Opt-Out (Bloquear Campanhas)'}
+            </span>
+          </button>
+        )}
+
+        {/* Exportar Dossiê de Portabilidade (Art. 18, V) */}
+        {onExportLgpd && (
+          <button
+            type="button"
+            onClick={() => onExportLgpd(contact.id)}
+            className="w-full py-2 px-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[11px] font-bold text-indigo-800 dark:text-indigo-200 flex items-center justify-center gap-1.5 transition"
+          >
+            <Download size={13} />
+            <span>Exportar Dossiê LGPD (JSON)</span>
+          </button>
+        )}
+
+        {/* Direito ao Esquecimento / Anonimização Irreversível (Art. 18, VI) */}
+        {onAnonymizeLgpd && contact.consent_status !== 'anonymized' && (
+          <>
+            {!confirmErase ? (
+              <button
+                type="button"
+                onClick={() => setConfirmErase(true)}
+                className="w-full py-2 px-3 rounded-xl border border-rose-200 dark:border-rose-800/80 bg-rose-50/60 dark:bg-rose-950/30 hover:bg-rose-100 text-[11px] font-bold text-rose-700 dark:text-rose-300 flex items-center justify-center gap-1.5 transition"
+              >
+                <Trash2 size={13} />
+                <span>Anonimizar Titular (Esquecimento)</span>
+              </button>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 space-y-2 text-[11px]">
+                <div className="flex items-center gap-1.5 font-bold text-rose-800 dark:text-rose-200">
+                  <ShieldAlert size={14} className="shrink-0" />
+                  <span>Confirmar exclusão LGPD irreversível?</span>
+                </div>
+                <p className="text-[10px] text-rose-700 dark:text-rose-300">
+                  O nome, telefone, e-mail e histórico de mensagens serão
+                  apagados permanentemente.
+                </p>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmErase(false)}
+                    className="flex-1 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await onAnonymizeLgpd(contact.id);
+                      setConfirmErase(false);
+                    }}
+                    className="flex-1 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="flex items-center gap-1 text-[10px] text-slate-400 pt-1">
+          <Shield size={11} className="text-emerald-600 shrink-0" />
+          <span>Criptografia AES-256 + Blind Index HMAC ativo</span>
+        </div>
+      </div>
     </aside>
   );
 }

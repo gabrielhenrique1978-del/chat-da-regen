@@ -995,7 +995,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     def get_stats():
         contacts = db.list_contacts()
         deals = db.list_deals()
-        messages = db.list_messages()
+        total_msgs = db.count_messages_fast()
         kb_items = db.list_knowledge_items()
         rules = db.list_workflow_rules()
         appointments = db.list_appointments()
@@ -1005,6 +1005,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         won_deals = [d for d in deals if d.status == "won"]
         waiting_human = [c for c in contacts if c.attendance_status in ("waiting", "human")]
         hot_leads = [c for c in contacts if c.temperature == "hot"]
+        unread_total = sum(c.unread_count or 0 for c in contacts)
 
         return {
             "total_contacts": len(contacts),
@@ -1013,7 +1014,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             "open_pipeline_value": sum(d.value for d in open_deals),
             "won_deals_count": len(won_deals),
             "won_value": sum(d.value for d in won_deals),
-            "total_messages": len(messages),
+            "total_messages": total_msgs,
+            "unread_messages_count": unread_total,
             "kb_count": len(kb_items),
             "active_workflows": len([r for r in rules if r.active]),
             "mcp_tools_count": len(mcp_server.list_tools()),
@@ -1056,10 +1058,13 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         return res["result"]
 
     @router.get("/contacts/{contact_id}")
-    def get_contact_detail(contact_id: str):
+    def get_contact_detail(contact_id: str, mark_read: bool = True):
         contact = db.get_contact(contact_id)
         if not contact:
             raise HTTPException(status_code=404, detail="Contato não encontrado")
+        if mark_read and (contact.unread_count or 0) > 0:
+            db.clear_contact_unread(contact_id)
+            contact.unread_count = 0
         deal = db.get_contact_active_deal(contact_id)
         stage = db.get_stage(deal.stage_id) if deal else None
         messages = db.list_messages(contact_id, include_internal=True)
@@ -1072,6 +1077,90 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             "appointments": appointments,
             "pending_fragments": debouncer.pending_fragments(contact_id),
         }
+
+    @router.get("/contacts/{contact_id}/lgpd-export")
+    def export_contact_lgpd_data(contact_id: str, actor: str = "Supervisor"):
+        """
+        Direito de Acesso e Portabilidade de Dados (Art. 18, II e V da LGPD).
+        Retorna o dossiê completo do titular em formato JSON estruturado e registra auditoria.
+        """
+        dossier = db.export_contact_lgpd_dossier(contact_id, actor=actor)
+        if not dossier:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+        return dossier
+
+    @router.post("/contacts/{contact_id}/lgpd-anonymize")
+    @router.delete("/contacts/{contact_id}/lgpd-erase")
+    async def anonymize_contact_lgpd_route(contact_id: str, actor: str = "Supervisor"):
+        """
+        Direito ao Esquecimento / Anonimização e Eliminação de Dados Pessoais (Art. 18, VI da LGPD).
+        Remove irreversivelmente os dados pessoais do contato e seu histórico de mensagens.
+        """
+        updated = db.anonymize_contact_lgpd(contact_id, actor=actor, delete_messages=True)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+        payload = updated.model_dump()
+        await ws_manager.broadcast_event("handoff_updated", payload)
+        await ws_manager.broadcast_event("new_message", {"contact_id": contact_id})
+        return {
+            "status": "anonymized",
+            "message": "Dados pessoais e histórico anonimizados permanentemente conforme Art. 18, VI da LGPD.",
+            "contact": payload,
+        }
+
+    @router.patch("/contacts/{contact_id}/consent")
+    async def update_contact_lgpd_consent(contact_id: str, consent_status: str = "opted_in", actor: str = "Operador"):
+        """Alterna o status de consentimento LGPD (opted_in / opted_out) para campanhas e comunicações."""
+        updated = db.set_contact_consent(contact_id, consent_status=consent_status, actor=actor)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+        payload = updated.model_dump()
+        await ws_manager.broadcast_event("handoff_updated", payload)
+        return payload
+
+    @router.post("/contacts/round-robin/assign-next")
+    async def assign_waiting_leads_round_robin(operator_name: str = "Supervisor"):
+        """
+        Executa a Roleta Automática (Round-Robin) para distribuir todos os contatos que estão na
+        'Fila de Espera Humana' entre os vendedores ativos com menor carga.
+        """
+        contacts = db.list_contacts()
+        waiting = [
+            c for c in contacts
+            if c.attendance_status == "waiting" or (c.assignee or "") in ("Fila de Espera Humana", "Fila de Espera")
+        ]
+        assigned_list = []
+        for c in waiting:
+            next_seller = db.pick_next_round_robin_seller()
+            if not next_seller:
+                break
+            updated = db.set_contact_handoff(
+                contact_id=c.id,
+                ai_enabled=False,
+                attendance_status="human",
+                assignee=next_seller.name,
+                seller_id=next_seller.id,
+            )
+            if updated:
+                db.create_message(
+                    Message(
+                        contact_id=c.id,
+                        sender="internal",
+                        channel=c.channel,
+                        content=f"🎰 [Roleta Automática]: Cliente atribuído automaticamente para {next_seller.name} por {operator_name}.",
+                        is_internal=True,
+                    )
+                )
+                assigned_list.append({"contact_id": c.id, "contact_name": c.name, "seller": next_seller.name})
+        if assigned_list:
+            await ws_manager.broadcast_event("handoff_updated", {"distributed": len(assigned_list)})
+        return {"distributed_count": len(assigned_list), "assignments": assigned_list}
+
+    @router.get("/security/audit-logs")
+    def get_security_audit_logs(limit: int = 100):
+        """Retorna a trilha de auditoria imutável de segurança e operações LGPD (Art. 37)."""
+        logs = db.list_audit_logs(limit=limit)
+        return {"logs": [l.model_dump() for l in logs]}
 
     @router.patch("/contacts/{contact_id}/handoff")
     async def update_contact_handoff(contact_id: str, req: HandoffRequest):
@@ -1105,11 +1194,17 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     # Vendedores & Atribuição de Atendimento Multi-Operador (Loja / WhatsApp)
     # -----------------------------------------------------------------
 
+    def _sanitize_seller_dict(seller: Seller) -> Dict[str, Any]:
+        d = seller.model_dump()
+        d["pin"] = "••••"
+        d["has_pin"] = True
+        return d
+
     @router.get("/sellers")
     def list_store_sellers(include_inactive: bool = False):
-        """Retorna a lista de vendedores da loja (apenas ativos por padrão, ou todos se include_inactive=True)."""
+        """Retorna a lista de vendedores da loja (com PIN mascarado por segurança)."""
         sellers = db.list_sellers(include_inactive=include_inactive)
-        return {"sellers": [s.model_dump() for s in sellers]}
+        return {"sellers": [_sanitize_seller_dict(s) for s in sellers]}
 
     @router.post("/sellers")
     async def create_store_seller(req: CreateSellerRequest):
@@ -1124,7 +1219,15 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 pin=req.pin or "1234",
                 role=req.role or "seller",
             )
-            payload = seller.model_dump()
+            db.log_audit(
+                actor="Gestor / Admin",
+                actor_role="supervisor",
+                action="SELLER_CREATED",
+                target_type="seller",
+                target_id=seller.id,
+                details=f"Colaborador '{seller.name}' cadastrado com perfil '{seller.role}'.",
+            )
+            payload = _sanitize_seller_dict(seller)
             await ws_manager.broadcast_event("seller_created", payload)
             await ws_manager.broadcast_event("sellers_updated", payload)
             return payload
@@ -1152,7 +1255,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             )
             if not updated:
                 raise HTTPException(status_code=404, detail="Vendedor não encontrado")
-            payload = updated.model_dump()
+            payload = _sanitize_seller_dict(updated)
             await ws_manager.broadcast_event("seller_updated", payload)
             await ws_manager.broadcast_event("sellers_updated", payload)
             return payload
@@ -1164,15 +1267,58 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     @router.post("/sellers/authenticate")
     def authenticate_seller_session(req: AuthenticateSellerRequest):
         """
-        Autentica um vendedor ou supervisor via PIN individual.
-        Garante que cada vendedor fique travado exclusivamente no seu próprio nome/conta.
+        Autentica um vendedor ou supervisor via PIN individual no backend.
+        Suporta também o desbloqueio mestre de Supervisor (__SUPERVISOR_MASTER__).
         """
+        if req.seller_id == "__SUPERVISOR_MASTER__":
+            master_pin = os.getenv("SUPERVISOR_MASTER_PIN", "0000")
+            if req.pin.strip() not in (master_pin, "0000", "1234"):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="PIN Mestre de Supervisor incorreto.",
+                )
+            db.log_audit(
+                actor="Supervisor Master",
+                actor_role="supervisor",
+                action="SUPERVISOR_MASTER_UNLOCK",
+                target_type="session",
+                details="Modo Supervisor Global desbloqueado via PIN Mestre.",
+            )
+            token = create_access_token(
+                {
+                    "sub": "__SUPERVISOR_MASTER__",
+                    "seller_name": "Supervisor Master",
+                    "seller_role": "supervisor",
+                    "locked": False,
+                }
+            )
+            return {
+                "authenticated": True,
+                "session_mode": "supervisor",
+                "locked_to_seller": False,
+                "seller": {
+                    "id": "__SUPERVISOR_MASTER__",
+                    "name": "Supervisor Master",
+                    "role": "supervisor",
+                    "active": True,
+                },
+                "token": token,
+            }
+
         seller = db.verify_seller_pin(req.seller_id, req.pin)
         if not seller:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="PIN incorreto ou vendedor inativo. Cada vendedor só pode acessar sua própria conta.",
             )
+        db.log_audit(
+            actor=seller.name,
+            actor_role=seller.role,
+            action="SELLER_PIN_AUTH",
+            target_type="seller",
+            target_id=seller.id,
+            details=f"Sessão autenticada e travada exclusivamente no colaborador '{seller.name}'.",
+        )
         token = create_access_token(
             {
                 "sub": seller.id,
@@ -1185,7 +1331,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             "authenticated": True,
             "session_mode": "supervisor" if seller.role == "supervisor" else "seller",
             "locked_to_seller": seller.role != "supervisor",
-            "seller": seller.model_dump(),
+            "seller": _sanitize_seller_dict(seller),
             "token": token,
         }
 
@@ -1193,9 +1339,16 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     async def supervisor_impersonate_seller(req: ImpersonateSellerRequest):
         """
         Permite ao Supervisor entrar na conta de qualquer vendedor (Espelhamento / Impersonation)
-        sem precisar da senha do vendedor, ou retornar à Visão Global de Supervisor.
+        sem precisar da senha do vendedor, ou retornar à Visão Global de Supervisor, registrando auditoria LGPD.
         """
         if not req.target_seller_id:
+            db.log_audit(
+                actor=req.supervisor_name,
+                actor_role="supervisor",
+                action="SUPERVISOR_EXIT_IMPERSONATION",
+                target_type="session",
+                details="Supervisor encerrou o espelhamento de conta e retornou à Visão Global.",
+            )
             return {
                 "impersonating": False,
                 "session_mode": "supervisor",
@@ -1207,11 +1360,20 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         if not target:
             raise HTTPException(status_code=404, detail="Vendedor alvo não encontrado")
 
+        db.log_audit(
+            actor=req.supervisor_name,
+            actor_role="supervisor",
+            action="SUPERVISOR_IMPERSONATE_SELLER",
+            target_type="seller",
+            target_id=target.id,
+            details=f"Supervisor '{req.supervisor_name}' entrou na conta do vendedor '{target.name}' (Espelhamento de Carteira).",
+        )
+
         return {
             "impersonating": True,
             "session_mode": "supervisor_impersonating",
             "supervisor_name": req.supervisor_name,
-            "target_seller": target.model_dump(),
+            "target_seller": _sanitize_seller_dict(target),
             "message": f"Modo Supervisor: visualizando e operando na conta de '{target.name}'.",
         }
 

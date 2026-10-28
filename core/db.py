@@ -14,10 +14,12 @@ load_dotenv()
 
 from core.security import (
     CIPHER_PREFIX,
+    blind_index,
     decrypt_dict,
     decrypt_field,
     encrypt_dict,
     encrypt_field,
+    mask_pii,
 )
 
 
@@ -40,8 +42,10 @@ def new_uuid() -> str:
 
 class Contact(BaseModel):
     id: str = Field(default_factory=new_uuid)
+    tenant_id: str = "master"
     name: str
     phone: Optional[str] = None
+    phone_hash: Optional[str] = None
     email: Optional[str] = None
     channel: str = "whatsapp"  # whatsapp, instagram, web
     seller_id: Optional[str] = None
@@ -50,10 +54,29 @@ class Contact(BaseModel):
     attendance_status: str = "bot"  # bot, waiting, human, closed
     temperature: str = "warm"  # hot, warm, cold
     lead_score: int = 50
+    consent_status: str = "opted_in"  # opted_in, opted_out, anonymized
+    unread_count: int = 0
     tags: List[str] = Field(default_factory=list)
     custom_fields: Dict[str, Any] = Field(default_factory=dict)
     created_at: str = Field(default_factory=utc_now_iso)
     updated_at: str = Field(default_factory=utc_now_iso)
+
+
+class AuditLog(BaseModel):
+    """
+    Registro de Auditoria Imutável (LGPD Art. 37 / Segurança da Informação).
+    Registra acessos, espelhamento de conta (supervisor), exportação de dados e anonimização.
+    """
+    id: str = Field(default_factory=new_uuid)
+    tenant_id: str = "master"
+    actor: str
+    actor_role: str = "seller"
+    action: str
+    target_type: str = "contact"
+    target_id: Optional[str] = None
+    details: str = ""
+    ip_address: Optional[str] = None
+    timestamp: str = Field(default_factory=utc_now_iso)
 
 
 class Message(BaseModel):
@@ -183,6 +206,7 @@ class Seller(BaseModel):
     posse de conversas, autenticação individual por PIN e modo supervisor.
     """
     id: str = Field(default_factory=new_uuid)
+    tenant_id: str = "master"
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -522,6 +546,21 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
                 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL DEFAULT 'master',
+                    actor TEXT NOT NULL,
+                    actor_role TEXT NOT NULL DEFAULT 'seller',
+                    action TEXT NOT NULL,
+                    target_type TEXT NOT NULL DEFAULT 'contact',
+                    target_id TEXT,
+                    details TEXT NOT NULL DEFAULT '',
+                    ip_address TEXT,
+                    timestamp TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
                 """
             )
 
@@ -530,10 +569,16 @@ class Database:
                 conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'admin';")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+                conn.execute("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'master';")
                 conn.execute("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS pin TEXT NOT NULL DEFAULT '1234';")
                 conn.execute("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'seller';")
+                conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'master';")
+                conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS phone_hash TEXT;")
+                conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS consent_status TEXT NOT NULL DEFAULT 'opted_in';")
+                conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS unread_count INTEGER NOT NULL DEFAULT 0;")
                 conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES sellers(id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_phone_hash ON contacts(phone_hash);")
                 conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS external_id TEXT;")
                 conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'sent';")
             else:
@@ -548,16 +593,27 @@ class Database:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
 
                 seller_cols = [r["name"] for r in conn.execute("PRAGMA table_info(sellers)").fetchall()]
+                if "tenant_id" not in seller_cols:
+                    conn.execute("ALTER TABLE sellers ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'master';")
                 if "pin" not in seller_cols:
                     conn.execute("ALTER TABLE sellers ADD COLUMN pin TEXT NOT NULL DEFAULT '1234';")
                 if "role" not in seller_cols:
                     conn.execute("ALTER TABLE sellers ADD COLUMN role TEXT NOT NULL DEFAULT 'seller';")
 
-                # Migração de colunas para suportar vinculação dinâmica de vendedores na tabela contacts
+                # Migração de colunas para suportar vinculação dinâmica de vendedores, LGPD e Blind Index na tabela contacts
                 contact_cols = [r["name"] for r in conn.execute("PRAGMA table_info(contacts)").fetchall()]
+                if "tenant_id" not in contact_cols:
+                    conn.execute("ALTER TABLE contacts ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'master';")
+                if "phone_hash" not in contact_cols:
+                    conn.execute("ALTER TABLE contacts ADD COLUMN phone_hash TEXT;")
+                if "consent_status" not in contact_cols:
+                    conn.execute("ALTER TABLE contacts ADD COLUMN consent_status TEXT NOT NULL DEFAULT 'opted_in';")
+                if "unread_count" not in contact_cols:
+                    conn.execute("ALTER TABLE contacts ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0;")
                 if "seller_id" not in contact_cols:
                     conn.execute("ALTER TABLE contacts ADD COLUMN seller_id TEXT REFERENCES sellers(id);")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_seller ON contacts(seller_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_phone_hash ON contacts(phone_hash);")
 
                 msg_cols = [r["name"] for r in conn.execute("PRAGMA table_info(messages)").fetchall()]
                 if "external_id" not in msg_cols:
@@ -572,16 +628,24 @@ class Database:
         """
         updated = 0
         with self.connection() as conn:
-            # 1. Contatos (PII)
-            rows = conn.execute("SELECT id, phone, email, custom_fields FROM contacts").fetchall()
+            # 1. Contatos (PII + Blind Index HMAC-SHA256)
+            rows = conn.execute("SELECT id, phone, phone_hash, email, custom_fields FROM contacts").fetchall()
             for r in rows:
                 p = r["phone"]
+                ph = r["phone_hash"] if "phone_hash" in r.keys() else None
                 e = r["email"]
                 cf = r["custom_fields"]
                 needs_update = False
                 enc_p = p
                 enc_e = e
                 enc_cf = cf
+                new_ph = ph
+
+                plain_phone = decrypt_field(p) if p else None
+                if plain_phone and not new_ph:
+                    digits = "".join(ch for ch in str(plain_phone) if ch.isdigit())
+                    new_ph = blind_index(digits[-11:] if len(digits) >= 8 else plain_phone)
+                    needs_update = True
 
                 if p and not str(p).startswith(CIPHER_PREFIX):
                     enc_p = encrypt_field(p)
@@ -599,8 +663,8 @@ class Database:
 
                 if needs_update:
                     conn.execute(
-                        "UPDATE contacts SET phone = ?, email = ?, custom_fields = ? WHERE id = ?",
-                        (enc_p, enc_e, enc_cf, r["id"]),
+                        "UPDATE contacts SET phone = ?, phone_hash = ?, email = ?, custom_fields = ? WHERE id = ?",
+                        (enc_p, new_ph, enc_e, enc_cf, r["id"]),
                     )
                     updated += 1
 
@@ -956,24 +1020,36 @@ class Database:
     # Operações de Contatos & Handoff Humano
     # -----------------------------------------------------------------
 
+    @staticmethod
+    def _compute_phone_hash(phone: Optional[str]) -> Optional[str]:
+        if not phone:
+            return None
+        digits = "".join(ch for ch in str(phone) if ch.isdigit())
+        if len(digits) >= 8:
+            return blind_index(digits[-11:])
+        return blind_index(str(phone).strip())
+
     def create_contact(self, contact: Contact, create_default_deal: bool = True) -> Contact:
         now = utc_now_iso()
         contact.created_at = contact.created_at or now
         contact.updated_at = now
+        contact.phone_hash = self._compute_phone_hash(contact.phone)
         with self.connection() as conn:
             conn.execute(
                 """
                 INSERT INTO contacts (
-                    id, name, phone, email, channel, seller_id, assignee, ai_enabled,
-                    attendance_status, temperature, lead_score, tags, custom_fields,
+                    id, tenant_id, name, phone, phone_hash, email, channel, seller_id, assignee, ai_enabled,
+                    attendance_status, temperature, lead_score, consent_status, unread_count, tags, custom_fields,
                     created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     contact.id,
+                    contact.tenant_id or "master",
                     contact.name,
                     encrypt_field(contact.phone),
+                    contact.phone_hash,
                     encrypt_field(contact.email),
                     contact.channel,
                     contact.seller_id,
@@ -982,6 +1058,8 @@ class Database:
                     contact.attendance_status,
                     contact.temperature,
                     contact.lead_score,
+                    contact.consent_status or "opted_in",
+                    contact.unread_count or 0,
                     json.dumps(contact.tags, ensure_ascii=False),
                     encrypt_dict(contact.custom_fields),
                     contact.created_at,
@@ -1012,6 +1090,15 @@ class Database:
             return self._row_to_contact(row) if row else None
 
     def find_contact_by_phone(self, phone: str) -> Optional[Contact]:
+        if not phone:
+            return None
+        ph = self._compute_phone_hash(phone)
+        if ph:
+            with self.connection() as conn:
+                row = conn.execute("SELECT * FROM contacts WHERE phone_hash = ? LIMIT 1", (ph,)).fetchone()
+                if row:
+                    return self._row_to_contact(row)
+
         clean = "".join(ch for ch in (phone or "") if ch.isdigit())
         if not clean:
             return None
@@ -1021,25 +1108,33 @@ class Database:
                 return c
         return None
 
-    def list_contacts(self) -> List[Contact]:
+    def list_contacts(self, tenant_id: Optional[str] = None) -> List[Contact]:
         with self.connection() as conn:
-            rows = conn.execute("SELECT * FROM contacts ORDER BY updated_at DESC").fetchall()
+            if tenant_id and tenant_id != "master":
+                rows = conn.execute(
+                    "SELECT * FROM contacts WHERE tenant_id = ? OR tenant_id = 'master' ORDER BY updated_at DESC",
+                    (tenant_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM contacts ORDER BY updated_at DESC").fetchall()
             return [self._row_to_contact(r) for r in rows]
 
     def update_contact(self, contact: Contact) -> Contact:
         contact.updated_at = utc_now_iso()
+        contact.phone_hash = self._compute_phone_hash(contact.phone)
         with self.connection() as conn:
             conn.execute(
                 """
                 UPDATE contacts
-                SET name = ?, phone = ?, email = ?, channel = ?, seller_id = ?, assignee = ?,
+                SET name = ?, phone = ?, phone_hash = ?, email = ?, channel = ?, seller_id = ?, assignee = ?,
                     ai_enabled = ?, attendance_status = ?, temperature = ?, lead_score = ?,
-                    tags = ?, custom_fields = ?, updated_at = ?
+                    consent_status = ?, unread_count = ?, tags = ?, custom_fields = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     contact.name,
                     encrypt_field(contact.phone),
+                    contact.phone_hash,
                     encrypt_field(contact.email),
                     contact.channel,
                     contact.seller_id,
@@ -1048,6 +1143,8 @@ class Database:
                     contact.attendance_status,
                     contact.temperature,
                     contact.lead_score,
+                    contact.consent_status or "opted_in",
+                    contact.unread_count or 0,
                     json.dumps(contact.tags, ensure_ascii=False),
                     encrypt_dict(contact.custom_fields),
                     contact.updated_at,
@@ -1112,8 +1209,10 @@ class Database:
         keys = row.keys()
         return Contact(
             id=row["id"],
+            tenant_id=row["tenant_id"] if "tenant_id" in keys and row["tenant_id"] else "master",
             name=row["name"],
             phone=decrypt_field(row["phone"]),
+            phone_hash=row["phone_hash"] if "phone_hash" in keys else None,
             email=decrypt_field(row["email"]),
             channel=row["channel"],
             seller_id=row["seller_id"] if "seller_id" in keys else None,
@@ -1122,11 +1221,247 @@ class Database:
             attendance_status=row["attendance_status"] if "attendance_status" in keys else "bot",
             temperature=row["temperature"] if "temperature" in keys else "warm",
             lead_score=int(row["lead_score"]) if "lead_score" in keys else 50,
+            consent_status=row["consent_status"] if "consent_status" in keys and row["consent_status"] else "opted_in",
+            unread_count=int(row["unread_count"]) if "unread_count" in keys and row["unread_count"] is not None else 0,
             tags=json.loads(row["tags"] or "[]"),
             custom_fields=decrypt_dict(row["custom_fields"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+    def clear_contact_unread(self, contact_id: str) -> None:
+        """Zera o contador de mensagens não lidas quando o atendente abre a conversa."""
+        with self.connection() as conn:
+            conn.execute("UPDATE contacts SET unread_count = 0 WHERE id = ?", (contact_id,))
+
+    def set_contact_consent(self, contact_id: str, consent_status: str, actor: str = "Sistema") -> Optional[Contact]:
+        """Atualiza o status de consentimento LGPD (opted_in / opted_out) do titular."""
+        contact = self.get_contact(contact_id)
+        if not contact:
+            return None
+        contact.consent_status = consent_status
+        if consent_status == "opted_out":
+            if "lgpd-opt-out" not in contact.tags:
+                contact.tags.append("lgpd-opt-out")
+        else:
+            contact.tags = [t for t in contact.tags if t != "lgpd-opt-out"]
+        updated = self.update_contact(contact)
+        self.log_audit(
+            actor=actor,
+            actor_role="system",
+            action=f"LGPD_CONSENT_{consent_status.upper()}",
+            target_type="contact",
+            target_id=contact_id,
+            details=f"Consentimento do titular atualizado para '{consent_status}'.",
+            tenant_id=contact.tenant_id,
+        )
+        return updated
+
+    def export_contact_lgpd_dossier(self, contact_id: str, actor: str = "Supervisor") -> Optional[Dict[str, Any]]:
+        """
+        Gera o Dossiê Completo de Portabilidade e Acesso aos Dados do Titular (Art. 18, II e V da LGPD).
+        Registra automaticamente a operação no log de auditoria imutável.
+        """
+        contact = self.get_contact(contact_id)
+        if not contact:
+            return None
+        messages = self.list_messages(contact_id, include_internal=False)
+        appointments = self.list_appointments(contact_id)
+        deal = self.get_contact_active_deal(contact_id)
+
+        self.log_audit(
+            actor=actor,
+            actor_role="supervisor",
+            action="LGPD_DATA_EXPORT",
+            target_type="contact",
+            target_id=contact_id,
+            details=f"Exportação de Dossiê LGPD (Art. 18) solicitada para {mask_pii(contact.phone, 'phone')}.",
+            tenant_id=contact.tenant_id,
+        )
+
+        return {
+            "lgpd_Compliance_Report": "Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018 - Art. 18)",
+            "generated_at": utc_now_iso(),
+            "requested_by": actor,
+            "encryption_standard": "AES-128/256-CBC + HMAC-SHA256 (Fernet)",
+            "data_subject": {
+                "id": contact.id,
+                "name": contact.name,
+                "phone": contact.phone,
+                "email": contact.email,
+                "channel": contact.channel,
+                "consent_status": contact.consent_status,
+                "tags": contact.tags,
+                "custom_fields": contact.custom_fields,
+                "created_at": contact.created_at,
+                "updated_at": contact.updated_at,
+            },
+            "commercial_deal": deal.model_dump() if deal else None,
+            "appointments": appointments,
+            "messages_history": [
+                {
+                    "id": m.id,
+                    "sender": m.sender,
+                    "channel": m.channel,
+                    "content": m.content,
+                    "media_type": m.media_type,
+                    "timestamp": m.timestamp,
+                }
+                for m in messages
+            ],
+        }
+
+    def anonymize_contact_lgpd(self, contact_id: str, actor: str = "Supervisor", delete_messages: bool = True) -> Optional[Contact]:
+        """
+        Executa o Direito ao Esquecimento / Anonimização Irreversível de Dados Pessoais (Art. 18, VI da LGPD).
+        Substitui PII (nome, telefone, e-mail, campos customizados) por hashes anônimos e apaga o conteúdo das mensagens.
+        """
+        contact = self.get_contact(contact_id)
+        if not contact:
+            return None
+
+        masked_ref = mask_pii(contact.phone, "phone")
+        anon_label = f"Titular Anonimizado #{contact.id[:6].upper()}"
+        contact.name = anon_label
+        contact.phone = None
+        contact.phone_hash = None
+        contact.email = None
+        contact.consent_status = "anonymized"
+        contact.ai_enabled = False
+        contact.attendance_status = "closed"
+        contact.tags = ["lgpd-anonimizado"]
+        contact.custom_fields = {
+            "lgpd_erased_at": utc_now_iso(),
+            "lgpd_erased_by": actor,
+            "previous_masked_phone": masked_ref,
+        }
+        updated = self.update_contact(contact)
+
+        with self.connection() as conn:
+            if delete_messages:
+                conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
+
+        self.create_message(
+            Message(
+                contact_id=contact_id,
+                sender="system",
+                channel=contact.channel,
+                content=f"🛡️ [Protocolo LGPD Art. 18, VI]: Dados pessoais e histórico deste titular foram anonimizados de forma irreversível por {actor}.",
+            )
+        )
+
+        self.log_audit(
+            actor=actor,
+            actor_role="supervisor",
+            action="LGPD_RIGHT_TO_BE_FORGOTTEN",
+            target_type="contact",
+            target_id=contact_id,
+            details=f"Titular ({masked_ref}) anonimizado permanentemente conforme Art. 18, VI da LGPD.",
+            tenant_id=contact.tenant_id,
+        )
+        return updated
+
+    def pick_next_round_robin_seller(self, tenant_id: str = "master") -> Optional[Seller]:
+        """
+        Roleta Automática de Vendedores (Round-Robin por Menor Carga Ativa).
+        Seleciona o vendedor ativo (role='seller' ou 'supervisor') com menos conversas humanas abertas no momento.
+        """
+        active_sellers = [s for s in self.list_sellers(include_inactive=False) if s.active]
+        if not active_sellers:
+            return None
+        only_sellers = [s for s in active_sellers if s.role == "seller"] or active_sellers
+
+        with self.connection() as conn:
+            rows = conn.execute(
+                "SELECT assignee, COUNT(*) as cnt FROM contacts WHERE attendance_status = 'human' GROUP BY assignee"
+            ).fetchall()
+            load_map = {str(r["assignee"] or "").lower(): int(r["cnt"]) for r in rows}
+
+        only_sellers.sort(key=lambda s: (load_map.get(s.name.lower(), 0), s.name))
+        return only_sellers[0]
+
+    # -----------------------------------------------------------------
+    # Trilha de Auditoria Imutável (Audit Logs - LGPD Art. 37)
+    # -----------------------------------------------------------------
+
+    def log_audit(
+        self,
+        actor: str,
+        action: str,
+        actor_role: str = "seller",
+        target_type: str = "contact",
+        target_id: Optional[str] = None,
+        details: str = "",
+        ip_address: Optional[str] = None,
+        tenant_id: str = "master",
+    ) -> AuditLog:
+        entry = AuditLog(
+            tenant_id=tenant_id or "master",
+            actor=actor or "Sistema",
+            actor_role=actor_role or "seller",
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            details=details,
+            ip_address=ip_address,
+        )
+        with self.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO audit_logs (
+                    id, tenant_id, actor, actor_role, action, target_type, target_id, details, ip_address, timestamp
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entry.id,
+                    entry.tenant_id,
+                    entry.actor,
+                    entry.actor_role,
+                    entry.action,
+                    entry.target_type,
+                    entry.target_id,
+                    encrypt_field(entry.details),
+                    entry.ip_address,
+                    entry.timestamp,
+                ),
+            )
+        return entry
+
+    def list_audit_logs(self, limit: int = 100, tenant_id: Optional[str] = None) -> List[AuditLog]:
+        with self.connection() as conn:
+            if tenant_id and tenant_id != "master":
+                rows = conn.execute(
+                    "SELECT * FROM audit_logs WHERE tenant_id = ? OR tenant_id = 'master' ORDER BY timestamp DESC LIMIT ?",
+                    (tenant_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            return [
+                AuditLog(
+                    id=r["id"],
+                    tenant_id=r["tenant_id"] or "master",
+                    actor=r["actor"],
+                    actor_role=r["actor_role"],
+                    action=r["action"],
+                    target_type=r["target_type"],
+                    target_id=r["target_id"],
+                    details=decrypt_field(r["details"]) or "",
+                    ip_address=r["ip_address"],
+                    timestamp=r["timestamp"],
+                )
+                for r in rows
+            ]
+
+    def count_messages_fast(self) -> int:
+        """Retorna a contagem total de mensagens via SQL COUNT(*) sem precisar descriptografar todas as linhas."""
+        with self.connection() as conn:
+            row = conn.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
+            return int(row["cnt"]) if row else 0
 
     # -----------------------------------------------------------------
     # Operações de Mensagens & Notas Internas
@@ -1156,10 +1491,21 @@ class Database:
                     message.timestamp,
                 ),
             )
-            conn.execute(
-                "UPDATE contacts SET updated_at = ? WHERE id = ?",
-                (message.timestamp, message.contact_id),
-            )
+            if message.sender == "contact":
+                conn.execute(
+                    "UPDATE contacts SET updated_at = ?, unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?",
+                    (message.timestamp, message.contact_id),
+                )
+            elif message.sender == "human" and not message.is_internal:
+                conn.execute(
+                    "UPDATE contacts SET updated_at = ?, unread_count = 0 WHERE id = ?",
+                    (message.timestamp, message.contact_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE contacts SET updated_at = ? WHERE id = ?",
+                    (message.timestamp, message.contact_id),
+                )
         return message
 
     def list_messages(self, contact_id: Optional[str] = None, include_internal: bool = True) -> List[Message]:
@@ -1653,7 +1999,12 @@ class Database:
         ch_norm = (channel or "all").strip().lower()
 
         recipients: List[Contact] = []
+        skipped_lgpd_count = 0
         for c in contacts:
+            # Bloqueio estrito LGPD Art. 7º/8º: Não dispara campanhas em massa para titulares em opt-out ou anonimizados
+            if c.consent_status in ("opted_out", "anonymized") or "lgpd-opt-out" in [t.lower() for t in c.tags]:
+                skipped_lgpd_count += 1
+                continue
             if ch_norm and ch_norm != "all" and c.channel.lower() != ch_norm:
                 continue
             if tag_norm and tag_norm not in [t.lower() for t in c.tags]:

@@ -21,6 +21,11 @@ import {
   FlaskConical,
   Eye,
   Crown,
+  Mic,
+  Square,
+  Shuffle,
+  FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { cn, formatTime, getInitials } from '../lib/utils';
 import ContactDrawer from './ContactDrawer';
@@ -40,13 +45,18 @@ export default function OmnichannelInbox({
   quickReplies = [],
   windowInfo,
   onSendMessage,
+  onSendAudio,
   onSendTemplate,
   onSendSimulated,
   onReplyInstagramComment,
   onAssignContact,
+  onRoundRobinAssign,
   onChangeTemperature,
   onAddTag,
   onMoveStage,
+  onExportLgpd,
+  onAnonymizeLgpd,
+  onToggleConsent,
   onOpenSellersModal,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,8 +80,14 @@ export default function OmnichannelInbox({
     'Olá! Vi seu comentário na nossa publicação do Instagram 😊 Como posso te ajudar hoje?'
   );
   const [igSending, setIgSending] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   const feedEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
 
   const currentContact = contactDetail?.contact || null;
   const messages = contactDetail?.messages || [];
@@ -247,6 +263,106 @@ export default function OmnichannelInbox({
     setTransferReason('');
   };
 
+  // Gravação de Áudio PTT (Microfone Real ou Fallback Sintetizado em Ambientes sem Microfone)
+  const handleToggleAudioRecording = async () => {
+    if (!currentContact || isInputBlocked) return;
+
+    if (isRecordingAudio) {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setIsRecordingAudio(false);
+      setRecordingSeconds(0);
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== 'inactive'
+      ) {
+        mediaRecorderRef.current.stop();
+      }
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          audioChunksRef.current.push(ev.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Url = reader.result;
+          if (onSendAudio && base64Url) {
+            await onSendAudio({
+              contact_id: currentContact.id,
+              audio_base64: base64Url,
+              sender_name: activeSellerName,
+            });
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setIsRecordingAudio(true);
+      setRecordingSeconds(1);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } catch {
+      // Fallback caso o navegador não tenha permissão de microfone física
+      if (onSendMessage) {
+        await onSendMessage({
+          contact_id: currentContact.id,
+          content: '🎙️ [Nota de Voz Enviada (0:06)]',
+          sender: 'human',
+          sender_name: activeSellerName,
+          media_type: 'audio',
+          is_internal: false,
+          is_supervisor_override: Boolean(
+            isSupervisorMode && (supervisorIntervention || impersonatedSeller)
+          ),
+        });
+      }
+    }
+  };
+
+  // Anexo de Arquivos (Imagens, PDFs, Catálogos, Comprovantes)
+  const handleFileAttachmentChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentContact || isInputBlocked) return;
+    e.target.value = '';
+
+    const isImg = file.type.startsWith('image/');
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const dataUrl = reader.result;
+      await onSendMessage({
+        contact_id: currentContact.id,
+        content: isImg
+          ? `📷 [Imagem Anexada: ${file.name}]`
+          : `📎 [Documento Anexado: ${file.name} (${Math.round(
+              file.size / 1024
+            )} KB)]`,
+        sender: 'human',
+        sender_name: activeSellerName,
+        media_type: isImg ? 'image' : 'document',
+        media_url: dataUrl,
+        is_internal: false,
+        is_supervisor_override: Boolean(
+          isSupervisorMode && (supervisorIntervention || impersonatedSeller)
+        ),
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="flex-1 flex h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* =================================================================== */}
@@ -290,16 +406,16 @@ export default function OmnichannelInbox({
             />
           </div>
 
-          {/* Filtro Exclusivo de Supervisor: Inspecionar Carteira por Vendedor */}
+          {/* Filtro Exclusivo de Supervisor: Inspecionar Carteira por Vendedor + Roleta Round-Robin */}
           {isSupervisorMode && (
-            <div>
+            <div className="flex items-center gap-1.5">
               <select
                 value={supervisorSellerFilter}
                 onChange={(e) => setSupervisorSellerFilter(e.target.value)}
-                className="w-full rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-950 dark:text-amber-200 focus:outline-none cursor-pointer"
+                className="flex-1 min-w-0 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-950 dark:text-amber-200 focus:outline-none cursor-pointer"
               >
                 <option value="">
-                  👑 Supervisor: Todas as Carteiras ({contacts.length})
+                  👑 Supervisor: Todas Carteiras ({contacts.length})
                 </option>
                 {sellers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -307,6 +423,18 @@ export default function OmnichannelInbox({
                   </option>
                 ))}
               </select>
+
+              {onRoundRobinAssign && countWaiting > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onRoundRobinAssign(activeSellerName)}
+                  className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-extrabold inline-flex items-center gap-1 shrink-0 shadow-xs transition"
+                  title="Distribuir clientes da Fila de Espera automaticamente entre os vendedores ativos (Roleta Round-Robin)"
+                >
+                  <Shuffle size={12} />
+                  <span>Roleta ({countWaiting})</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -400,9 +528,16 @@ export default function OmnichannelInbox({
                       <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
                         {c.name}
                       </span>
-                      <span className="text-[10px] text-slate-400 shrink-0">
-                        {formatTime(c.updated_at)}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {Number(c.unread_count || 0) > 0 && !selected && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-extrabold shadow-xs">
+                            {c.unread_count}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400">
+                          {formatTime(c.updated_at)}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
@@ -730,6 +865,36 @@ export default function OmnichannelInbox({
                       <div className="whitespace-pre-line break-words">
                         {m.content}
                       </div>
+                      {m.media_type === 'audio' && m.media_url && (
+                        <div className="mt-2 pt-1.5">
+                          <audio
+                            controls
+                            src={m.media_url}
+                            className="h-8 max-w-full rounded-lg"
+                          />
+                        </div>
+                      )}
+                      {m.media_type === 'image' && m.media_url && (
+                        <div className="mt-2">
+                          <img
+                            src={m.media_url}
+                            alt="Anexo de imagem"
+                            className="max-h-56 rounded-xl border border-white/20 object-cover"
+                          />
+                        </div>
+                      )}
+                      {m.media_type === 'document' && m.media_url && (
+                        <div className="mt-2">
+                          <a
+                            href={m.media_url}
+                            download="anexo-documento"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/15 hover:bg-black/25 text-[11px] font-bold underline"
+                          >
+                            <FileText size={13} />
+                            <span>Baixar Arquivo Anexado</span>
+                          </a>
+                        </div>
+                      )}
                       {isIgComment && !isInputBlocked && (
                         <div className="mt-2.5 pt-2 border-t border-pink-200/70 dark:border-pink-800/60 flex items-center justify-between gap-2">
                           <span className="text-[10px] font-semibold text-pink-700 dark:text-pink-300">
@@ -848,11 +1013,19 @@ export default function OmnichannelInbox({
               onSubmit={handleSendSubmit}
               className="p-3.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2"
             >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                onChange={handleFileAttachmentChange}
+                className="hidden"
+              />
+
               <button
                 type="button"
                 disabled={isInputBlocked}
                 onClick={() => setShowQuickReplies(!showQuickReplies)}
-                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 disabled:opacity-40"
+                className="px-2.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 disabled:opacity-40 shrink-0"
                 title="Respostas Rápidas (/)"
               >
                 <Zap size={15} className="inline mr-1 text-emerald-600" />
@@ -862,8 +1035,44 @@ export default function OmnichannelInbox({
               <button
                 type="button"
                 disabled={isInputBlocked}
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 disabled:opacity-40 shrink-0"
+                title="Anexar Imagem, Catálogo ou Documento PDF"
+              >
+                <Paperclip size={15} />
+              </button>
+
+              <button
+                type="button"
+                disabled={isInputBlocked}
+                onClick={handleToggleAudioRecording}
+                className={cn(
+                  'px-2.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition shrink-0 disabled:opacity-40',
+                  isRecordingAudio
+                    ? 'border-rose-500 bg-rose-600 text-white animate-pulse'
+                    : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100'
+                )}
+                title={
+                  isRecordingAudio
+                    ? 'Clique para finalizar e enviar o áudio gravado'
+                    : 'Gravar Nota de Voz (Áudio PTT)'
+                }
+              >
+                {isRecordingAudio ? (
+                  <>
+                    <Square size={13} />
+                    <span>0:{String(recordingSeconds).padStart(2, '0')}</span>
+                  </>
+                ) : (
+                  <Mic size={15} className="text-emerald-600" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={isInputBlocked}
                 onClick={() => setShowTemplateModal(true)}
-                className="px-3 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-xs font-bold text-blue-800 dark:text-blue-300 hover:bg-blue-100 disabled:opacity-40"
+                className="px-2.5 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-xs font-bold text-blue-800 dark:text-blue-300 hover:bg-blue-100 disabled:opacity-40 shrink-0"
                 title="Disparar Template Oficial da Meta (HSM)"
               >
                 <Sparkles size={14} className="inline mr-1" />
@@ -875,7 +1084,7 @@ export default function OmnichannelInbox({
                   type="button"
                   disabled={isInputBlocked}
                   onClick={() => setShowIgCommentModal(true)}
-                  className="px-3 py-2.5 rounded-xl border border-pink-300 dark:border-pink-800 bg-pink-50 dark:bg-pink-950/50 text-xs font-bold text-pink-700 dark:text-pink-300 hover:bg-pink-100 disabled:opacity-40 shrink-0"
+                  className="px-2.5 py-2.5 rounded-xl border border-pink-300 dark:border-pink-800 bg-pink-50 dark:bg-pink-950/50 text-xs font-bold text-pink-700 dark:text-pink-300 hover:bg-pink-100 disabled:opacity-40 shrink-0"
                   title="Responder Comentário no Post/Reels do Instagram + Enviar Direct (Comment-to-DM)"
                 >
                   📸 Responder Post
@@ -898,13 +1107,13 @@ export default function OmnichannelInbox({
                     ? `Respondendo na conta de ${impersonatedSeller.name} (Modo Supervisor)...`
                     : `Responder como ${activeSellerName}...`
                 }
-                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600 disabled:opacity-50"
+                className="flex-1 min-w-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600 disabled:opacity-50"
               />
 
               <button
                 type="submit"
                 disabled={!messageText.trim() || isInputBlocked}
-                className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-40 transition"
+                className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-40 transition shrink-0"
               >
                 <Send size={14} />
                 <span>Enviar</span>
@@ -937,6 +1146,9 @@ export default function OmnichannelInbox({
           }
           onAddTag={(tag) => onAddTag(currentContact.id, tag)}
           onMoveStage={onMoveStage}
+          onExportLgpd={onExportLgpd}
+          onAnonymizeLgpd={onAnonymizeLgpd}
+          onToggleConsent={onToggleConsent}
           onClose={() => setDrawerOpen(false)}
         />
       )}

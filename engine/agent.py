@@ -121,6 +121,17 @@ class ConversationalAgent:
         "marcar call",
     ]
 
+    LGPD_OPT_OUT_KEYWORDS = [
+        "sair",
+        "parar",
+        "descadastrar",
+        "cancelar inscricao",
+        "remover meu numero",
+        "excluir meus dados",
+        "nao quero receber",
+        "stop",
+    ]
+
     def __init__(self, db: Database, workflow_engine: Optional[WorkflowEngine] = None):
         self.db = db
         self.workflow = workflow_engine or WorkflowEngine(db)
@@ -265,6 +276,36 @@ class ConversationalAgent:
         norm_content = normalize_text(content)
         deal = self.db.get_contact_active_deal(contact.id)
 
+        # 2.5. Detecção Automática de Opt-Out LGPD (Art. 7º / Art. 8º / Art. 18)
+        clean_exact = norm_content.strip()
+        if clean_exact in ("sair", "parar", "stop", "descadastrar") or any(
+            kw in norm_content for kw in ("descadastrar", "cancelar inscricao", "remover meu numero", "excluir meus dados", "nao quero receber")
+        ):
+            self.db.set_contact_consent(contact.id, "opted_out", actor="Titular via Chat")
+            opt_msg = self.db.create_message(
+                Message(
+                    contact_id=contact.id,
+                    sender="agent",
+                    channel=active_channel,
+                    content="🛡️ **Confirmação LGPD:** Seu consentimento foi revogado com sucesso (`opt-out`). Você não receberá mais campanhas ou disparos promocionais. Caso deseje retomar o contato no futuro, basta nos enviar uma mensagem.",
+                )
+            )
+            updated_c = self.db.get_contact(contact.id)
+            return {
+                "contact": updated_c.model_dump() if updated_c else None,
+                "user_message": user_msg.model_dump() if user_msg else None,
+                "agent_message": opt_msg.model_dump(),
+                "ai_paused": False,
+                "lgpd_opt_out": True,
+                "kb_matches": [],
+                "extracted_fields": extracted_fields,
+                "intent_detected": "lgpd_opt_out",
+                "stage_transition": None,
+                "workflow_actions": workflow_actions,
+                "scheduled_appointment": None,
+                "deal": deal.model_dump() if deal else None,
+            }
+
         # 3. Detecção de Pedido de Agendamento de Reunião
         scheduled_appointment: Optional[Dict[str, Any]] = None
         if any(kw in norm_content for kw in self.SCHEDULE_KEYWORDS):
@@ -279,15 +320,36 @@ class ConversationalAgent:
             self.db.add_contact_tag(contact.id, "reuniao-agendada")
             scheduled_appointment = appt.model_dump()
 
-        # 4. Detecção de Pedido de Handoff para Atendente Humano
+        # 4. Detecção de Pedido de Handoff para Atendente Humano + Roleta Automática (Round-Robin)
         handoff_triggered = False
+        assigned_round_robin_seller: Optional[str] = None
         if any(kw in norm_content for kw in self.HANDOFF_KEYWORDS):
-            self.db.set_contact_handoff(
-                contact_id=contact.id,
-                ai_enabled=False,
-                attendance_status="waiting",
-                assignee="Fila de Espera Humana",
-            )
+            next_seller = self.db.pick_next_round_robin_seller()
+            if next_seller:
+                assigned_round_robin_seller = next_seller.name
+                self.db.set_contact_handoff(
+                    contact_id=contact.id,
+                    ai_enabled=False,
+                    attendance_status="human",
+                    assignee=next_seller.name,
+                    seller_id=next_seller.id,
+                )
+                self.db.create_message(
+                    Message(
+                        contact_id=contact.id,
+                        sender="internal",
+                        channel=active_channel,
+                        content=f"🎰 [Roleta Automática Round-Robin]: Lead distribuído automaticamente para o vendedor {next_seller.name} (menor fila ativa).",
+                        is_internal=True,
+                    )
+                )
+            else:
+                self.db.set_contact_handoff(
+                    contact_id=contact.id,
+                    ai_enabled=False,
+                    attendance_status="waiting",
+                    assignee="Fila de Espera Humana",
+                )
             self.db.add_contact_tag(contact.id, "handoff-humano")
             handoff_triggered = True
 
@@ -350,9 +412,14 @@ class ConversationalAgent:
         # 7. Construção da resposta
         reply_parts: List[str] = []
         if handoff_triggered:
-            reply_parts.append(
-                "🎧 Transferi seu atendimento para a nossa **Fila de Especialistas Humanos** e pausei o assistente automático. Um consultor assumirá esta conversa em instantes!"
-            )
+            if assigned_round_robin_seller:
+                reply_parts.append(
+                    f"🎧 Transferi seu atendimento automaticamente pela nossa **Roleta de Especialistas** para **{assigned_round_robin_seller}** e pausei o assistente automático. Você será atendido em instantes!"
+                )
+            else:
+                reply_parts.append(
+                    "🎧 Transferi seu atendimento para a nossa **Fila de Especialistas Humanos** e pausei o assistente automático. Um consultor assumirá esta conversa em instantes!"
+                )
         else:
             if kb_hits:
                 reply_parts.append(kb_hits[0]["answer"])

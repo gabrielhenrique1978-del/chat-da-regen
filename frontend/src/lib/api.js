@@ -41,11 +41,30 @@ export const api = {
   getStats: () => apiRequest('/stats'),
   getSecurityStatus: () => apiRequest('/security/status'),
   runSecurityAudit: () => apiRequest('/security/re-encrypt', { method: 'POST' }),
+  getAuditLogs: (limit = 100) => apiRequest(`/security/audit-logs?limit=${limit}`),
 
   // Contatos e Atendimento Omnichannel
   getContacts: (channel = '') =>
     apiRequest(`/contacts${channel ? `?channel=${encodeURIComponent(channel)}` : ''}`),
   getContactDetail: (contactId) => apiRequest(`/contacts/${contactId}`),
+  exportContactLgpd: (contactId, actor = 'Supervisor') =>
+    apiRequest(`/contacts/${contactId}/lgpd-export?actor=${encodeURIComponent(actor)}`),
+  anonymizeContactLgpd: (contactId, actor = 'Supervisor') =>
+    apiRequest(`/contacts/${contactId}/lgpd-anonymize?actor=${encodeURIComponent(actor)}`, {
+      method: 'POST',
+    }),
+  updateContactConsent: (contactId, consentStatus, actor = 'Operador') =>
+    apiRequest(
+      `/contacts/${contactId}/consent?consent_status=${encodeURIComponent(
+        consentStatus
+      )}&actor=${encodeURIComponent(actor)}`,
+      { method: 'PATCH' }
+    ),
+  assignRoundRobinWaiting: (operatorName = 'Supervisor') =>
+    apiRequest(
+      `/contacts/round-robin/assign-next?operator_name=${encodeURIComponent(operatorName)}`,
+      { method: 'POST' }
+    ),
   assignContact: (contactId, payload) =>
     apiRequest(`/contacts/${contactId}/assign`, {
       method: 'PATCH',
@@ -63,9 +82,14 @@ export const api = {
     }),
   getContact24hWindow: (contactId) => apiRequest(`/contacts/${contactId}/window`),
 
-  // Mensagens, Templates HSM e Simulador
+  // Mensagens, Áudio PTT, Templates HSM e Simulador
   sendMessage: (payload) =>
     apiRequest('/messages/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  sendWhatsAppAudio: (payload) =>
+    apiRequest('/whatsapp/send-audio', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

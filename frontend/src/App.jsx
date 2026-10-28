@@ -290,7 +290,7 @@ export default function App() {
     [showToast]
   );
 
-  // Authenticate via PIN Modal
+  // Authenticate via PIN Modal (Validated in Backend + Audit Log)
   const handleAuthenticatePin = async (e) => {
     e.preventDefault();
     setPinError('');
@@ -298,29 +298,27 @@ export default function App() {
       setPinError('Selecione o colaborador.');
       return;
     }
-    if (pinSellerId === '__SUPERVISOR_MASTER__') {
-      // Master Supervisor PIN (0000 or 1234)
-      if (pinInput.trim() === '0000' || pinInput.trim() === '1234') {
-        setIsSupervisorMode(true);
-        setImpersonatedSeller(null);
-        setShowPinModal(false);
-        setPinInput('');
-        showToast('👑 Modo Supervisor Global desbloqueado com sucesso!');
-      } else {
-        setPinError('PIN de Supervisor incorreto (Padrão: 0000 ou 1234).');
-      }
-      return;
-    }
 
     try {
       const res = await api.authenticateSeller(pinSellerId, pinInput.trim());
-      if (res.authenticated && res.seller) {
-        handleLockToSeller(res.seller);
-        setShowPinModal(false);
-        setPinInput('');
+      if (res.authenticated) {
+        if (pinSellerId === '__SUPERVISOR_MASTER__') {
+          setIsSupervisorMode(true);
+          setImpersonatedSeller(null);
+          localStorage.setItem('ocf_supervisor_mode', 'true');
+          setShowPinModal(false);
+          setPinInput('');
+          showToast('👑 Modo Supervisor Global desbloqueado com sucesso!');
+          return;
+        }
+        if (res.seller) {
+          handleLockToSeller(res.seller);
+          setShowPinModal(false);
+          setPinInput('');
+        }
       }
     } catch (err) {
-      setPinError(err.message || 'PIN incorreto para este vendedor.');
+      setPinError(err.message || 'PIN incorreto para este colaborador.');
     }
   };
 
@@ -335,6 +333,83 @@ export default function App() {
     } catch (err) {
       if (err.status === 403) setSuspendedDetail(err.detail);
       showToast(err.message || 'Erro ao enviar mensagem', 'error');
+    }
+  };
+
+  const handleSendAudio = async (payload) => {
+    try {
+      await api.sendWhatsAppAudio(payload);
+      showToast('🎙️ Nota de voz enviada com sucesso!');
+      await Promise.all([
+        loadContactDetail(payload.contact_id),
+        loadContacts(),
+      ]);
+    } catch (err) {
+      showToast(err.message || 'Erro ao enviar nota de voz', 'error');
+    }
+  };
+
+  const handleRoundRobinAssign = async (operatorName) => {
+    try {
+      const res = await api.assignRoundRobinWaiting(operatorName);
+      showToast(
+        `🎰 Roleta executada: ${res.distributed_count || 0} cliente(s) distribuído(s)!`
+      );
+      await loadContacts();
+      if (selectedContactId) {
+        await loadContactDetail(selectedContactId);
+      }
+    } catch (err) {
+      showToast(err.message || 'Erro na roleta automática', 'error');
+    }
+  };
+
+  const handleExportLgpd = async (contactId) => {
+    try {
+      const actor = activeSeller?.name || 'Supervisor';
+      const dossier = await api.exportContactLgpd(contactId, actor);
+      const blob = new Blob([JSON.stringify(dossier, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dossie-lgpd-${contactId.slice(0, 8)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('🛡️ Dossiê LGPD (Art. 18) exportado e registrado na auditoria!');
+    } catch (err) {
+      showToast(err.message || 'Erro ao exportar dossiê LGPD', 'error');
+    }
+  };
+
+  const handleAnonymizeLgpd = async (contactId) => {
+    try {
+      const actor = activeSeller?.name || 'Supervisor';
+      await api.anonymizeContactLgpd(contactId, actor);
+      showToast(
+        '🛡️ Titular anonimizado permanentemente (Direito ao Esquecimento LGPD)!'
+      );
+      await Promise.all([loadContactDetail(contactId), loadContacts()]);
+    } catch (err) {
+      showToast(err.message || 'Erro ao anonimizar contato', 'error');
+    }
+  };
+
+  const handleToggleConsent = async (contactId, consentStatus) => {
+    try {
+      const actor = activeSeller?.name || 'Operador';
+      await api.updateContactConsent(contactId, consentStatus, actor);
+      showToast(
+        consentStatus === 'opted_out'
+          ? '🛡️ Opt-Out LGPD ativado: cliente bloqueado para campanhas.'
+          : '🛡️ Consentimento LGPD reativado (Opt-In).'
+      );
+      await Promise.all([loadContactDetail(contactId), loadContacts()]);
+    } catch (err) {
+      showToast(err.message || 'Erro ao atualizar consentimento LGPD', 'error');
     }
   };
 
@@ -508,13 +583,18 @@ export default function App() {
               quickReplies={quickReplies}
               windowInfo={windowInfo}
               onSendMessage={handleSendMessage}
+              onSendAudio={handleSendAudio}
               onSendTemplate={handleSendTemplate}
               onSendSimulated={handleSendSimulated}
               onReplyInstagramComment={handleReplyInstagramComment}
               onAssignContact={handleAssignContact}
+              onRoundRobinAssign={handleRoundRobinAssign}
               onChangeTemperature={handleChangeTemperature}
               onAddTag={handleAddTag}
               onMoveStage={handleMoveStage}
+              onExportLgpd={handleExportLgpd}
+              onAnonymizeLgpd={handleAnonymizeLgpd}
+              onToggleConsent={handleToggleConsent}
               onOpenSellersModal={() => setShowSellersModal(true)}
             />
           )}
