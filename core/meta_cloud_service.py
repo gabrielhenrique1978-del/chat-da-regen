@@ -227,7 +227,40 @@ class MetaCloudService:
                             }
                         )
 
-            # 2. Formato Instagram Graph API (entry[].messaging[])
+            # 2. Formato Instagram Graph API - Comentários em Posts / Reels (entry[].changes[] com field == 'comments')
+            for change in entry.get("changes", []):
+                field_name = change.get("field", "")
+                if field_name in ("comments", "live_comments"):
+                    val = change.get("value", {})
+                    comment_id = val.get("id")
+                    comment_text = val.get("text", "")
+                    from_info = val.get("from", {})
+                    ig_user_id = from_info.get("id") or "ig_user"
+                    ig_username = from_info.get("username") or f"insta_{str(ig_user_id)[-4:]}"
+                    media_info = val.get("media", {})
+                    post_id = media_info.get("id") or "post_oficial"
+                    media_kind = media_info.get("media_product_type", "POST")
+
+                    if comment_text:
+                        incoming_messages.append(
+                            {
+                                "channel": "instagram",
+                                "phone_number_id": None,
+                                "ig_account_id": entry.get("id"),
+                                "sender_phone": f"ig_{ig_user_id}",
+                                "sender_name": f"@{ig_username}",
+                                "content": f"📸 [Comentou no {media_kind} #{str(post_id)[-6:]}]: \"{comment_text}\"",
+                                "raw_comment_text": comment_text,
+                                "media_type": "ig_comment",
+                                "media_id": post_id,
+                                "external_id": comment_id,
+                                "is_ig_comment": True,
+                                "comment_id": comment_id,
+                                "ig_username": ig_username,
+                            }
+                        )
+
+            # 3. Formato Instagram Graph API - Direct Messages (entry[].messaging[])
             ig_account_id = entry.get("id") if obj_type == "instagram" else None
             for messaging in entry.get("messaging", []):
                 sender_id = messaging.get("sender", {}).get("id")
@@ -246,6 +279,7 @@ class MetaCloudService:
                             "media_type": "text",
                             "media_id": None,
                             "external_id": mid,
+                            "is_ig_comment": False,
                         }
                     )
 
@@ -350,6 +384,91 @@ class MetaCloudService:
                     "external_id": None,
                     "status": "failed",
                     "error": data.get("error", {}).get("message", "Erro ao enviar template na Meta"),
+                }
+        except Exception as exc:
+            return {"simulated": False, "external_id": None, "status": "failed", "error": str(exc)}
+
+    async def reply_to_instagram_comment(
+        self, cfg: MetaConfig, comment_id: str, text: str
+    ) -> Dict[str, Any]:
+        """
+        Responde publicamente a um comentário em um Post ou Reels do Instagram
+        via Graph API v21.0 (POST /{comment_id}/replies).
+        """
+        if not comment_id or not cfg.access_token:
+            return {
+                "simulated": True,
+                "external_id": f"ig_reply_sim_{int(datetime.now(timezone.utc).timestamp())}",
+                "status": "sent",
+                "detail": "Resposta pública ao comentário registrada (modo simulado / sem token ativo).",
+            }
+
+        url = f"{GRAPH_API_BASE}/{comment_id}/replies"
+        headers = {
+            "Authorization": f"Bearer {cfg.access_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {"message": text}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                data = resp.json()
+                if resp.status_code in (200, 201):
+                    return {
+                        "simulated": False,
+                        "external_id": data.get("id"),
+                        "status": "sent",
+                        "raw": data,
+                    }
+                return {
+                    "simulated": False,
+                    "external_id": None,
+                    "status": "failed",
+                    "error": data.get("error", {}).get("message", "Erro ao responder comentário no Instagram"),
+                }
+        except Exception as exc:
+            return {"simulated": False, "external_id": None, "status": "failed", "error": str(exc)}
+
+    async def send_instagram_private_reply_from_comment(
+        self, cfg: MetaConfig, comment_id: str, text: str
+    ) -> Dict[str, Any]:
+        """
+        Envia uma DM privada no Instagram Direct vinculada a um comentário de Post/Reels
+        (Comment-to-DM oficial da Meta: POST /{ig_account_id}/messages com recipient.comment_id).
+        """
+        if not comment_id or not cfg.access_token or not cfg.ig_account_id:
+            return {
+                "simulated": True,
+                "external_id": f"ig_dm_comment_sim_{int(datetime.now(timezone.utc).timestamp())}",
+                "status": "sent",
+                "detail": "Direct privado (Comment-to-DM) registrado (modo simulado / sem token ativo).",
+            }
+
+        url = f"{GRAPH_API_BASE}/{cfg.ig_account_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {cfg.access_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "recipient": {"comment_id": comment_id},
+            "message": {"text": text},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                data = resp.json()
+                if resp.status_code in (200, 201):
+                    return {
+                        "simulated": False,
+                        "external_id": data.get("message_id") or data.get("id"),
+                        "status": "sent",
+                        "raw": data,
+                    }
+                return {
+                    "simulated": False,
+                    "external_id": None,
+                    "status": "failed",
+                    "error": data.get("error", {}).get("message", "Erro ao enviar Private Reply no Instagram"),
                 }
         except Exception as exc:
             return {"simulated": False, "external_id": None, "status": "failed", "error": str(exc)}

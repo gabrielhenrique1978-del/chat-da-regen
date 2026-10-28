@@ -364,6 +364,24 @@ export default function App() {
     }
   };
 
+  const handleReplyInstagramComment = async (payload) => {
+    try {
+      await api.replyInstagramComment(payload);
+      showToast(
+        '📸 Resposta enviada no Comentário do Post + Direct (Comment-to-DM)!'
+      );
+      await Promise.all([
+        loadContactDetail(payload.contact_id),
+        loadContacts(),
+      ]);
+    } catch (err) {
+      showToast(
+        err.message || 'Erro ao responder comentário do Instagram',
+        'error'
+      );
+    }
+  };
+
   const handleAssignContact = async (contactId, payload) => {
     try {
       await api.assignContact(contactId, payload);
@@ -492,6 +510,7 @@ export default function App() {
               onSendMessage={handleSendMessage}
               onSendTemplate={handleSendTemplate}
               onSendSimulated={handleSendSimulated}
+              onReplyInstagramComment={handleReplyInstagramComment}
               onAssignContact={handleAssignContact}
               onChangeTemperature={handleChangeTemperature}
               onAddTag={handleAddTag}

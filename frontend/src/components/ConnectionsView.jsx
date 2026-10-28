@@ -117,6 +117,41 @@ export default function ConnectionsView({ onWebhookSimulated }) {
     onWebhookSimulated?.();
   };
 
+  const handleSimulateInstagramCommentWebhook = async () => {
+    const sampleIgCommentPayload = {
+      object: 'instagram',
+      entry: [
+        {
+          id: 'IG_BUSINESS_ACCOUNT_01',
+          changes: [
+            {
+              field: 'comments',
+              value: {
+                id: `ig_comment_${Date.now()}`,
+                text: 'Eu quero! Qual o valor desse pacote e como faço para contratar?',
+                from: {
+                  id: '9988776655',
+                  username: 'carolina.mendes.fit',
+                },
+                media: {
+                  id: '180987654321',
+                  media_product_type: 'REELS',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    await api.simulateMetaWebhook(sampleIgCommentPayload);
+    setMetaTestResult({
+      ok: true,
+      message:
+        '📸 Comentário em Reels do Instagram simulado! O sistema respondeu publicamente no post e abriu a conversa no Direct (Comment-to-DM).',
+    });
+    onWebhookSimulated?.();
+  };
+
   return (
     <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
       <div>
@@ -336,20 +371,27 @@ export default function ConnectionsView({ onWebhookSimulated }) {
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleTestGraphApi}
-                className="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold"
+                className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold"
               >
                 Testar Graph API
               </button>
               <button
                 type="button"
                 onClick={handleSimulateOfficialWebhook}
-                className="px-3.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
+                className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
               >
-                Simular Webhook Meta
+                Simular WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulateInstagramCommentWebhook}
+                className="px-3 py-2 rounded-xl border border-pink-200 bg-pink-50 dark:bg-pink-950/50 text-pink-800 dark:text-pink-300 text-xs font-bold"
+              >
+                📸 Simular Comentário Insta
               </button>
             </div>
             <button

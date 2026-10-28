@@ -275,6 +275,15 @@ class SendMetaTemplateRequest(BaseModel):
     sender_name: Optional[str] = None
 
 
+class ReplyInstagramCommentRequest(BaseModel):
+    contact_id: str
+    comment_id: Optional[str] = None
+    public_reply: Optional[str] = None
+    private_dm: Optional[str] = None
+    sender_name: Optional[str] = None
+    is_supervisor_override: bool = False
+
+
 class QuickSwitchProfileRequest(BaseModel):
     target_role: str = "super_admin"  # "super_admin" ou "tenant"
     tenant_id: Optional[str] = None
@@ -1978,21 +1987,37 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         processed_messages = []
         updated_statuses = []
 
-        # 1. Processa mensagens recebidas dos clientes
+        # 1. Processa mensagens e comentários de Posts/Reels recebidos dos clientes
         for item in parsed["incoming_messages"]:
             sender_phone = item["sender_phone"]
             channel = item["channel"]
+            is_ig_comment = bool(item.get("is_ig_comment"))
             contact = db.find_contact_by_phone(sender_phone)
             if not contact:
+                initial_tags = [f"{channel}-oficial-meta"]
+                if is_ig_comment:
+                    initial_tags.append("comentou-post-insta")
+                custom_f = {}
+                if is_ig_comment:
+                    custom_f["last_ig_comment_id"] = item.get("comment_id")
+                    custom_f["last_ig_post_id"] = item.get("media_id")
+                    custom_f["ig_username"] = item.get("ig_username")
                 contact = db.create_contact(
                     Contact(
                         name=item["sender_name"],
                         phone=sender_phone if sender_phone.startswith("+") or sender_phone.startswith("ig_") else f"+{sender_phone}",
                         channel=channel,
-                        tags=[f"{channel}-oficial-meta"],
+                        tags=initial_tags,
+                        custom_fields=custom_f,
                     ),
                     create_default_deal=True,
                 )
+            elif is_ig_comment:
+                if "comentou-post-insta" not in contact.tags:
+                    contact.tags.append("comentou-post-insta")
+                contact.custom_fields["last_ig_comment_id"] = item.get("comment_id")
+                contact.custom_fields["last_ig_post_id"] = item.get("media_id")
+                db.update_contact(contact)
 
             result = agent.process_incoming_message(
                 contact_id=contact.id,
@@ -2000,8 +2025,29 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 channel=channel,
                 media_type=item["media_type"],
             )
+
+            # Se foi um comentário em Post/Reels do Instagram e a IA está ativa,
+            # responde publicamente no comentário para gerar engajamento e avisa que enviou Direct!
+            if is_ig_comment and contact.ai_enabled:
+                comment_id = item.get("comment_id") or "ig_comment_sim"
+                public_auto_text = (
+                    f"Olá {item['sender_name']}! Te enviamos todos os detalhes e valores no seu Direct agora mesmo! 📩✨"
+                )
+                pub_res = await meta_service.reply_to_instagram_comment(cfg, comment_id, public_auto_text)
+                db.create_message(
+                    Message(
+                        contact_id=contact.id,
+                        sender="agent",
+                        channel="instagram",
+                        content=f"💬 [Auto-Resposta Pública no Comentário do Post]: {public_auto_text}",
+                        media_type="ig_comment_reply",
+                        external_id=pub_res.get("external_id"),
+                    )
+                )
+
             processed_messages.append(result)
             await ws_manager.broadcast_event("message_processed", result)
+            await ws_manager.broadcast_event("new_message", result)
 
         # 2. Processa recibos de entrega e leitura (✓, ✓✓, ✓✓ azul)
         for st in parsed["status_updates"]:
@@ -2017,12 +2063,92 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             }
             updated_statuses.append(status_payload)
             await ws_manager.broadcast_event("message_status_updated", status_payload)
+            await ws_manager.broadcast_event("meta_message_status", status_payload)
 
         return {
             "status": "EVENT_RECEIVED",
             "processed_messages": len(processed_messages),
             "updated_statuses": len(updated_statuses),
         }
+
+    @router.post("/instagram/reply-comment")
+    async def reply_to_instagram_post_comment(req: ReplyInstagramCommentRequest):
+        """
+        Permite ao vendedor ou supervisor responder:
+        1) Publicamente no comentário do Post/Reels do Instagram (POST /{comment_id}/replies)
+        2) Privadamente no Direct do cliente a partir do comentário (Comment-to-DM oficial da Meta)
+        """
+        contact = db.get_contact(req.contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+
+        # Verifica trava de exclusividade de vendedor (a menos que seja intervenção de Supervisor)
+        assigned_seller = (contact.assignee or "").strip()
+        is_assigned_human = (
+            (contact.attendance_status == "human" or not contact.ai_enabled)
+            and assigned_seller
+            and assigned_seller not in ("Agente IA", "Fila de Espera Humana", "Fila de Espera", "Fila", "")
+        )
+        sender_seller = (req.sender_name or "").strip()
+        if is_assigned_human and not req.is_supervisor_override:
+            if sender_seller and sender_seller.lower() != assigned_seller.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Chat bloqueado: este cliente pertence exclusivamente à carteira de '{assigned_seller}'.",
+                )
+
+        comment_id = (
+            req.comment_id
+            or contact.custom_fields.get("last_ig_comment_id")
+            or f"ig_comment_{contact.id[:8]}"
+        )
+        cfg = db.get_meta_config("master")
+        created_msgs = []
+
+        if req.public_reply and req.public_reply.strip():
+            pub_text = req.public_reply.strip()
+            pub_res = await meta_service.reply_to_instagram_comment(cfg, comment_id, pub_text)
+            m_pub = db.create_message(
+                Message(
+                    contact_id=contact.id,
+                    sender="human",
+                    channel="instagram",
+                    content=f"💬 [Resposta Pública no Comentário do Post]: {pub_text}",
+                    media_type="ig_comment_reply",
+                    external_id=pub_res.get("external_id"),
+                )
+            )
+            created_msgs.append(m_pub.model_dump())
+
+        if req.private_dm and req.private_dm.strip():
+            dm_text = req.private_dm.strip()
+            dm_res = await meta_service.send_instagram_private_reply_from_comment(cfg, comment_id, dm_text)
+            m_dm = db.create_message(
+                Message(
+                    contact_id=contact.id,
+                    sender="human",
+                    channel="instagram",
+                    content=f"📩 [Direct Enviado do Comentário (Comment-to-DM)]: {dm_text}",
+                    media_type="text",
+                    external_id=dm_res.get("external_id"),
+                )
+            )
+            created_msgs.append(m_dm.model_dump())
+
+        # Se o contato estava com a IA, fixa automaticamente com o vendedor que respondeu o comentário
+        if not is_assigned_human and sender_seller:
+            seller_obj = db.get_seller_by_name(sender_seller)
+            db.set_contact_handoff(
+                contact_id=contact.id,
+                ai_enabled=False,
+                attendance_status="human",
+                assignee=sender_seller,
+                seller_id=seller_obj.id if seller_obj else None,
+            )
+
+        payload = {"status": "sent", "messages": created_msgs, "comment_id": comment_id}
+        await ws_manager.broadcast_event("new_message", payload)
+        return payload
 
     # -----------------------------------------------------------------
     # Base de Conhecimento (Knowledge Base)

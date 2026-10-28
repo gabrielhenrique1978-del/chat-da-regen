@@ -134,6 +134,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  replyInstagramComment: (payload) =>
+    apiRequest('/instagram/reply-comment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // Autenticação & Super Admin Multi-Tenant (Inadimplência)
   login: (email, password) =>

@@ -42,6 +42,7 @@ export default function OmnichannelInbox({
   onSendMessage,
   onSendTemplate,
   onSendSimulated,
+  onReplyInstagramComment,
   onAssignContact,
   onChangeTemperature,
   onAddTag,
@@ -61,6 +62,14 @@ export default function OmnichannelInbox({
   const [transferTargetId, setTransferTargetId] = useState('');
   const [transferReason, setTransferReason] = useState('');
   const [supervisorIntervention, setSupervisorIntervention] = useState(false);
+  const [showIgCommentModal, setShowIgCommentModal] = useState(false);
+  const [igPublicReply, setIgPublicReply] = useState(
+    'Olá! Respondemos você no Direct com todos os detalhes! 🚀📩'
+  );
+  const [igPrivateDm, setIgPrivateDm] = useState(
+    'Olá! Vi seu comentário na nossa publicação do Instagram 😊 Como posso te ajudar hoje?'
+  );
+  const [igSending, setIgSending] = useState(false);
 
   const feedEndRef = useRef(null);
 
@@ -657,23 +666,29 @@ export default function OmnichannelInbox({
                   const isCustomer = m.sender === 'contact';
                   const isSystem = m.sender === 'system';
                   const isInternal = m.is_internal || m.sender === 'internal';
+                  const isIgComment = m.media_type === 'ig_comment';
+                  const isIgCommentReply = m.media_type === 'ig_comment_reply';
 
                   return (
                     <div
                       key={m.id}
                       className={cn(
                         'flex flex-col max-w-[78%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs border',
-                        isCustomer
+                        isIgComment
+                          ? 'mr-auto bg-gradient-to-br from-fuchsia-50 via-pink-50 to-amber-50 dark:from-fuchsia-950/50 dark:via-pink-950/40 dark:to-slate-900 border-pink-300 dark:border-pink-800 text-slate-900 dark:text-slate-100'
+                          : isCustomer
                           ? 'mr-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100'
                           : isSystem
                           ? 'mx-auto max-w-lg bg-slate-100 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-center'
                           : isInternal
                           ? 'ml-auto bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-100'
+                          : isIgCommentReply
+                          ? 'ml-auto bg-pink-700 text-white border-pink-800'
                           : 'ml-auto bg-emerald-700 text-white border-emerald-800'
                       )}
                     >
                       <div className="flex items-center justify-between gap-4 mb-1 opacity-80 text-[10px] font-semibold">
-                        <span>
+                        <span className="flex items-center gap-1.5">
                           {isCustomer
                             ? currentContact.name
                             : isSystem
@@ -683,6 +698,16 @@ export default function OmnichannelInbox({
                             : m.sender === 'agent'
                             ? '🤖 Assistente IA'
                             : `👤 ${currentContact.assignee || activeSellerName}`}
+                          {isIgComment && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-pink-600 text-white text-[9px] font-bold">
+                              📸 Comentário no Post/Reels
+                            </span>
+                          )}
+                          {isIgCommentReply && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[9px] font-bold">
+                              💬 Resposta Pública no Post
+                            </span>
+                          )}
                         </span>
                         <span className="flex items-center gap-1">
                           {formatTime(m.timestamp)}
@@ -705,6 +730,20 @@ export default function OmnichannelInbox({
                       <div className="whitespace-pre-line break-words">
                         {m.content}
                       </div>
+                      {isIgComment && !isInputBlocked && (
+                        <div className="mt-2.5 pt-2 border-t border-pink-200/70 dark:border-pink-800/60 flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-semibold text-pink-700 dark:text-pink-300">
+                            Responder no Post + Puxar para o Direct (Comment-to-DM)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowIgCommentModal(true)}
+                            className="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-[10px] font-bold shadow-xs transition shrink-0"
+                          >
+                            💬 Responder Post + Direct
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -830,6 +869,18 @@ export default function OmnichannelInbox({
                 <Sparkles size={14} className="inline mr-1" />
                 Template HSM
               </button>
+
+              {currentContact?.channel === 'instagram' && (
+                <button
+                  type="button"
+                  disabled={isInputBlocked}
+                  onClick={() => setShowIgCommentModal(true)}
+                  className="px-3 py-2.5 rounded-xl border border-pink-300 dark:border-pink-800 bg-pink-50 dark:bg-pink-950/50 text-xs font-bold text-pink-700 dark:text-pink-300 hover:bg-pink-100 disabled:opacity-40 shrink-0"
+                  title="Responder Comentário no Post/Reels do Instagram + Enviar Direct (Comment-to-DM)"
+                >
+                  📸 Responder Post
+                </button>
+              )}
 
               <input
                 type="text"
@@ -1007,6 +1058,113 @@ export default function OmnichannelInbox({
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal de Resposta em Comentário de Post/Reels do Instagram + Direct (Comment-to-DM) */}
+      {showIgCommentModal && currentContact && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!onReplyInstagramComment) return;
+              if (!igPublicReply.trim() && !igPrivateDm.trim()) return;
+              setIgSending(true);
+              try {
+                await onReplyInstagramComment({
+                  contact_id: currentContact.id,
+                  public_reply: igPublicReply.trim(),
+                  private_dm: igPrivateDm.trim(),
+                  sender_name: activeSellerName,
+                  is_supervisor_override: Boolean(
+                    isSupervisorMode &&
+                      (supervisorIntervention || impersonatedSeller)
+                  ),
+                });
+                setShowIgCommentModal(false);
+              } finally {
+                setIgSending(false);
+              }
+            }}
+            className="bg-white dark:bg-slate-900 border border-pink-200 dark:border-pink-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-950 text-pink-700 dark:text-pink-300 text-[10px] font-bold mb-1">
+                  📸 Instagram Graph API v21.0 • Comment-to-DM
+                </span>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Responder Comentário no Post + Puxar para o Direct
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIgCommentModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              Responda publicamente abaixo do comentário de{' '}
+              <strong>{currentContact.name}</strong> na publicação/Reels e
+              envie simultaneamente uma mensagem privada no Instagram Direct.
+            </p>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                1. Resposta Pública no Comentário do Post (Opcional)
+              </label>
+              <textarea
+                rows={2}
+                value={igPublicReply}
+                onChange={(e) => setIgPublicReply(e.target.value)}
+                placeholder="Ex: Olá! Te enviamos todos os detalhes e valores no seu Direct agora mesmo! 🚀📩"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs"
+              />
+              <span className="text-[10px] text-slate-400">
+                Aparecerá publicamente abaixo do comentário do cliente no Post/Reels (`POST /{'{comment_id}'}/replies`).
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                2. Mensagem Privada no Direct — Comment-to-DM (Opcional)
+              </label>
+              <textarea
+                rows={3}
+                value={igPrivateDm}
+                onChange={(e) => setIgPrivateDm(e.target.value)}
+                placeholder="Ex: Olá! Vi seu comentário no nosso post 😊 Aqui estão as condições especiais..."
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs"
+              />
+              <span className="text-[10px] text-slate-400">
+                Abre a conversa no Direct vinculada ao comentário (`recipient.comment_id`).
+              </span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowIgCommentModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={
+                  igSending || (!igPublicReply.trim() && !igPrivateDm.trim())
+                }
+                className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold disabled:opacity-40"
+              >
+                {igSending
+                  ? 'Enviando...'
+                  : '🚀 Responder no Post + Enviar Direct'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
