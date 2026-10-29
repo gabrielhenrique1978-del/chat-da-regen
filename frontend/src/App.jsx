@@ -24,7 +24,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('ocf_theme');
-    return saved ? saved === 'dark' : false;
+    return saved ? saved === 'dark' : true;
   });
 
   // Global Data States
@@ -537,7 +537,7 @@ export default function App() {
     authUser?.role === 'super_admin' || authUser?.is_super_admin;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 select-none">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0A0D14] text-[#F8FAFC] select-none">
       {/* Left Navigation Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -650,21 +650,21 @@ export default function App() {
 
       {/* Modal de Autenticação por PIN Individual (Vendedor Travado vs Supervisor) */}
       {showPinModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <form
             onSubmit={handleAuthenticatePin}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl"
+            className="bg-[#121824] border border-[#00D2FF]/25 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-neon"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30 shadow-neon flex items-center justify-center">
                   <KeyRound size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                  <h3 className="text-sm font-extrabold text-[#F8FAFC]">
                     Identidade do Operador & PIN
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-[#94A3B8]">
                     Garante que cada vendedor opere apenas no próprio nome
                   </p>
                 </div>
@@ -672,27 +672,27 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowPinModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-[#94A3B8] hover:text-[#F8FAFC]"
               >
                 <X size={18} />
               </button>
             </div>
 
             {pinError && (
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-300">
+              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs font-semibold text-rose-300">
                 {pinError}
               </div>
             )}
 
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                   Selecionar Perfil / Conta
                 </label>
                 <select
                   value={pinSellerId}
                   onChange={(e) => setPinSellerId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                  className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2.5 text-xs font-bold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
                 >
                   <option value="__SUPERVISOR_MASTER__">
                     👑 MODO SUPERVISOR GLOBAL (Acessar todas as contas)
@@ -707,7 +707,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                   PIN de Acesso Individual (Padrão: 1234)
                 </label>
                 <input
@@ -716,7 +716,7 @@ export default function App() {
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
                   placeholder="Digite seu PIN (ex: 1234)"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                  className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2.5 text-xs font-mono font-bold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
                 />
               </div>
             </div>
@@ -725,13 +725,13 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowPinModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl border border-[#00D2FF]/20 text-[#94A3B8] hover:text-[#F8FAFC] text-xs font-semibold"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] hover:from-[#38BDF8] hover:to-[#00D2FF] text-[#0A0D14] shadow-neon text-xs font-extrabold transition"
               >
                 Confirmar e Travar Sessão
               </button>
@@ -742,25 +742,25 @@ export default function App() {
 
       {/* Quick Sellers Management Modal */}
       {showSellersModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#121824] border border-[#00D2FF]/25 rounded-2xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-neon overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#00D2FF]/15 flex items-center justify-between bg-[#0A0D14]/60">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-600/10 text-emerald-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30 flex items-center justify-center">
                   <Users className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  <h3 className="text-sm font-bold text-[#F8FAFC]">
                     Gestão de Vendedores, PIN Individual & Espelhamento de Contas
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-[#94A3B8]">
                     Cadastre vendedores, defina o PIN individual ou clique em "Entrar na Conta" como Supervisor
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowSellersModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#00D2FF] hover:bg-[#1B2333] transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -796,21 +796,21 @@ export default function App() {
 
       {/* Suspended Tenant Overlay (HTTP 403 Lockout) */}
       {suspendedDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-rose-500/40 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto">
+        <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#121824] border border-rose-500/40 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
               <ShieldAlert className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+            <h3 className="text-base font-extrabold text-[#F8FAFC]">
               Acesso da Empresa Suspenso (HTTP 403)
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
               {suspendedDetail}
             </p>
             <div className="pt-2">
               <button
                 onClick={() => handleSwitchAuthRole('super_admin')}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon text-xs font-extrabold transition"
               >
                 Voltar para Identidade Super Admin (Proprietário)
               </button>
@@ -821,16 +821,16 @@ export default function App() {
 
       {/* Global Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl border text-xs font-medium animate-fade-in bg-slate-900 text-white border-slate-700 dark:bg-slate-800 dark:border-slate-700">
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-neon border text-xs font-semibold animate-fade-in bg-[#121824] text-[#F8FAFC] border-[#00D2FF]/30">
           {toast.type === 'error' ? (
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-[#00D2FF] shrink-0" />
           )}
           <span>{toast.message}</span>
           <button
             onClick={() => setToast(null)}
-            className="ml-2 text-slate-400 hover:text-white"
+            className="ml-2 text-[#94A3B8] hover:text-[#F8FAFC]"
           >
             <X className="w-3.5 h-3.5" />
           </button>

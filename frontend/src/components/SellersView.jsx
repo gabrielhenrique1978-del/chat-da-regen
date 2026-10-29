@@ -138,22 +138,22 @@ export default function SellersView({
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
+    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-[#0A0D14] text-[#F8FAFC] space-y-6">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-            <Users className="text-emerald-600" size={24} />
+          <h1 className="text-xl font-extrabold text-[#F8FAFC] flex items-center gap-2.5">
+            <Users className="text-[#00D2FF]" size={24} />
             Gestão de Vendedores, PIN Individual & Supervisão
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-[#94A3B8] mt-1">
             Cada vendedor possui seu próprio PIN para travar sua sessão. Como{' '}
             <strong>Supervisor</strong>, você pode entrar na conta de qualquer
             vendedor em 1 clique para auditar atendimentos.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-3.5 py-2 rounded-xl">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#00D2FF] bg-[#121824] border border-[#00D2FF]/30 shadow-neon px-3.5 py-2 rounded-xl">
             <ShieldCheck size={16} />
             <span>
               {allSellers.filter((s) => s.active).length} ativos de{' '}
@@ -165,9 +165,9 @@ export default function SellersView({
 
       {/* Aviso quando está em Modo Vendedor Travado */}
       {!isSupervisorMode && (
-        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 text-xs text-amber-950 dark:text-amber-200">
-            <Lock size={18} className="text-amber-600 shrink-0" />
+        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-xs text-amber-200">
+            <Lock size={18} className="text-amber-400 shrink-0" />
             <div>
               <strong>
                 Sessão Travada no Vendedor ({activeSeller?.name}):
@@ -180,7 +180,7 @@ export default function SellersView({
           {onOpenPinModal && (
             <button
               onClick={onOpenPinModal}
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shrink-0 flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon text-xs font-extrabold shrink-0 flex items-center gap-1.5"
             >
               <KeyRound size={14} />
               <span>Desbloquear Supervisor</span>
@@ -194,8 +194,8 @@ export default function SellersView({
           className={cn(
             'p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between',
             feedback.type === 'error'
-              ? 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200'
+              ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+              : 'bg-[#00D2FF]/15 border-[#00D2FF]/40 text-[#00D2FF] shadow-neon'
           )}
         >
           <span>{feedback.text}</span>
@@ -207,10 +207,10 @@ export default function SellersView({
       {isSupervisorMode && (
         <form
           onSubmit={handleSubmit}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4"
+          className="bg-[#121824] border border-[#00D2FF]/20 rounded-2xl p-5 shadow-neon space-y-4"
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#00D2FF] flex items-center gap-1.5">
               <UserPlus size={15} />
               {editingId
                 ? 'Editar Vendedor / Credenciais'
@@ -220,7 +220,7 @@ export default function SellersView({
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-xs text-slate-500 hover:underline"
+                className="text-xs text-[#94A3B8] hover:text-[#00D2FF] hover:underline"
               >
                 Cancelar edição
               </button>
@@ -229,7 +229,7 @@ export default function SellersView({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
             <div className="lg:col-span-1">
-              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                 Nome Completo *
               </label>
               <input
@@ -237,18 +237,18 @@ export default function SellersView({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex: Camila Santos"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2 text-xs text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                 Perfil / Cargo
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               >
                 <option value="seller">🎧 Vendedor (Apenas Próprio Nome)</option>
                 <option value="supervisor">
@@ -258,7 +258,7 @@ export default function SellersView({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                 PIN Individual (Senha) *
               </label>
               <input
@@ -267,12 +267,12 @@ export default function SellersView({
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 placeholder="Ex: 1234"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2 text-xs font-mono font-bold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                 E-mail (Opcional)
               </label>
               <input
@@ -280,12 +280,12 @@ export default function SellersView({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="camila@loja.com"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2 text-xs text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
                 Telefone / WhatsApp
               </label>
               <input
@@ -293,7 +293,7 @@ export default function SellersView({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(11) 99999-0000"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600"
+                className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2 text-xs text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function SellersView({
           <div className="flex justify-end">
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] hover:from-[#38BDF8] hover:to-[#00D2FF] text-[#0A0D14] shadow-neon text-xs font-extrabold transition"
             >
               {editingId ? 'Salvar Alterações' : 'Adicionar Membro à Equipe'}
             </button>
@@ -310,12 +310,12 @@ export default function SellersView({
       )}
 
       {/* Listagem de Vendedores & Acesso do Supervisor às Contas */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
-        <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <span className="font-bold text-xs text-slate-700 dark:text-slate-200">
+      <div className="bg-[#121824] border border-[#00D2FF]/20 rounded-2xl overflow-hidden shadow-xs">
+        <div className="px-5 py-3.5 border-b border-[#00D2FF]/15 bg-[#0A0D14]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <span className="font-bold text-xs text-[#F8FAFC]">
             Equipe Cadastrada ({allSellers.length})
           </span>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-[#94A3B8]">
             {isSupervisorMode
               ? 'Clique em "Entrar na Conta (Espelhar)" para ver os atendimentos do vendedor em tempo real.'
               : 'Sessão protegida por PIN individual.'}
@@ -323,11 +323,11 @@ export default function SellersView({
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-400">
+          <div className="p-8 text-center text-xs text-[#94A3B8]">
             Carregando equipe...
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="divide-y divide-[#00D2FF]/10">
             {allSellers.map((s) => {
               const activeChatsCount = getSellerChatCount(s);
               const isBeingImpersonated = impersonatedSeller?.id === s.id;
@@ -338,9 +338,9 @@ export default function SellersView({
                 <div
                   key={s.id}
                   className={cn(
-                    'p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition',
+                    'p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-[#1B2333]/70 transition',
                     isBeingImpersonated &&
-                      'bg-amber-50/60 dark:bg-amber-950/25 border-l-4 border-l-amber-500'
+                      'bg-amber-950/30 border-l-4 border-l-amber-500'
                   )}
                 >
                   <div className="flex items-center gap-3.5">
@@ -348,10 +348,10 @@ export default function SellersView({
                       className={cn(
                         'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0',
                         !s.active
-                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                          ? 'bg-[#0A0D14] text-[#94A3B8]'
                           : s.role === 'supervisor'
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-emerald-700 text-white'
+                          ? 'bg-gradient-to-br from-[#6366F1] to-[#4C1D95] text-white'
+                          : 'bg-gradient-to-br from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon'
                       )}
                     >
                       {getInitials(s.name)}
@@ -362,8 +362,8 @@ export default function SellersView({
                           className={cn(
                             'font-bold text-sm',
                             s.active
-                              ? 'text-slate-900 dark:text-white'
-                              : 'line-through text-slate-400'
+                              ? 'text-[#F8FAFC]'
+                              : 'line-through text-[#94A3B8]'
                           )}
                         >
                           {s.name}
@@ -372,10 +372,10 @@ export default function SellersView({
                         {/* Role Badge */}
                         <span
                           className={cn(
-                            'px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1',
+                            'px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 border',
                             s.role === 'supervisor'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
-                              : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                              ? 'bg-[#6366F1]/15 text-[#A5B4FC] border-[#6366F1]/40'
+                              : 'bg-[#00D2FF]/15 text-[#00D2FF] border-[#00D2FF]/30'
                           )}
                         >
                           {s.role === 'supervisor' ? (
@@ -392,32 +392,32 @@ export default function SellersView({
                           className={cn(
                             'px-2 py-0.5 rounded-full text-[10px] font-bold',
                             s.active
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                              ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-[#0A0D14] text-[#94A3B8]'
                           )}
                         >
                           {s.active ? 'Ativo' : 'Desativado'}
                         </span>
 
                         {/* Live Workload Badge */}
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 inline-flex items-center gap-1">
-                          <MessageSquare size={10} />
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#0A0D14] border border-[#00D2FF]/20 text-[#F8FAFC] inline-flex items-center gap-1">
+                          <MessageSquare size={10} className="text-[#00D2FF]" />
                           {activeChatsCount} em atendimento
                         </span>
 
                         {isSupervisorMode && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            PIN: {s.pin || '1234'}
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[#0A0D14] border border-[#00D2FF]/15 text-[#94A3B8]">
+                            PIN: {s.pin || '••••'}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-4 text-xs text-slate-500 mt-1">
+                      <div className="flex items-center gap-4 text-xs text-[#94A3B8] mt-1">
                         <span className="flex items-center gap-1">
-                          <Mail size={12} /> {s.email || 'Sem e-mail'}
+                          <Mail size={12} className="text-[#00D2FF]" /> {s.email || 'Sem e-mail'}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Phone size={12} /> {s.phone || 'Sem telefone'}
+                          <Phone size={12} className="text-[#00D2FF]" /> {s.phone || 'Sem telefone'}
                         </span>
                       </div>
                     </div>
@@ -433,7 +433,7 @@ export default function SellersView({
                             'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs',
                             isBeingImpersonated
                               ? 'bg-amber-600 text-white'
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                              : 'bg-gradient-to-r from-[#6366F1] to-[#4C1D95] hover:opacity-95 text-white'
                           )}
                           title={`Entrar na conta de ${s.name} como Supervisor para ver e auditar os atendimentos`}
                         >
@@ -447,7 +447,7 @@ export default function SellersView({
 
                         <button
                           onClick={() => onLockToSeller?.(s)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#00D2FF]/40 bg-[#00D2FF]/10 text-[#00D2FF] text-xs font-bold hover:bg-[#00D2FF]/20 transition"
                           title={`Travar tela exclusivamente no modo Vendedor de ${s.name}`}
                         >
                           <Lock size={12} />
@@ -457,7 +457,7 @@ export default function SellersView({
                     )}
 
                     {isLockedCurrent && (
-                      <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30 text-xs font-bold">
                         <Lock size={12} /> Sua Conta Ativa
                       </span>
                     )}
@@ -466,7 +466,7 @@ export default function SellersView({
                       <>
                         <button
                           onClick={() => startEdit(s)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] text-xs font-semibold text-[#F8FAFC] hover:bg-[#1B2333] transition"
                         >
                           <Edit3 size={13} />
                           <span>Editar</span>
@@ -476,8 +476,8 @@ export default function SellersView({
                           className={cn(
                             'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition',
                             s.active
-                              ? 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300'
-                              : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
+                              ? 'border-amber-500/40 bg-amber-950/40 text-amber-300 hover:bg-amber-950/60'
+                              : 'border-[#00D2FF]/40 bg-[#00D2FF]/10 text-[#00D2FF] hover:bg-[#00D2FF]/20'
                           )}
                         >
                           {s.active ? (

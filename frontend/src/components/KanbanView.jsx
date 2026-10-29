@@ -43,15 +43,15 @@ export default function KanbanView({ onOpenContactInInbox }) {
   const pipelines = board?.pipelines || [];
 
   return (
-    <div className="flex-1 h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 p-6">
+    <div className="flex-1 h-full flex flex-col overflow-hidden bg-[#0A0D14] text-[#F8FAFC] p-6">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-            <Kanban className="text-emerald-600" size={24} />
+          <h1 className="text-xl font-extrabold text-[#F8FAFC] flex items-center gap-2.5">
+            <Kanban className="text-[#00D2FF]" size={24} />
             Funil Comercial CRM (Kanban)
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-[#94A3B8] mt-1">
             Acompanhe negócios em tempo real sincronizados com as conversas do
             WhatsApp e Instagram.
           </p>
@@ -64,7 +64,7 @@ export default function KanbanView({ onOpenContactInInbox }) {
               setSelectedPipelineId(e.target.value);
               loadBoard(e.target.value);
             }}
-            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-white"
+            className="rounded-xl border border-[#00D2FF]/25 bg-[#121824] px-3.5 py-2 text-xs font-bold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] shadow-neon"
           >
             {pipelines.map((p) => (
               <option key={p.id} value={p.id}>
@@ -77,7 +77,7 @@ export default function KanbanView({ onOpenContactInInbox }) {
 
       {/* Colunas do Kanban */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+        <div className="flex-1 flex items-center justify-center text-xs text-[#94A3B8]">
           Carregando funil...
         </div>
       ) : (
@@ -87,19 +87,19 @@ export default function KanbanView({ onOpenContactInInbox }) {
             return (
               <div
                 key={st.id}
-                className="w-80 shrink-0 flex flex-col rounded-2xl bg-slate-100/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 overflow-hidden"
+                className="w-80 shrink-0 flex flex-col rounded-2xl bg-[#121824] border border-[#00D2FF]/15 overflow-hidden"
               >
                 {/* Topo da Coluna */}
-                <div className="p-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div className="p-3.5 bg-[#0A0D14]/60 border-b border-[#00D2FF]/15 flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-xs text-slate-900 dark:text-white">
+                    <span className="font-bold text-xs text-[#F8FAFC]">
                       {st.name}
                     </span>
-                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30">
                       {st.deals?.length || 0}
                     </span>
                   </div>
-                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400">
+                  <span className="text-xs font-extrabold text-[#00D2FF]">
                     R$ {Number(st.total_value || 0).toLocaleString('pt-BR')}
                   </span>
                 </div>
@@ -111,41 +111,41 @@ export default function KanbanView({ onOpenContactInInbox }) {
                     return (
                       <div
                         key={deal.id}
-                        className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5 hover:border-emerald-500/60 transition"
+                        className="p-3.5 rounded-xl bg-[#0A0D14] border border-[#00D2FF]/15 shadow-xs space-y-2.5 hover:border-[#00D2FF]/60 hover:bg-[#1B2333]/60 transition"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <h4 className="font-bold text-xs text-slate-900 dark:text-white">
+                            <h4 className="font-bold text-xs text-[#F8FAFC]">
                               {c.name || deal.title}
                             </h4>
-                            <p className="text-[11px] text-slate-400">
+                            <p className="text-[11px] text-[#94A3B8]">
                               {c.phone || deal.title}
                             </p>
                           </div>
-                          <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center">
+                          <span className="text-xs font-extrabold text-[#00D2FF] flex items-center">
                             <DollarSign size={12} />
                             {Number(deal.value || 0).toLocaleString('pt-BR')}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between text-[10px]">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
-                            <UserCheck size={11} className="text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#121824] border border-[#00D2FF]/20 text-[#F8FAFC] font-semibold">
+                            <UserCheck size={11} className="text-[#00D2FF]" />
                             {c.assignee || 'Agente IA'}
                           </span>
                           {c.temperature === 'hot' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 font-bold">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/60 border border-rose-500/30 text-rose-400 font-bold">
                               <Flame size={11} /> Quente
                             </span>
                           )}
                         </div>
 
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                        <div className="pt-2 border-t border-[#00D2FF]/10 flex items-center justify-between gap-2">
                           <button
                             onClick={() =>
                               c.id && onOpenContactInInbox?.(c.id)
                             }
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[#00D2FF] hover:underline"
                           >
                             <MessageSquare size={12} /> Abrir Chat
                           </button>
@@ -155,7 +155,7 @@ export default function KanbanView({ onOpenContactInInbox }) {
                               onClick={() =>
                                 handleMove(deal.id, nextStage.id, deal.value)
                               }
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-700 hover:text-white text-[10px] font-bold text-slate-700 dark:text-slate-200 transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon text-[10px] font-extrabold transition"
                               title={`Avançar para ${nextStage.name}`}
                             >
                               <span>Avançar</span>
