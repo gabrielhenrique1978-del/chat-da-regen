@@ -53,16 +53,16 @@ export default function ContactDrawer({
   );
 
   return (
-    <aside className="w-72 xl:w-80 h-full border-l border-[#00D2FF]/15 bg-[#121824] text-[#F8FAFC] flex flex-col shrink-0 overflow-y-auto">
+    <aside className="w-72 xl:w-80 h-full border-l border-[#1E293B] bg-[#121824] text-[#F8FAFC] flex flex-col shrink-0 overflow-y-auto">
       {/* Cabeçalho da Gaveta (Alinhado em h-16 com as demais colunas) */}
-      <div className="h-16 px-4 border-b border-[#00D2FF]/15 bg-[#0A0D14]/40 flex items-center justify-between shrink-0">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-[#00D2FF]">
+      <div className="h-16 px-4 border-b border-[#1E293B] bg-[#121824] flex items-center justify-between shrink-0">
+        <span className="text-xs font-bold uppercase tracking-wider text-[#94A3B8]">
           Detalhes do Lead & CRM
         </span>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#00D2FF] hover:bg-[#1B2333] transition"
+            className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] transition"
             title="Recolher gaveta lateral"
           >
             <ChevronRight size={16} />
@@ -71,25 +71,25 @@ export default function ContactDrawer({
       </div>
 
       {/* Perfil do Contato */}
-      <div className="p-5 border-b border-[#00D2FF]/15 flex flex-col items-center text-center">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00D2FF]/20 to-[#0072FF]/20 border border-[#00D2FF]/40 text-[#00D2FF] shadow-neon flex items-center justify-center text-xl font-extrabold mb-3">
+      <div className="p-5 border-b border-[#1E293B] flex flex-col items-center text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#1B2333] border border-[#1E293B] text-[#00D2FF] flex items-center justify-center text-lg font-bold mb-3 shadow-subtle">
           {getInitials(contact.name)}
         </div>
-        <h3 className="font-bold text-sm text-[#F8FAFC]">
+        <h3 className="font-semibold text-sm text-[#F8FAFC]">
           {contact.name}
         </h3>
-        <span className="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#1B2333] border border-[#00D2FF]/20 text-[#00D2FF] uppercase">
+        <span className="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#0A0D14] border border-[#1E293B] text-[#94A3B8] uppercase">
           {contact.channel}
         </span>
 
         <div className="w-full mt-4 space-y-2 text-left text-xs">
-          <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#0A0D14] border border-[#00D2FF]/15 text-[#F8FAFC]">
+          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-[#F8FAFC]">
             <Phone size={14} className="text-[#00D2FF] shrink-0" />
             <span className="truncate font-mono">
               {contact.phone || 'Sem telefone'}
             </span>
           </div>
-          <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#0A0D14] border border-[#00D2FF]/15 text-[#F8FAFC]">
+          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-[#F8FAFC]">
             <Mail size={14} className="text-[#00D2FF] shrink-0" />
             <span className="truncate">
               {contact.email || 'E-mail não informado'}
@@ -99,8 +99,8 @@ export default function ContactDrawer({
       </div>
 
       {/* Seletor Dinâmico do Vendedor Responsável (Alimentado por GET /api/sellers) */}
-      <div className="p-4 border-b border-[#00D2FF]/15 space-y-2">
-        <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
+      <div className="p-4 border-b border-[#1E293B] space-y-2">
+        <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
           <UserCheck size={14} className="text-[#00D2FF]" />
           Vendedor Responsável (Posse)
         </label>
@@ -128,7 +128,7 @@ export default function ContactDrawer({
               }
             }
           }}
-          className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] focus:shadow-neon disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           <option value="Agente IA">🤖 Agente IA (Automático)</option>
           {sellers.map((s) => (
@@ -144,14 +144,14 @@ export default function ContactDrawer({
       </div>
 
       {/* Etapa do Funil CRM */}
-      <div className="p-4 border-b border-[#00D2FF]/15 space-y-2.5">
+      <div className="p-4 border-b border-[#1E293B] space-y-2.5">
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
             <Briefcase size={14} className="text-[#00D2FF]" />
             Etapa do Funil CRM
           </label>
           {deal && (
-            <span className="text-xs font-extrabold text-[#00D2FF]">
+            <span className="text-xs font-bold text-[#00D2FF]">
               R$ {Number(deal.value || 0).toLocaleString('pt-BR')}
             </span>
           )}
@@ -161,7 +161,7 @@ export default function ContactDrawer({
           <select
             value={stage?.id || deal.stage_id || ''}
             onChange={(e) => onMoveStage(deal.id, e.target.value, deal.value)}
-            className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] focus:shadow-neon transition"
+            className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] transition"
           >
             {stages.map((st) => (
               <option key={st.id} value={st.id}>
@@ -177,21 +177,21 @@ export default function ContactDrawer({
       </div>
 
       {/* Temperatura & Lead Score */}
-      <div className="p-4 border-b border-[#00D2FF]/15 space-y-2.5">
+      <div className="p-4 border-b border-[#1E293B] space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
             Qualificação / Temperatura
           </span>
-          <span className="text-xs font-bold text-[#00D2FF]">
+          <span className="text-xs font-semibold text-[#00D2FF]">
             Score: {contact.lead_score || 50}/100
           </span>
         </div>
 
         <div className="grid grid-cols-3 gap-1.5">
           {[
-            { id: 'hot', label: 'Quente', icon: Flame, color: 'text-rose-400 bg-rose-950/60 border-rose-500/40 shadow-sm' },
-            { id: 'warm', label: 'Morno', icon: Sun, color: 'text-amber-300 bg-amber-950/60 border-amber-500/40 shadow-sm' },
-            { id: 'cold', label: 'Frio', icon: Snowflake, color: 'text-[#00D2FF] bg-[#00D2FF]/15 border-[#00D2FF]/40 shadow-neon' },
+            { id: 'hot', label: 'Quente', icon: Flame, color: 'text-rose-400 bg-rose-950/40 border-rose-500/40' },
+            { id: 'warm', label: 'Morno', icon: Sun, color: 'text-amber-300 bg-amber-950/40 border-amber-500/40' },
+            { id: 'cold', label: 'Frio', icon: Snowflake, color: 'text-[#00D2FF] bg-[#1B2333] border-[#00D2FF]/40' },
           ].map((temp) => {
             const Icon = temp.icon;
             const active = contact.temperature === temp.id;
@@ -200,10 +200,10 @@ export default function ContactDrawer({
                 key={temp.id}
                 onClick={() => onChangeTemperature(temp.id)}
                 className={cn(
-                  'flex flex-col items-center justify-center py-2 px-2 rounded-xl border text-[11px] font-bold transition',
+                  'flex flex-col items-center justify-center py-2 px-2 rounded-xl border text-[11px] font-semibold transition',
                   active
                     ? temp.color
-                    : 'border-[#00D2FF]/15 bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC]'
+                    : 'border-[#1E293B] bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC]'
                 )}
               >
                 <Icon size={15} className="mb-1" />
@@ -215,8 +215,8 @@ export default function ContactDrawer({
       </div>
 
       {/* Tags do Contato */}
-      <div className="p-4 border-b border-[#00D2FF]/15 space-y-2.5">
-        <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
+      <div className="p-4 border-b border-[#1E293B] space-y-2.5">
+        <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
           <Tag size={14} className="text-[#00D2FF]" />
           Tags do Cliente
         </label>
@@ -225,7 +225,7 @@ export default function ContactDrawer({
           {(contact.tags || []).map((t) => (
             <span
               key={t}
-              className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/30"
+              className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/20"
             >
               #{t}
             </span>
@@ -238,11 +238,11 @@ export default function ContactDrawer({
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}
             placeholder="Nova tag (ex: vip)..."
-            className="flex-1 rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-2.5 py-1.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
+            className="flex-1 rounded-xl border border-[#1E293B] bg-[#0A0D14] px-2.5 py-1.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
           />
           <button
             type="submit"
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] hover:from-[#38BDF8] hover:to-[#00D2FF] text-[#0A0D14] shadow-neon text-xs font-extrabold flex items-center transition"
+            className="px-3 py-1.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold flex items-center transition"
           >
             <Plus size={14} />
           </button>
@@ -251,8 +251,8 @@ export default function ContactDrawer({
 
       {/* Status da Janela Oficial de 24h da Meta */}
       {windowInfo && (
-        <div className="p-4 border-b border-[#00D2FF]/15 space-y-1.5">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
+        <div className="p-4 border-b border-[#1E293B] space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
             <Clock size={14} className="text-[#00D2FF]" />
             Janela Oficial Meta (24h)
           </div>
@@ -260,8 +260,8 @@ export default function ContactDrawer({
             className={cn(
               'p-2.5 rounded-xl border text-xs',
               windowInfo.window_open
-                ? 'bg-[#00D2FF]/10 border-[#00D2FF]/30 text-[#F8FAFC]'
-                : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                ? 'bg-[#1B2333] border-[#1E293B] text-[#F8FAFC]'
+                : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
             )}
           >
             {windowInfo.reason}
@@ -270,20 +270,20 @@ export default function ContactDrawer({
       )}
 
       {/* Governança LGPD & Direitos do Titular (Art. 18, Lei 13.709/2018) */}
-      <div className="p-4 space-y-3 bg-[#0A0D14]/60">
+      <div className="p-4 space-y-3 bg-[#0A0D14]/40">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#F8FAFC]">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#F8FAFC]">
             <Shield size={14} className="text-[#00D2FF]" />
-            Privacidade & LGPD (Art. 18)
+            Privacidade & LGPD
           </div>
           <span
             className={cn(
-              'px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border',
+              'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border',
               contact.consent_status === 'opted_out'
                 ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
                 : contact.consent_status === 'anonymized'
                 ? 'bg-rose-950/60 text-rose-300 border-rose-500/40'
-                : 'bg-[#00D2FF]/15 text-[#00D2FF] border-[#00D2FF]/30'
+                : 'bg-[#1B2333] text-[#00D2FF] border-[#00D2FF]/30'
             )}
           >
             {contact.consent_status === 'opted_out'
@@ -306,7 +306,7 @@ export default function ContactDrawer({
                   : 'opted_out'
               )
             }
-            className="w-full py-2 px-3 rounded-xl border border-[#00D2FF]/25 bg-[#121824] hover:bg-[#1B2333] text-[11px] font-bold text-[#F8FAFC] flex items-center justify-center gap-1.5 transition"
+            className="w-full py-2 px-3 rounded-xl border border-[#1E293B] bg-[#121824] hover:bg-[#1B2333] text-[11px] font-semibold text-[#F8FAFC] flex items-center justify-center gap-1.5 transition"
           >
             <CheckCircle2 size={13} className="text-[#00D2FF]" />
             <span>
@@ -322,7 +322,7 @@ export default function ContactDrawer({
           <button
             type="button"
             onClick={() => onExportLgpd(contact.id)}
-            className="w-full py-2 px-3 rounded-xl border border-[#6366F1]/40 bg-[#6366F1]/15 hover:bg-[#6366F1]/25 text-[11px] font-bold text-[#F8FAFC] flex items-center justify-center gap-1.5 transition"
+            className="w-full py-2 px-3 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:bg-[#1B2333]/80 text-[11px] font-semibold text-[#F8FAFC] flex items-center justify-center gap-1.5 transition"
           >
             <Download size={13} className="text-[#00D2FF]" />
             <span>Exportar Dossiê LGPD (JSON)</span>
@@ -336,7 +336,7 @@ export default function ContactDrawer({
               <button
                 type="button"
                 onClick={() => setConfirmErase(true)}
-                className="w-full py-2 px-3 rounded-xl border border-rose-500/30 bg-rose-950/30 hover:bg-rose-950/50 text-[11px] font-bold text-rose-300 flex items-center justify-center gap-1.5 transition"
+                className="w-full py-2 px-3 rounded-xl border border-rose-500/20 bg-rose-950/20 hover:bg-rose-950/40 text-[11px] font-semibold text-rose-300 flex items-center justify-center gap-1.5 transition"
               >
                 <Trash2 size={13} />
                 <span>Anonimizar Titular (Esquecimento)</span>
@@ -355,7 +355,7 @@ export default function ContactDrawer({
                   <button
                     type="button"
                     onClick={() => setConfirmErase(false)}
-                    className="flex-1 py-1.5 rounded-lg border border-[#00D2FF]/20 bg-[#121824] text-[#F8FAFC] font-semibold"
+                    className="flex-1 py-1.5 rounded-lg border border-[#1E293B] bg-[#121824] text-[#F8FAFC] font-semibold"
                   >
                     Cancelar
                   </button>
@@ -377,7 +377,7 @@ export default function ContactDrawer({
 
         <div className="flex items-center gap-1 text-[10px] text-[#94A3B8] pt-1">
           <Shield size={11} className="text-[#00D2FF] shrink-0" />
-          <span>Criptografia AES-256 + Blind Index HMAC ativo</span>
+          <span>Criptografia AES-256 + Blind Index HMAC</span>
         </div>
       </div>
     </aside>

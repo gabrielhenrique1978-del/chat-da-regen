@@ -24,14 +24,20 @@
 }
 
 @layer utilities {
+  .shadow-subtle {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.24);
+  }
   .shadow-neon {
-    box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+    box-shadow: 0 1px 8px rgba(0, 210, 255, 0.16);
   }
   .shadow-neon-strong {
-    box-shadow: 0 0 24px rgba(0, 210, 255, 0.52);
+    box-shadow: 0 2px 12px rgba(0, 210, 255, 0.24);
+  }
+  .border-subtle {
+    border-color: rgba(0, 210, 255, 0.08);
   }
   .border-neon {
-    border-color: rgba(0, 210, 255, 0.15);
+    border-color: rgba(0, 210, 255, 0.16);
   }
   .text-gradient-regen {
     background: linear-gradient(90deg, #00D2FF 0%, #38BDF8 50%, #6366F1 100%);
@@ -40,7 +46,7 @@
   }
 }
 
-/* Custom sleek neon scrollbars */
+/* Custom sleek, comfortable scrollbars */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -51,10 +57,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 210, 255, 0.22);
+  background: #1E293B;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 210, 255, 0.48);
+  background: rgba(0, 210, 255, 0.3);
 }

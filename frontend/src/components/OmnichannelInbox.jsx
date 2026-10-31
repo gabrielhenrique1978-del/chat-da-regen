@@ -369,14 +369,14 @@ export default function OmnichannelInbox({
       {/* =================================================================== */}
       {/* COLUNA 1: PAINEL DE CONVERSAS (FILA OMNICHANNEL)                     */}
       {/* =================================================================== */}
-      <div className="w-80 h-full border-r border-[#00D2FF]/15 bg-[#121824] flex flex-col shrink-0">
+      <div className="w-80 h-full border-r border-[#1E293B] bg-[#121824] flex flex-col shrink-0">
         {/* Topo da Lista (Alinhado em h-16 com Sidebar, Chat e Gaveta) */}
-        <div className="h-16 px-4 border-b border-[#00D2FF]/15 flex items-center justify-between shrink-0">
+        <div className="h-16 px-4 border-b border-[#1E293B] flex items-center justify-between shrink-0">
           <div className="min-w-0 flex items-center gap-2.5">
             <img
               src={regenLogo}
               alt="REGEN FLOW"
-              className="w-7 h-7 rounded-lg object-cover border border-[#00D2FF]/35 shadow-neon shrink-0"
+              className="w-7 h-7 rounded-lg object-contain border border-[#1E293B] shrink-0"
             />
             <div className="min-w-0">
               <h2 className="font-bold text-sm text-[#F8FAFC] truncate">
@@ -389,16 +389,16 @@ export default function OmnichannelInbox({
           </div>
           <button
             onClick={onOpenSellersModal}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/30 text-xs font-bold hover:bg-[#00D2FF]/20 hover:shadow-neon transition shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] text-[#F8FAFC] hover:text-[#00D2FF] border border-[#1E293B] text-xs font-semibold hover:border-[#00D2FF]/30 transition shrink-0"
             title="Gerenciar equipe de vendedores"
           >
-            <Users size={13} />
+            <Users size={13} className="text-[#00D2FF]" />
             <span>Equipe</span>
           </button>
         </div>
 
         {/* Barra de Busca e Filtros */}
-        <div className="p-3 border-b border-[#00D2FF]/15 space-y-2 shrink-0 bg-[#0A0D14]/60">
+        <div className="p-3 border-b border-[#1E293B] space-y-2 shrink-0 bg-[#0A0D14]/60">
           {/* Busca Rápida */}
           <div className="relative">
             <Search
@@ -410,7 +410,7 @@ export default function OmnichannelInbox({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar cliente, telefone ou #tag..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-[#00D2FF]/20 bg-[#121824] text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF] focus:shadow-neon transition"
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-[#1E293B] bg-[#121824] text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF] transition"
             />
           </div>
 
@@ -420,7 +420,7 @@ export default function OmnichannelInbox({
               <select
                 value={supervisorSellerFilter}
                 onChange={(e) => setSupervisorSellerFilter(e.target.value)}
-                className="flex-1 min-w-0 rounded-xl border border-[#6366F1]/40 bg-[#121824] px-2.5 py-1.5 text-[11px] font-bold text-[#00D2FF] focus:outline-none focus:border-[#00D2FF] cursor-pointer"
+                className="flex-1 min-w-0 rounded-xl border border-[#1E293B] bg-[#121824] px-2.5 py-1.5 text-[11px] font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] cursor-pointer"
               >
                 <option value="">
                   👑 Supervisor: Todas Carteiras ({contacts.length})
@@ -436,7 +436,7 @@ export default function OmnichannelInbox({
                 <button
                   type="button"
                   onClick={() => onRoundRobinAssign(activeSellerName)}
-                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] text-[10px] font-extrabold inline-flex items-center gap-1 shrink-0 shadow-neon transition"
+                  className="px-2.5 py-1.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-[10px] font-bold inline-flex items-center gap-1 shrink-0 transition"
                   title="Distribuir clientes da Fila de Espera automaticamente entre os vendedores ativos (Roleta Round-Robin)"
                 >
                   <Shuffle size={12} />
@@ -464,10 +464,10 @@ export default function OmnichannelInbox({
                 key={tab.id}
                 onClick={() => setStatusFilter(tab.id)}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition',
+                  'px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition',
                   statusFilter === tab.id
-                    ? 'bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon'
-                    : 'bg-[#121824] text-[#94A3B8] border border-[#00D2FF]/15 hover:bg-[#1B2333] hover:text-[#F8FAFC]'
+                    ? 'bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/40'
+                    : 'bg-[#121824] text-[#94A3B8] border border-[#1E293B] hover:bg-[#1B2333] hover:text-[#F8FAFC]'
                 )}
               >
                 {tab.label}
@@ -486,9 +486,9 @@ export default function OmnichannelInbox({
                 key={ch.id}
                 onClick={() => setChannelFilter(ch.id)}
                 className={cn(
-                  'py-1 rounded-lg font-semibold border transition text-center truncate',
+                  'py-1 rounded-lg font-medium border transition text-center truncate',
                   channelFilter === ch.id
-                    ? 'border-[#00D2FF] bg-[#00D2FF]/15 text-[#00D2FF] shadow-neon'
+                    ? 'border-[#00D2FF]/40 bg-[#1B2333] text-[#00D2FF]'
                     : 'border-transparent text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333]'
                 )}
               >
@@ -499,7 +499,7 @@ export default function OmnichannelInbox({
         </div>
 
         {/* Lista de Contatos */}
-        <div className="flex-1 overflow-y-auto divide-y divide-[#00D2FF]/10">
+        <div className="flex-1 overflow-y-auto divide-y divide-[#1E293B]/60">
           {filteredContacts.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#94A3B8]">
               Nenhuma conversa encontrada para este filtro.
@@ -523,22 +523,23 @@ export default function OmnichannelInbox({
                   key={c.id}
                   onClick={() => onSelectContact(c.id)}
                   className={cn(
-                    'w-full p-3.5 text-left flex items-start gap-3 transition hover:bg-[#1B2333]',
-                    selected &&
-                      'bg-[#1B2333] border-l-4 border-l-[#00D2FF] shadow-[inset_0_0_20px_rgba(0,210,255,0.08)]'
+                    'w-full p-3.5 text-left flex items-start gap-3 transition-colors',
+                    selected
+                      ? 'bg-[#1B2333] border-l-2 border-l-[#00D2FF]'
+                      : 'hover:bg-[#1B2333]/60'
                   )}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[#0A0D14] border border-[#00D2FF]/25 text-[#00D2FF] font-bold text-xs flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-[#00D2FF] font-bold text-xs flex items-center justify-center shrink-0">
                     {getInitials(c.name)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-xs text-[#F8FAFC] truncate">
+                      <span className="font-semibold text-xs text-[#F8FAFC] truncate">
                         {c.name}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {Number(c.unread_count || 0) > 0 && !selected && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] text-[9px] font-extrabold shadow-neon">
+                          <span className="px-1.5 py-0.5 rounded-full bg-[#00D2FF] text-[#0A0D14] text-[9px] font-extrabold">
                             {c.unread_count}
                           </span>
                         )}
@@ -554,19 +555,19 @@ export default function OmnichannelInbox({
 
                     {/* Badges de Posse do Vendedor e Canal */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#0A0D14] border border-[#00D2FF]/20 text-[#94A3B8]">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-[#0A0D14] border border-[#1E293B] text-[#94A3B8]">
                         {c.channel}
                       </span>
                       {cIsMine ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/20">
                           ✓ {impersonatedSeller ? 'Conta Espelhada' : 'Seu'} ({c.assignee})
                         </span>
                       ) : cIsOther ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#6366F1]/20 text-indigo-300 border border-[#6366F1]/40">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#1B2333] text-[#A5B4FC] border border-[#6366F1]/30">
                           🔒 Com: {c.assignee}
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#0A0D14] text-[#94A3B8]">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#0A0D14] text-[#94A3B8] border border-[#1E293B]">
                           🤖 Agente IA
                         </span>
                       )}
@@ -585,7 +586,7 @@ export default function OmnichannelInbox({
       <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0A0D14]">
         {!currentContact ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-[#121824] border border-[#00D2FF]/30 p-2 mb-4 shadow-neon">
+            <div className="w-20 h-20 rounded-2xl bg-[#121824] border border-[#1E293B] p-2 mb-4 shadow-card">
               <img
                 src={regenLogo}
                 alt="REGEN FLOW"
@@ -603,17 +604,17 @@ export default function OmnichannelInbox({
         ) : (
           <>
             {/* Cabeçalho do Chat (Alinhado em h-16 com as demais colunas) */}
-            <header className="h-16 px-4 bg-[#121824] border-b border-[#00D2FF]/15 flex items-center justify-between gap-3 shrink-0">
+            <header className="h-16 px-4 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] font-extrabold text-xs flex items-center justify-center shrink-0 shadow-neon">
+                <div className="w-9 h-9 rounded-xl bg-[#1B2333] border border-[#1E293B] text-[#00D2FF] font-bold text-xs flex items-center justify-center shrink-0">
                   {getInitials(currentContact.name)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="font-bold text-sm text-[#F8FAFC] truncate">
+                    <h3 className="font-semibold text-sm text-[#F8FAFC] truncate">
                       {currentContact.name}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/35 shrink-0">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-[#0A0D14] text-[#94A3B8] border border-[#1E293B] shrink-0">
                       {currentContact.channel}
                     </span>
                   </div>
@@ -639,7 +640,7 @@ export default function OmnichannelInbox({
                         setTransferTargetId(colleagues[0]?.id || '');
                         setShowTransferModal(true);
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#00D2FF]/30 bg-[#1B2333] hover:bg-[#00D2FF]/20 text-xs font-semibold text-[#F8FAFC] whitespace-nowrap transition"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#1B2333] hover:border-[#00D2FF]/40 text-xs font-semibold text-[#F8FAFC] whitespace-nowrap transition"
                     >
                       <ArrowRightLeft size={13} className="text-[#00D2FF]" />
                       <span>Transferir</span>
@@ -654,7 +655,7 @@ export default function OmnichannelInbox({
                           operator_name: activeSellerName,
                         })
                       }
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#00D2FF]/20 bg-[#0A0D14] hover:bg-[#1B2333] text-xs font-semibold text-[#94A3B8] hover:text-[#F8FAFC] whitespace-nowrap transition"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#0A0D14] hover:bg-[#1B2333] text-xs font-semibold text-[#94A3B8] hover:text-[#F8FAFC] whitespace-nowrap transition"
                     >
                       <Bot size={14} className="text-[#00D2FF]" />
                       <span className="hidden xl:inline">Devolver à IA</span>
@@ -675,10 +676,10 @@ export default function OmnichannelInbox({
                             onImpersonateSeller?.(ownerObj);
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#6366F1] hover:bg-indigo-500 text-white text-xs font-bold whitespace-nowrap shadow-neon-indigo transition"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] hover:bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#A5B4FC] text-xs font-semibold whitespace-nowrap transition"
                         title={`Entrar na conta de ${currentContact.assignee} para operar como ele`}
                       >
-                        <Eye size={13} />
+                        <Eye size={13} className="text-[#6366F1]" />
                         <span>Espelhar Conta</span>
                       </button>
 
@@ -690,7 +691,7 @@ export default function OmnichannelInbox({
                           setTransferTargetId(colleagues[0]?.id || '');
                           setShowTransferModal(true);
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] text-xs font-extrabold whitespace-nowrap shadow-neon transition"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold whitespace-nowrap transition"
                         title="Como Supervisor, você pode reatribuir ou destravar este atendimento"
                       >
                         <ArrowRightLeft size={13} />
@@ -698,7 +699,7 @@ export default function OmnichannelInbox({
                       </button>
                     </div>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] text-[#94A3B8] text-xs font-bold whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] border border-[#1E293B] text-[#94A3B8] text-xs font-semibold whitespace-nowrap">
                       <Lock size={12} />
                       <span>Com {currentContact.assignee.split(' ')[0]}</span>
                     </span>
@@ -714,7 +715,7 @@ export default function OmnichannelInbox({
                         operator_name: activeSellerName,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#00D2FF] to-[#0072FF] hover:from-[#38BDF8] hover:to-[#0072FF] text-[#0A0D14] text-xs font-extrabold whitespace-nowrap shadow-neon transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold whitespace-nowrap transition shadow-xs"
                   >
                     <UserCheck size={14} />
                     <span>Assumir Conversa</span>
@@ -723,7 +724,7 @@ export default function OmnichannelInbox({
 
                 <button
                   onClick={() => setDrawerOpen(!drawerOpen)}
-                  className="p-1.5 rounded-lg border border-[#00D2FF]/20 text-[#94A3B8] hover:text-[#00D2FF] hover:bg-[#1B2333] shrink-0"
+                  className="p-1.5 rounded-lg border border-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] shrink-0 transition"
                   title={
                     drawerOpen
                       ? 'Ocultar gaveta de detalhes'
@@ -740,7 +741,7 @@ export default function OmnichannelInbox({
             </header>
 
             {/* Sub-Abas do Chat (Atendimento Oficial / Notas Internas / Simulador) */}
-            <div className="px-4 py-2 bg-[#121824]/80 border-b border-[#00D2FF]/15 flex items-center justify-between gap-2 shrink-0">
+            <div className="px-4 py-2 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                 {[
                   {
@@ -765,10 +766,10 @@ export default function OmnichannelInbox({
                       key={t.id}
                       onClick={() => setChatSubTab(t.id)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition',
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition',
                         chatSubTab === t.id
-                          ? 'bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon'
-                          : 'text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC]'
+                          ? 'bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/30'
+                          : 'text-[#94A3B8] hover:bg-[#1B2333]/50 hover:text-[#F8FAFC]'
                       )}
                     >
                       <Icon size={13} />
@@ -780,12 +781,12 @@ export default function OmnichannelInbox({
 
               <div className="flex items-center gap-2 shrink-0 text-[11px]">
                 {impersonatedSeller ? (
-                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#00D2FF] font-bold">
-                    <Eye size={12} />
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#1B2333] border border-[#6366F1]/30 text-[#A5B4FC] font-medium">
+                    <Eye size={12} className="text-[#6366F1]" />
                     <span>Conta de: {impersonatedSeller.name}</span>
                     <button
                       onClick={onExitImpersonation}
-                      className="ml-1 px-1.5 py-0.5 rounded bg-[#6366F1] text-white text-[10px] hover:bg-indigo-500 transition"
+                      className="ml-1 px-1.5 py-0.5 rounded bg-[#6366F1]/30 text-[#F8FAFC] text-[10px] hover:bg-[#6366F1]/50 transition"
                     >
                       Sair
                     </button>
@@ -793,7 +794,7 @@ export default function OmnichannelInbox({
                 ) : (
                   <span className="text-[#94A3B8] hidden md:inline">
                     {isSupervisorMode ? '👑 Supervisor:' : '🔒 Vendedor:'}{' '}
-                    <strong className="text-[#00D2FF]">
+                    <strong className="text-[#F8FAFC]">
                       {activeSellerName}
                     </strong>
                   </span>
@@ -819,21 +820,21 @@ export default function OmnichannelInbox({
                     <div
                       key={m.id}
                       className={cn(
-                        'flex flex-col max-w-[78%] rounded-2xl px-4 py-3 text-xs leading-relaxed border',
+                        'flex flex-col max-w-[78%] rounded-2xl px-4 py-3 text-xs leading-relaxed border shadow-subtle',
                         isIgComment
-                          ? 'mr-auto bg-[#1E293B] border-pink-500/50 text-[#F8FAFC] shadow-[0_0_15px_rgba(236,72,153,0.2)]'
+                          ? 'mr-auto bg-[#1B2333] border-pink-500/40 text-[#F8FAFC]'
                           : isCustomer
-                          ? 'mr-auto bg-[#1E293B] border-[#00D2FF]/20 text-[#F8FAFC] shadow-sm'
+                          ? 'mr-auto bg-[#1B2333] border-[#1E293B] text-[#F8FAFC]'
                           : isSystem
-                          ? 'mx-auto max-w-lg bg-[#121824] border-[#00D2FF]/20 text-[#94A3B8] text-center'
+                          ? 'mx-auto max-w-lg bg-[#121824] border-[#1E293B] text-[#94A3B8] text-center'
                           : isInternal
-                          ? 'ml-auto bg-amber-950/60 border-amber-500/40 text-amber-100'
+                          ? 'ml-auto bg-[#1a1c24] border-amber-500/30 text-amber-200'
                           : isIgCommentReply
-                          ? 'ml-auto bg-gradient-to-r from-pink-600 to-indigo-600 text-white border-pink-400/40 shadow-sm'
-                          : 'ml-auto bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-[#00D2FF]/40 shadow-neon'
+                          ? 'ml-auto bg-gradient-to-r from-[#831843] to-[#4c1d95] text-[#F8FAFC] border-pink-500/30'
+                          : 'ml-auto bg-[#0c2a4d] border border-[#0072FF]/30 text-[#F8FAFC]'
                       )}
                     >
-                      <div className="flex items-center justify-between gap-4 mb-1 opacity-80 text-[10px] font-semibold">
+                      <div className="flex items-center justify-between gap-4 mb-1 text-[10px] font-medium text-[#94A3B8]">
                         <span className="flex items-center gap-1.5">
                           {isCustomer
                             ? currentContact.name
@@ -845,12 +846,12 @@ export default function OmnichannelInbox({
                             ? '🤖 Assistente IA'
                             : `👤 ${currentContact.assignee || activeSellerName}`}
                           {isIgComment && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-pink-600 text-white text-[9px] font-bold">
+                            <span className="px-1.5 py-0.5 rounded-full bg-pink-700 text-white text-[9px] font-bold">
                               📸 Comentário no Post/Reels
                             </span>
                           )}
                           {isIgCommentReply && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[9px] font-bold">
+                            <span className="px-1.5 py-0.5 rounded-full bg-white/15 text-white text-[9px] font-bold">
                               💬 Resposta Pública no Post
                             </span>
                           )}
@@ -860,11 +861,11 @@ export default function OmnichannelInbox({
                           {!isCustomer && !isSystem && (
                             <>
                               {m.delivery_status === 'read' ? (
-                                <CheckCheck size={13} className="text-sky-300" />
+                                <CheckCheck size={13} className="text-[#00D2FF]" />
                               ) : m.delivery_status === 'failed' ? (
                                 <AlertTriangle
                                   size={13}
-                                  className="text-rose-300"
+                                  className="text-rose-400"
                                 />
                               ) : (
                                 <Check size={13} />
@@ -873,7 +874,7 @@ export default function OmnichannelInbox({
                           )}
                         </span>
                       </div>
-                      <div className="whitespace-pre-line break-words">
+                      <div className="whitespace-pre-line break-words text-[#F8FAFC]">
                         {m.content}
                       </div>
                       {m.media_type === 'audio' && m.media_url && (
@@ -890,7 +891,7 @@ export default function OmnichannelInbox({
                           <img
                             src={m.media_url}
                             alt="Anexo de imagem"
-                            className="max-h-56 rounded-xl border border-white/20 object-cover"
+                            className="max-h-56 rounded-xl border border-white/10 object-cover"
                           />
                         </div>
                       )}
@@ -899,7 +900,7 @@ export default function OmnichannelInbox({
                           <a
                             href={m.media_url}
                             download="anexo-documento"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/15 hover:bg-black/25 text-[11px] font-bold underline"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/20 hover:bg-black/30 text-[11px] font-medium underline"
                           >
                             <FileText size={13} />
                             <span>Baixar Arquivo Anexado</span>
@@ -907,14 +908,14 @@ export default function OmnichannelInbox({
                         </div>
                       )}
                       {isIgComment && !isInputBlocked && (
-                        <div className="mt-2.5 pt-2 border-t border-pink-200/70 dark:border-pink-800/60 flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-semibold text-pink-700 dark:text-pink-300">
+                        <div className="mt-2.5 pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-medium text-[#94A3B8]">
                             Responder no Post + Puxar para o Direct (Comment-to-DM)
                           </span>
                           <button
                             type="button"
                             onClick={() => setShowIgCommentModal(true)}
-                            className="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-[10px] font-bold shadow-xs transition shrink-0"
+                            className="px-2.5 py-1 rounded-lg bg-pink-700 hover:bg-pink-600 text-white text-[10px] font-bold transition shrink-0"
                           >
                             💬 Responder Post + Direct
                           </button>
@@ -933,8 +934,8 @@ export default function OmnichannelInbox({
                 className={cn(
                   'px-5 py-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs',
                   isSupervisorMode
-                    ? 'bg-[#121824] border-[#6366F1]/40 text-[#F8FAFC]'
-                    : 'bg-[#121824] border-amber-500/40 text-amber-200'
+                    ? 'bg-[#121824] border-[#1E293B] text-[#F8FAFC]'
+                    : 'bg-[#121824] border-amber-500/30 text-amber-200'
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -976,8 +977,8 @@ export default function OmnichannelInbox({
                       className={cn(
                         'px-3 py-1.5 rounded-lg font-bold text-[11px] transition',
                         supervisorIntervention
-                          ? 'bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon'
-                          : 'bg-[#1B2333] border border-[#00D2FF]/40 text-[#00D2FF]'
+                          ? 'bg-[#00D2FF] text-[#0A0D14]'
+                          : 'bg-[#1B2333] border border-[#1E293B] text-[#F8FAFC] hover:border-[#00D2FF]/40'
                       )}
                     >
                       {supervisorIntervention
@@ -991,10 +992,10 @@ export default function OmnichannelInbox({
 
             {/* Popup de Respostas Rápidas (/) */}
             {showQuickReplies && (
-              <div className="mx-5 mb-2 p-3 rounded-2xl bg-[#121824] border border-[#00D2FF]/30 shadow-neon max-h-48 overflow-y-auto space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-bold text-[#00D2FF] pb-1 border-b border-[#00D2FF]/15">
+              <div className="mx-5 mb-2 p-3 rounded-2xl bg-[#121824] border border-[#1E293B] shadow-card max-h-48 overflow-y-auto space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-[#00D2FF] pb-1 border-b border-[#1E293B]">
                   <span>⚡ Respostas Rápidas (Clique para usar)</span>
-                  <button onClick={() => setShowQuickReplies(false)}>✕</button>
+                  <button onClick={() => setShowQuickReplies(false)} className="text-[#94A3B8] hover:text-[#F8FAFC]">✕</button>
                 </div>
                 {quickReplies.map((qr) => (
                   <button
@@ -1003,7 +1004,7 @@ export default function OmnichannelInbox({
                       setMessageText(qr.content);
                       setShowQuickReplies(false);
                     }}
-                    className="w-full text-left p-2 rounded-lg hover:bg-[#1B2333] text-xs flex items-center justify-between gap-2"
+                    className="w-full text-left p-2 rounded-lg hover:bg-[#1B2333] text-xs flex items-center justify-between gap-2 transition"
                   >
                     <div>
                       <span className="font-mono font-bold text-[#00D2FF] mr-2">
@@ -1024,7 +1025,7 @@ export default function OmnichannelInbox({
             {/* Barra de Digitação */}
             <form
               onSubmit={handleSendSubmit}
-              className="p-3.5 bg-[#121824] border-t border-[#00D2FF]/15 flex items-center gap-2"
+              className="p-3.5 bg-[#121824] border-t border-[#1E293B] flex items-center gap-2"
             >
               <input
                 ref={fileInputRef}
@@ -1038,7 +1039,7 @@ export default function OmnichannelInbox({
                 type="button"
                 disabled={isInputBlocked}
                 onClick={() => setShowQuickReplies(!showQuickReplies)}
-                className="px-2.5 py-2.5 rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] text-xs font-bold text-[#F8FAFC] hover:bg-[#1B2333] hover:border-[#00D2FF]/50 disabled:opacity-40 shrink-0 transition"
+                className="px-2.5 py-2.5 rounded-xl border border-[#1E293B] bg-[#0A0D14] text-xs font-semibold text-[#F8FAFC] hover:bg-[#1B2333] hover:border-[#00D2FF]/40 disabled:opacity-40 shrink-0 transition"
                 title="Respostas Rápidas (/)"
               >
                 <Zap size={15} className="inline mr-1 text-[#00D2FF]" />
@@ -1049,7 +1050,7 @@ export default function OmnichannelInbox({
                 type="button"
                 disabled={isInputBlocked}
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2.5 rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] text-[#F8FAFC] hover:bg-[#1B2333] hover:text-[#00D2FF] disabled:opacity-40 shrink-0 transition"
+                className="p-2.5 rounded-xl border border-[#1E293B] bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#00D2FF] disabled:opacity-40 shrink-0 transition"
                 title="Anexar Imagem, Catálogo ou Documento PDF"
               >
                 <Paperclip size={15} />
@@ -1060,10 +1061,10 @@ export default function OmnichannelInbox({
                 disabled={isInputBlocked}
                 onClick={handleToggleAudioRecording}
                 className={cn(
-                  'px-2.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition shrink-0 disabled:opacity-40',
+                  'px-2.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition shrink-0 disabled:opacity-40',
                   isRecordingAudio
                     ? 'border-rose-500 bg-rose-600 text-white animate-pulse'
-                    : 'border-[#00D2FF]/25 bg-[#0A0D14] text-[#F8FAFC] hover:bg-[#1B2333]'
+                    : 'border-[#1E293B] bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#00D2FF]'
                 )}
                 title={
                   isRecordingAudio
@@ -1085,10 +1086,10 @@ export default function OmnichannelInbox({
                 type="button"
                 disabled={isInputBlocked}
                 onClick={() => setShowTemplateModal(true)}
-                className="px-2.5 py-2.5 rounded-xl border border-[#6366F1]/40 bg-[#6366F1]/15 text-xs font-bold text-[#00D2FF] hover:bg-[#6366F1]/25 disabled:opacity-40 shrink-0 transition"
+                className="px-2.5 py-2.5 rounded-xl border border-[#1E293B] bg-[#0A0D14] text-xs font-semibold text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#00D2FF] disabled:opacity-40 shrink-0 transition"
                 title="Disparar Template Oficial da Meta (HSM)"
               >
-                <Sparkles size={14} className="inline mr-1" />
+                <Sparkles size={14} className="inline mr-1 text-[#00D2FF]" />
                 Template HSM
               </button>
 
@@ -1097,7 +1098,7 @@ export default function OmnichannelInbox({
                   type="button"
                   disabled={isInputBlocked}
                   onClick={() => setShowIgCommentModal(true)}
-                  className="px-2.5 py-2.5 rounded-xl border border-pink-500/40 bg-pink-950/40 text-xs font-bold text-pink-300 hover:bg-pink-900/50 disabled:opacity-40 shrink-0"
+                  className="px-2.5 py-2.5 rounded-xl border border-pink-500/30 bg-[#0A0D14] text-xs font-semibold text-pink-400 hover:bg-[#1B2333] disabled:opacity-40 shrink-0 transition"
                   title="Responder Comentário no Post/Reels do Instagram + Enviar Direct (Comment-to-DM)"
                 >
                   📸 Responder Post
@@ -1120,13 +1121,13 @@ export default function OmnichannelInbox({
                     ? `Respondendo na conta de ${impersonatedSeller.name} (Modo Supervisor)...`
                     : `Responder como ${activeSellerName}...`
                 }
-                className="flex-1 min-w-0 rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-4 py-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF] focus:shadow-neon disabled:opacity-50 transition"
+                className="flex-1 min-w-0 rounded-xl border border-[#1E293B] bg-[#0A0D14] px-4 py-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF] disabled:opacity-50 transition"
               />
 
               <button
                 type="submit"
                 disabled={!messageText.trim() || isInputBlocked}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] hover:from-[#38BDF8] hover:to-[#0072FF] text-[#0A0D14] text-xs font-extrabold flex items-center gap-1.5 shadow-neon disabled:opacity-40 transition shrink-0"
+                className="px-4 py-2.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 transition shrink-0"
               >
                 <Send size={14} />
                 <span>Enviar</span>
@@ -1168,26 +1169,26 @@ export default function OmnichannelInbox({
 
       {/* Modal de Transferência de Vendedor */}
       {showTransferModal && currentContact && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#0A0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form
             onSubmit={handleConfirmTransfer}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl"
+            className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-card"
           >
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
+            <h3 className="font-bold text-base text-[#F8FAFC]">
               Transferir Atendimento
             </h3>
-            <p className="text-xs text-slate-500">
-              Transferindo <strong>{currentContact.name}</strong> para outro
+            <p className="text-xs text-[#94A3B8]">
+              Transferindo <strong className="text-[#F8FAFC]">{currentContact.name}</strong> para outro
               vendedor da equipe:
             </p>
             <div>
-              <label className="block text-xs font-bold mb-1">
+              <label className="block text-xs font-semibold text-[#94A3B8] mb-1">
                 Selecionar Vendedor Destino
               </label>
               <select
                 value={transferTargetId}
                 onChange={(e) => setTransferTargetId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs font-semibold"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               >
                 {sellers
                   .filter((s) => s.id !== activeSeller?.id)
@@ -1199,7 +1200,7 @@ export default function OmnichannelInbox({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold mb-1">
+              <label className="block text-xs font-semibold text-[#94A3B8] mb-1">
                 Motivo / Observação Interna (Opcional)
               </label>
               <textarea
@@ -1207,20 +1208,20 @@ export default function OmnichannelInbox({
                 value={transferReason}
                 onChange={(e) => setTransferReason(e.target.value)}
                 placeholder="Ex: Cliente pediu orçamento de atacado..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowTransferModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl border border-[#1E293B] text-xs font-semibold text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC] transition"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold transition"
               >
                 Confirmar Transferência
               </button>
@@ -1231,20 +1232,20 @@ export default function OmnichannelInbox({
 
       {/* Modal de Disparo de Templates HSM Oficiais da Meta */}
       {showTemplateModal && currentContact && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-[#0A0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-card">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">
+              <h3 className="font-bold text-base text-[#F8FAFC]">
                 Templates Oficiais Meta (HSM)
               </h3>
               <button
                 onClick={() => setShowTemplateModal(false)}
-                className="text-slate-400 hover:text-slate-700"
+                className="text-[#94A3B8] hover:text-[#F8FAFC]"
               >
                 ✕
               </button>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[#94A3B8]">
               {windowInfo?.reason ||
                 'Selecione um template aprovado para iniciar ou reabrir a janela de 24h.'}
             </p>
@@ -1252,16 +1253,16 @@ export default function OmnichannelInbox({
               {(windowInfo?.templates || []).map((tpl) => (
                 <div
                   key={tpl.name}
-                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3"
+                  className="p-3 rounded-xl border border-[#1E293B] bg-[#0A0D14] flex items-center justify-between gap-3"
                 >
                   <div>
-                    <div className="font-bold text-xs text-slate-900 dark:text-white">
+                    <div className="font-bold text-xs text-[#F8FAFC]">
                       {tpl.title}{' '}
-                      <span className="font-mono text-[10px] text-blue-600">
+                      <span className="font-mono text-[10px] text-[#00D2FF]">
                         ({tpl.name})
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="text-[11px] text-[#94A3B8] mt-0.5">
                       {tpl.preview}
                     </p>
                   </div>
@@ -1275,7 +1276,7 @@ export default function OmnichannelInbox({
                       });
                       setShowTemplateModal(false);
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-[#0072FF] hover:bg-[#00D2FF] hover:text-[#0A0D14] text-[#F8FAFC] text-xs font-bold shrink-0 transition"
                   >
                     Disparar
                   </button>
@@ -1288,7 +1289,7 @@ export default function OmnichannelInbox({
 
       {/* Modal de Resposta em Comentário de Post/Reels do Instagram + Direct (Comment-to-DM) */}
       {showIgCommentModal && currentContact && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#0A0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -1311,34 +1312,34 @@ export default function OmnichannelInbox({
                 setIgSending(false);
               }
             }}
-            className="bg-white dark:bg-slate-900 border border-pink-200 dark:border-pink-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl"
+            className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-card"
           >
             <div className="flex items-center justify-between">
               <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-950 text-pink-700 dark:text-pink-300 text-[10px] font-bold mb-1">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-950/60 text-pink-300 text-[10px] font-bold mb-1 border border-pink-500/30">
                   📸 Instagram Graph API v21.0 • Comment-to-DM
                 </span>
-                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                <h3 className="font-bold text-base text-[#F8FAFC]">
                   Responder Comentário no Post + Puxar para o Direct
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowIgCommentModal(false)}
-                className="text-slate-400 hover:text-slate-700"
+                className="text-[#94A3B8] hover:text-[#F8FAFC]"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[#94A3B8]">
               Responda publicamente abaixo do comentário de{' '}
-              <strong>{currentContact.name}</strong> na publicação/Reels e
+              <strong className="text-[#F8FAFC]">{currentContact.name}</strong> na publicação/Reels e
               envie simultaneamente uma mensagem privada no Instagram Direct.
             </p>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+              <label className="block text-xs font-semibold text-[#F8FAFC] mb-1">
                 1. Resposta Pública no Comentário do Post (Opcional)
               </label>
               <textarea
@@ -1346,15 +1347,15 @@ export default function OmnichannelInbox({
                 value={igPublicReply}
                 onChange={(e) => setIgPublicReply(e.target.value)}
                 placeholder="Ex: Olá! Te enviamos todos os detalhes e valores no seu Direct agora mesmo! 🚀📩"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-[#94A3B8]">
                 Aparecerá publicamente abaixo do comentário do cliente no Post/Reels (`POST /{'{comment_id}'}/replies`).
               </span>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+              <label className="block text-xs font-semibold text-[#F8FAFC] mb-1">
                 2. Mensagem Privada no Direct — Comment-to-DM (Opcional)
               </label>
               <textarea
@@ -1362,9 +1363,9 @@ export default function OmnichannelInbox({
                 value={igPrivateDm}
                 onChange={(e) => setIgPrivateDm(e.target.value)}
                 placeholder="Ex: Olá! Vi seu comentário no nosso post 😊 Aqui estão as condições especiais..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-[#94A3B8]">
                 Abre a conversa no Direct vinculada ao comentário (`recipient.comment_id`).
               </span>
             </div>
@@ -1373,7 +1374,7 @@ export default function OmnichannelInbox({
               <button
                 type="button"
                 onClick={() => setShowIgCommentModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl border border-[#1E293B] text-xs font-semibold text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC] transition"
               >
                 Cancelar
               </button>
@@ -1382,7 +1383,7 @@ export default function OmnichannelInbox({
                 disabled={
                   igSending || (!igPublicReply.trim() && !igPrivateDm.trim())
                 }
-                className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold disabled:opacity-40"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-[#6366F1] hover:opacity-90 text-white text-xs font-bold disabled:opacity-40 transition"
               >
                 {igSending
                   ? 'Enviando...'

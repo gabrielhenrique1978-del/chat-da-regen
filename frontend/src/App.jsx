@@ -653,15 +653,15 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <form
             onSubmit={handleAuthenticatePin}
-            className="bg-[#121824] border border-[#00D2FF]/25 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-neon"
+            className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-card"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30 shadow-neon flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/20 flex items-center justify-center">
                   <KeyRound size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-[#F8FAFC]">
+                  <h3 className="text-sm font-bold text-[#F8FAFC]">
                     Identidade do Operador & PIN
                   </h3>
                   <p className="text-[11px] text-[#94A3B8]">
@@ -692,7 +692,7 @@ export default function App() {
                 <select
                   value={pinSellerId}
                   onChange={(e) => setPinSellerId(e.target.value)}
-                  className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2.5 text-xs font-bold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
+                  className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3.5 py-2.5 text-xs font-medium text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
                 >
                   <option value="__SUPERVISOR_MASTER__">
                     👑 MODO SUPERVISOR GLOBAL (Acessar todas as contas)
@@ -716,7 +716,7 @@ export default function App() {
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
                   placeholder="Digite seu PIN (ex: 1234)"
-                  className="w-full rounded-xl border border-[#00D2FF]/25 bg-[#0A0D14] px-3.5 py-2.5 text-xs font-mono font-bold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
+                  className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3.5 py-2.5 text-xs font-mono font-medium text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
                 />
               </div>
             </div>
@@ -725,13 +725,13 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowPinModal(false)}
-                className="px-4 py-2 rounded-xl border border-[#00D2FF]/20 text-[#94A3B8] hover:text-[#F8FAFC] text-xs font-semibold"
+                className="px-4 py-2 rounded-xl border border-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] text-xs font-medium transition"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] hover:from-[#38BDF8] hover:to-[#00D2FF] text-[#0A0D14] shadow-neon text-xs font-extrabold transition"
+                className="px-4 py-2 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] shadow-subtle text-xs font-bold transition"
               >
                 Confirmar e Travar Sessão
               </button>
@@ -743,10 +743,10 @@ export default function App() {
       {/* Quick Sellers Management Modal */}
       {showSellersModal && (
         <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#121824] border border-[#00D2FF]/25 rounded-2xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-neon overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#00D2FF]/15 flex items-center justify-between bg-[#0A0D14]/60">
+          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-card overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0A0D14]/70">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/30 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/20 flex items-center justify-center">
                   <Users className="w-4 h-4" />
                 </div>
                 <div>
@@ -810,7 +810,7 @@ export default function App() {
             <div className="pt-2">
               <button
                 onClick={() => handleSwitchAuthRole('super_admin')}
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] shadow-neon text-xs font-extrabold transition"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] shadow-subtle text-xs font-bold transition"
               >
                 Voltar para Identidade Super Admin (Proprietário)
               </button>
@@ -821,7 +821,7 @@ export default function App() {
 
       {/* Global Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-neon border text-xs font-semibold animate-fade-in bg-[#121824] text-[#F8FAFC] border-[#00D2FF]/30">
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-card border text-xs font-semibold animate-fade-in bg-[#121824] text-[#F8FAFC] border-[#1E293B]">
           {toast.type === 'error' ? (
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           ) : (

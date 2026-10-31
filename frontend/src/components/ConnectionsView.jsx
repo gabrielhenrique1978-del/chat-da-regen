@@ -153,13 +153,13 @@ export default function ConnectionsView({ onWebhookSimulated }) {
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-slate-950 space-y-6">
+    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-[#0A0D14] text-[#F8FAFC] space-y-6">
       <div>
-        <h1 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-          <Smartphone className="text-emerald-600" size={24} />
+        <h1 className="text-xl font-bold text-[#F8FAFC] flex items-center gap-2.5">
+          <Smartphone className="text-[#00D2FF]" size={22} />
           Conexões WhatsApp QR Code & API Oficial da Meta
         </h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-xs text-[#94A3B8] mt-1">
           Conecte o WhatsApp da loja via QR Code ou opere em alta escala com a
           Graph API v21.0 Oficial da Meta (WhatsApp Cloud API & Instagram).
         </p>
@@ -167,30 +167,30 @@ export default function ConnectionsView({ onWebhookSimulated }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Card 1: WhatsApp Web QR Code Bridge */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs">
+        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-6 space-y-4 shadow-card">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <QrCode className="text-emerald-600" size={20} />
-              <h2 className="font-bold text-sm text-slate-900 dark:text-white">
+              <QrCode className="text-[#00D2FF]" size={20} />
+              <h2 className="font-semibold text-sm text-[#F8FAFC]">
                 WhatsApp da Loja (QR Code Direto)
               </h2>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/30">
               Estado: {waStatus?.state || 'disconnected'}
             </span>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800 min-h-64">
+          <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-[#0A0D14] border border-[#1E293B] min-h-64">
             {waStatus?.state === 'connected' ? (
               <div className="text-center space-y-2">
                 <CheckCircle2
-                  size={48}
-                  className="text-emerald-600 mx-auto"
+                  size={44}
+                  className="text-[#00D2FF] mx-auto"
                 />
-                <div className="font-bold text-sm text-slate-900 dark:text-white">
+                <div className="font-semibold text-sm text-[#F8FAFC]">
                   WhatsApp Conectado e Sincronizado!
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[#94A3B8]">
                   Número: {waStatus?.phone_number || 'Sessão Ativa'}
                 </p>
               </div>
@@ -199,15 +199,15 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 <img
                   src={waStatus.qrcode}
                   alt="QR Code WhatsApp"
-                  className="w-48 h-48 mx-auto rounded-xl border border-slate-200 bg-white p-2"
+                  className="w-48 h-48 mx-auto rounded-xl border border-[#1E293B] bg-white p-2"
                 />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[#94A3B8]">
                   Abra o WhatsApp no celular → Aparelhos Conectados → Conectar
                   Aparelho
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#94A3B8]">
                 Clique em &ldquo;Gerar QR Code&rdquo; abaixo para iniciar a sessão.
               </p>
             )}
@@ -219,7 +219,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 const res = await api.connectWhatsApp();
                 setWaStatus(res);
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold transition shadow-xs"
             >
               <RefreshCw size={14} />
               <span>Gerar QR Code</span>
@@ -229,10 +229,10 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 const res = await api.simulateWhatsAppScan();
                 setWaStatus(res);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:border-[#00D2FF]/40 text-[#F8FAFC] text-xs font-semibold transition"
             >
-              <Zap size={14} />
-              <span>Simular Leitura Instantânea</span>
+              <Zap size={14} className="text-[#00D2FF]" />
+              <span>Simular Leitura</span>
             </button>
             {waStatus?.state === 'connected' && (
               <button
@@ -240,7 +240,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   const res = await api.disconnectWhatsApp();
                   setWaStatus(res);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-600 text-xs font-semibold ml-auto"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-500/30 text-rose-300 hover:bg-rose-950/30 text-xs font-semibold ml-auto transition"
               >
                 <LogOut size={14} />
                 <span>Desconectar</span>
@@ -252,32 +252,32 @@ export default function ConnectionsView({ onWebhookSimulated }) {
         {/* Card 2: API Oficial da Meta (Graph API v21.0) */}
         <form
           onSubmit={handleSaveMeta}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs"
+          className="bg-[#121824] border border-[#1E293B] rounded-2xl p-6 space-y-4 shadow-card"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Globe className="text-blue-600" size={20} />
-              <h2 className="font-bold text-sm text-slate-900 dark:text-white">
+              <Globe className="text-[#0072FF]" size={20} />
+              <h2 className="font-semibold text-sm text-[#F8FAFC]">
                 API Oficial da Meta (Graph API v21.0)
               </h2>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-[#1B2333] text-[#A5B4FC] border border-[#6366F1]/30">
               HMAC-SHA256 & 24h Window
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs space-y-1">
-            <div className="font-bold text-blue-950 dark:text-blue-200">
+          <div className="p-3 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-xs space-y-1">
+            <div className="font-semibold text-[#F8FAFC]">
               Webhook Callback URL (Meta for Developers):
             </div>
-            <div className="font-mono text-[11px] bg-white dark:bg-slate-900 p-2 rounded border border-blue-200 dark:border-blue-800 select-all">
+            <div className="font-mono text-[11px] bg-[#121824] text-[#00D2FF] p-2 rounded border border-[#1E293B] select-all">
               {window.location.origin}/api/webhooks/meta
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[10px] font-semibold uppercase text-[#94A3B8] mb-1">
                 Phone Number ID (WhatsApp)
               </label>
               <input
@@ -287,11 +287,11 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   setMetaCfg({ ...metaCfg, phone_number_id: e.target.value })
                 }
                 placeholder="Ex: 109283746512345"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[10px] font-semibold uppercase text-[#94A3B8] mb-1">
                 WABA ID (Conta WhatsApp)
               </label>
               <input
@@ -301,11 +301,11 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   setMetaCfg({ ...metaCfg, waba_id: e.target.value })
                 }
                 placeholder="Ex: 987654321012345"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[10px] font-semibold uppercase text-[#94A3B8] mb-1">
                 Instagram Business ID
               </label>
               <input
@@ -315,11 +315,11 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   setMetaCfg({ ...metaCfg, ig_account_id: e.target.value })
                 }
                 placeholder="Ex: 17841400000000"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[10px] font-semibold uppercase text-[#94A3B8] mb-1">
                 Verify Token (hub.verify_token)
               </label>
               <input
@@ -328,14 +328,14 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 onChange={(e) =>
                   setMetaCfg({ ...metaCfg, verify_token: e.target.value })
                 }
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs font-mono"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2 text-xs font-mono text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[10px] font-semibold uppercase text-[#94A3B8] mb-1">
                 Permanent Access Token (System User)
               </label>
               <input
@@ -345,11 +345,11 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   setMetaCfg({ ...metaCfg, access_token: e.target.value })
                 }
                 placeholder="EAAGm0PX4ZCps..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+              <label className="block text-[10px] font-semibold uppercase text-[#94A3B8] mb-1">
                 App Secret (X-Hub-Signature-256)
               </label>
               <input
@@ -359,13 +359,13 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   setMetaCfg({ ...metaCfg, app_secret: e.target.value })
                 }
                 placeholder="Chave secreta do aplicativo Meta"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs"
+                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
               />
             </div>
           </div>
 
           {metaTestResult && (
-            <div className="p-3 rounded-xl border text-xs font-medium bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+            <div className="p-3 rounded-xl border text-xs font-medium bg-[#0A0D14] border-[#1E293B] text-[#F8FAFC]">
               {metaTestResult.message}
             </div>
           )}
@@ -375,21 +375,21 @@ export default function ConnectionsView({ onWebhookSimulated }) {
               <button
                 type="button"
                 onClick={handleTestGraphApi}
-                className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold"
+                className="px-3 py-2 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:border-[#0072FF]/40 text-[#F8FAFC] text-xs font-semibold transition"
               >
                 Testar Graph API
               </button>
               <button
                 type="button"
                 onClick={handleSimulateOfficialWebhook}
-                className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-xs font-bold"
+                className="px-3 py-2 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:border-[#00D2FF]/40 text-[#F8FAFC] text-xs font-semibold transition"
               >
                 Simular WhatsApp
               </button>
               <button
                 type="button"
                 onClick={handleSimulateInstagramCommentWebhook}
-                className="px-3 py-2 rounded-xl border border-pink-200 bg-pink-50 dark:bg-pink-950/50 text-pink-800 dark:text-pink-300 text-xs font-bold"
+                className="px-3 py-2 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:border-pink-500/40 text-pink-300 text-xs font-semibold transition"
               >
                 📸 Simular Comentário Insta
               </button>
@@ -397,7 +397,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
             >
               <Shield size={13} />
               <span>Salvar (AES-256)</span>
