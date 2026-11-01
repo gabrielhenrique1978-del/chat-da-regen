@@ -32,9 +32,33 @@ let myLid = null;
 let myName = null;
 let isStarting = false;
 
-// Armazena catálogo de contatos em memória e mapeamento JID/LID
+// Mapeamentos automáticos bidirecionais
+const lidToPhoneMap = new Map();
+const phoneToLidMap = new Map();
 const contactsMap = new Map();
 const jidMap = new Map();
+
+function recordMapping(jid, lid, name) {
+  if (!jid && !lid) return;
+  const cleanPhone = jid && jid.includes('@s.whatsapp.net') ? jid.split('@')[0] : null;
+  const cleanLid = lid && lid.includes('@lid') ? lid.split('@')[0] : (jid && jid.includes('@lid') ? jid.split('@')[0] : null);
+
+  if (cleanPhone && cleanLid) {
+    lidToPhoneMap.set(cleanLid, cleanPhone);
+    phoneToLidMap.set(cleanPhone, cleanLid);
+    jidMap.set(cleanPhone, `${cleanLid}@lid`);
+    jidMap.set(cleanLid, `${cleanLid}@lid`);
+  } else if (cleanLid) {
+    jidMap.set(cleanLid, `${cleanLid}@lid`);
+  } else if (cleanPhone) {
+    jidMap.set(cleanPhone, `${cleanPhone}@s.whatsapp.net`);
+  }
+
+  if (name) {
+    if (cleanPhone) contactsMap.set(cleanPhone, name);
+    if (cleanLid) contactsMap.set(cleanLid, name);
+  }
+}
 
 function getTargetJid(number) {
   if (!number) return null;
@@ -46,8 +70,8 @@ function getTargetJid(number) {
   if (jidMap.has(clean)) {
     return jidMap.get(clean);
   }
-  if (jidMap.has(str)) {
-    return jidMap.get(str);
+  if (phoneToLidMap.has(clean)) {
+    return `${phoneToLidMap.get(clean)}@lid`;
   }
   if (clean.length > 13) {
     return `${clean}@lid`;
@@ -82,13 +106,24 @@ async function processAndForwardMessage(msg) {
   const remoteJid = msg.key?.remoteJid;
   if (!remoteJid) return;
 
-  const rawPhone = remoteJid.split('@')[0];
-  jidMap.set(rawPhone, remoteJid);
-  jidMap.set(remoteJid, remoteJid);
-
   // Ignora grupos e stories
   if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
     return;
+  }
+
+  const rawId = remoteJid.split('@')[0];
+  const isLid = remoteJid.endsWith('@lid') || rawId.length > 13;
+
+  // Registra mapeamento do JID ativo
+  jidMap.set(rawId, remoteJid);
+  jidMap.set(remoteJid, remoteJid);
+
+  // Tenta resolver o telefone real a partir do mapa ou de participant
+  let realPhone = isLid ? (lidToPhoneMap.get(rawId) || rawId) : rawId;
+  const altJid = msg.key?.participant || msg.participant;
+  if (altJid && altJid.includes('@s.whatsapp.net')) {
+    realPhone = altJid.split('@')[0];
+    recordMapping(altJid, remoteJid, msg.pushName);
   }
 
   const text =
@@ -103,44 +138,38 @@ async function processAndForwardMessage(msg) {
   if (!text && !isAudio) return;
 
   const fromMe = Boolean(msg.key?.fromMe);
-
-  let contactPhone = remoteJid.split('@')[0];
-  if (remoteJid.endsWith('@lid')) {
-    const altJid = msg.key?.participant || msg.participant;
-    if (altJid && altJid.includes('@s.whatsapp.net')) {
-      contactPhone = altJid.split('@')[0];
-    }
-  }
-
   const isSelf = isSelfJid(remoteJid);
+
   let clientName;
   if (isSelf) {
-    // Quando o usuário envia mensagem para o próprio número para testar
     clientName = 'Meu WhatsApp (Conversa de Teste)';
-    contactPhone = myPhoneNumber || contactPhone;
+    realPhone = myPhoneNumber || realPhone;
   } else {
-    clientName = contactsMap.get(contactPhone) || contactsMap.get(remoteJid);
+    clientName = contactsMap.get(realPhone) || contactsMap.get(rawId) || contactsMap.get(remoteJid);
     if (!clientName) {
       if (!fromMe && msg.pushName) {
         clientName = msg.pushName;
-        contactsMap.set(contactPhone, clientName);
+        contactsMap.set(realPhone, clientName);
+        contactsMap.set(rawId, clientName);
       } else {
-        clientName = `WhatsApp (+${contactPhone})`;
+        clientName = `WhatsApp (+${realPhone})`;
       }
     }
   }
 
-  console.log(`📩 [WhatsApp ${fromMe ? 'Enviada' : 'Recebida'} (${contactPhone})]: ${text || '[Áudio]'}`);
+  console.log(`📩 [WhatsApp ${fromMe ? 'Enviada' : 'Recebida'} (${realPhone})]: ${text || '[Áudio]'}`);
 
   await notifyWebhook({
     event: 'messages.upsert',
     instance: 'regenflow',
     data: {
       key: {
-        remoteJid: `${contactPhone}@s.whatsapp.net`,
+        remoteJid: remoteJid,
         fromMe: fromMe,
         id: msg.key?.id,
       },
+      phone: realPhone,
+      whatsappJid: remoteJid,
       pushName: clientName,
       isSelf: isSelf,
       message: {
@@ -149,30 +178,6 @@ async function processAndForwardMessage(msg) {
       },
     },
   });
-}
-
-function processContactsList(contacts) {
-  if (!Array.isArray(contacts)) return [];
-  const validContacts = [];
-
-  for (const c of contacts) {
-    const jid = c.id || '';
-    if (!jid.endsWith('@s.whatsapp.net')) continue;
-    if (isSelfJid(jid)) continue;
-
-    const phone = jid.split('@')[0];
-    const name = c.name || c.notify || c.verifiedName;
-    if (name) {
-      contactsMap.set(phone, name);
-      contactsMap.set(jid, name);
-      validContacts.push({
-        id: jid,
-        phone,
-        name,
-      });
-    }
-  }
-  return validContacts;
 }
 
 async function startWhatsAppSocket() {
@@ -203,6 +208,7 @@ async function startWhatsAppSocket() {
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
       syncFullHistory: false,
+      shouldSyncHistoryMessage: (msg) => msg.syncType !== 2, // Permite RECENT e BOOTSTRAP, descarta FULL pesado
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: true,
       connectTimeoutMs: 60000,
@@ -288,46 +294,52 @@ async function startWhatsAppSocket() {
 
     // Mensagens em tempo real
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      console.log(`⚡ [messages.upsert] Recebido evento (${type || 'unknown'}): ${messages?.length || 0} mensagens.`);
+      console.log(`⚡ [messages.upsert] Evento (${type}): ${messages?.length || 0} mensagens.`);
       if (!messages || !Array.isArray(messages)) return;
       for (const msg of messages) {
-        console.log(`   -> Mensagem detalhe: fromMe=${msg.key?.fromMe}, remoteJid=${msg.key?.remoteJid}, pushName=${msg.pushName}`);
         await processAndForwardMessage(msg);
       }
     });
 
-    // Sincronização da agenda de contatos reais do celular
+    // Sincronização de contatos
     sock.ev.on('contacts.upsert', async (contacts) => {
-      const valid = processContactsList(contacts);
-      if (valid.length > 0) {
-        console.log(`📇 [Baileys] Sincronizados ${valid.length} contatos da agenda.`);
-        await notifyWebhook({
-          event: 'contacts.sync',
-          instance: 'regenflow',
-          data: { contacts: valid },
-        });
+      for (const c of contacts || []) {
+        recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
       }
     });
 
     sock.ev.on('contacts.set', async ({ contacts }) => {
-      const valid = processContactsList(contacts);
-      if (valid.length > 0) {
-        console.log(`📇 [Baileys] Agenda completa recebida: ${valid.length} contatos.`);
-        await notifyWebhook({
-          event: 'contacts.sync',
-          instance: 'regenflow',
-          data: { contacts: valid },
-        });
+      console.log(`📇 [Baileys] Agenda recebida: ${contacts?.length || 0} contatos.`);
+      for (const c of contacts || []) {
+        recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
       }
     });
 
-    // Sincronização inicial das conversas recentes
+    // Sincronização de conversas (chats)
+    sock.ev.on('chats.set', async ({ chats }) => {
+      console.log(`💬 [Baileys] Lista de conversas recebida: ${chats?.length || 0} chats.`);
+      for (const ch of chats || []) {
+        recordMapping(ch.id, ch.lidJid, ch.name);
+      }
+    });
+
+    sock.ev.on('chats.upsert', async (chats) => {
+      for (const ch of chats || []) {
+        recordMapping(ch.id, ch.lidJid, ch.name);
+      }
+    });
+
+    // Sincronização de histórico recente
     sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
-      if (contacts) processContactsList(contacts);
-      console.log(`📥 [Baileys] Histórico recebido: ${chats?.length || 0} conversas, ${messages?.length || 0} mensagens.`);
+      console.log(`📥 [Baileys] Sincronização inicial: ${chats?.length || 0} chats, ${contacts?.length || 0} contatos.`);
+      for (const ch of chats || []) {
+        recordMapping(ch.id, ch.lidJid, ch.name);
+      }
+      for (const c of contacts || []) {
+        recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
+      }
       if (messages && Array.isArray(messages)) {
-        const recents = messages.slice(-100);
-        for (const msg of recents) {
+        for (const msg of messages.slice(-50)) {
           try {
             await processAndForwardMessage(msg);
           } catch (e) {}
@@ -343,7 +355,7 @@ async function startWhatsAppSocket() {
 }
 
 // ---------------------------------------------------------------------
-// Endpoints compatíveis com Evolution API
+// Endpoints de Envio Oficial (com suporte automático e transparente a LID e JID)
 // ---------------------------------------------------------------------
 
 app.get('/instance/connectionState/:instance', (req, res) => {
@@ -397,6 +409,9 @@ app.delete('/instance/logout/:instance', async (req, res) => {
   myPhoneNumber = null;
   myLid = null;
   contactsMap.clear();
+  lidToPhoneMap.clear();
+  phoneToLidMap.clear();
+  jidMap.clear();
   if (sock) {
     try {
       sock.ev.removeAllListeners();
