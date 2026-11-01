@@ -2058,11 +2058,29 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
                 return {"status": "processed", "contact_id": contact.id}
             else:
+                # Mensagem enviada a partir de um aparelho do WhatsApp (fromMe = True)
+                # 1. Verifica se não é eco duplicado de uma mensagem recém enviada pelo próprio CRM
+                recent_msgs = db.list_messages(contact.id)
+                is_echo_duplicate = False
+                for rm in reversed(recent_msgs[-3:] if len(recent_msgs) >= 3 else recent_msgs):
+                    if (
+                        rm.sender in ("human", "agent")
+                        and rm.content.strip() == (text_content or "").strip()
+                    ):
+                        is_echo_duplicate = True
+                        break
+
+                if is_echo_duplicate:
+                    logger.info(f"Eco de confirmação do WhatsApp reconhecido: {contact.id}")
+                    return {"status": "echo_acknowledged", "contact_id": contact.id}
+
+                # 2. Se não for eco, foi enviada diretamente pelo celular físico da loja!
+                # Mantém a posse estrita do vendedor e espelha no chat em tempo real
                 sent_msg = db.create_message(
                     Message(
                         contact_id=contact.id,
-                        sender="agent",
-                        content=text_content or "Áudio enviado via WhatsApp",
+                        sender="human",
+                        content=text_content or "Áudio enviado via WhatsApp pelo celular",
                         channel="whatsapp",
                         media_type=media_type,
                     )
@@ -2070,7 +2088,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 payload = {"message": sent_msg.model_dump()}
                 await ws_manager.broadcast_event("message_sent", payload)
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
-                return {"status": "mirrored", "contact_id": contact.id}
+                logger.info(f"Mensagem enviada pelo celular da loja espelhada no CRM: {contact.id}")
+                return {"status": "mirrored_from_phone", "contact_id": contact.id}
 
         elif "PHONE_IDENTIFIED" in event or "PHONE" in event and "IDENTIFIED" in event:
             lid_val = str(data.get("lid", "")).strip()
