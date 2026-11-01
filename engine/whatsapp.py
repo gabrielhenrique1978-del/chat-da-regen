@@ -154,7 +154,7 @@ class WhatsAppService:
         connect_url = f"{self.base_url}/instance/connect/{self.instance_name}"
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 # Cria instância caso não exista
                 create_payload = {
                     "instanceName": self.instance_name,
@@ -174,24 +174,19 @@ class WhatsAppService:
                     return {
                         "success": True,
                         "instance": self.instance_name,
-                        "state": "connecting",
+                        "state": data.get("state", "connecting"),
                         "qrcode": qr_base64,
                         "pairingCode": data.get("pairingCode"),
                         "message": "Escaneie o QR Code no seu WhatsApp (Aparelhos Conectados).",
                     }
         except Exception as exc:
-            logger.warning(f"Evolution API offline: {exc}")
+            logger.warning(f"WhatsApp Bridge offline: {exc}")
 
-        # Fallback de demonstração quando Docker não estiver rodando no momento
-        mock_qr = generate_whatsapp_pairing_qr_svg(f"{self.instance_name}-session")
-        self._last_qrcode = mock_qr
         return {
-            "success": True,
+            "success": False,
             "instance": self.instance_name,
-            "state": "connecting",
-            "qrcode": mock_qr,
-            "is_simulated": True,
-            "message": "QR Code gerado para pareamento. Escaneie ou clique em 'Simular Leitura no Celular' para conectar.",
+            "state": "disconnected",
+            "message": "WhatsApp Bridge offline. O serviço de pareamento está sendo iniciado...",
         }
 
     async def disconnect(self) -> Dict[str, Any]:

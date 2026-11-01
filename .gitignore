@@ -10,6 +10,7 @@ scratch/
 node_modules/
 frontend/node_modules/
 whatsapp_bridge/node_modules/
+whatsapp_bridge/auth_info_baileys/
 whatsapp_bridge/.wwebjs_auth/
 whatsapp_bridge/.wwebjs_cache/
 

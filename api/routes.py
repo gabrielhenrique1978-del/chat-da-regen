@@ -1975,8 +1975,9 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
         elif "CONNECTION" in event and "UPDATE" in event:
             state = data.get("state", "disconnected")
-            whatsapp_service.set_connection_state_from_webhook(state)
-            await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state})
+            phone = data.get("phone")
+            whatsapp_service.set_connection_state_from_webhook(state, phone)
+            await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state, "phone": phone})
 
         elif "QRCODE" in event:
             qrcode = data.get("qrcode", {}).get("base64") or data.get("base64")

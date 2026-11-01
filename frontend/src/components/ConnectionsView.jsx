@@ -29,6 +29,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
   const [metaTestResult, setMetaTestResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [loadingWa, setLoadingWa] = useState(false);
 
   const loadAll = async () => {
     try {
@@ -52,6 +53,41 @@ export default function ConnectionsView({ onWebhookSimulated }) {
   useEffect(() => {
     loadAll();
   }, []);
+
+  // Polling automático para atualizar o QR Code e detectar pareamento do WhatsApp
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const wa = await api.getWhatsAppStatus();
+        setWaStatus((prev) => {
+          if (!prev) return wa;
+          if (
+            prev.state !== wa.state ||
+            prev.qrcode !== wa.qrcode ||
+            prev.phone_number !== wa.phone_number
+          ) {
+            return wa;
+          }
+          return prev;
+        });
+      } catch (err) {
+        // silencioso durante inicialização
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleConnectWa = async () => {
+    setLoadingWa(true);
+    try {
+      const res = await api.connectWhatsApp();
+      setWaStatus(res);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingWa(false);
+    }
+  };
 
   const handleSaveMeta = async (e) => {
     e?.preventDefault();
@@ -189,7 +225,14 @@ export default function ConnectionsView({ onWebhookSimulated }) {
             </div>
 
             <div className="flex min-h-[220px] flex-col items-center justify-center rounded-md border border-line bg-canvas p-6 text-center">
-              {waStatus?.state === 'connected' ? (
+              {loadingWa ? (
+                <div className="space-y-3">
+                  <RefreshCw size={24} className="mx-auto text-primary animate-spin" />
+                  <p className="text-2xs text-muted">
+                    Conectando aos servidores do WhatsApp...
+                  </p>
+                </div>
+              ) : waStatus?.state === 'connected' ? (
                 <div className="space-y-2">
                   <CheckCircle2 size={36} className="mx-auto text-primary" />
                   <p className="text-xs font-medium text-fg">
@@ -204,16 +247,24 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   <img
                     src={waStatus.qrcode}
                     alt="QR Code WhatsApp"
-                    className="mx-auto h-44 w-44 rounded border border-line bg-white p-2"
+                    className="mx-auto h-48 w-48 rounded border border-line bg-white p-2"
                   />
-                  <p className="text-2xs text-muted">
-                    Abra o WhatsApp no celular → Aparelhos conectados → Conectar aparelho
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-2xs font-medium text-fg">
+                      Aponte a câmera do WhatsApp:
+                    </p>
+                    <p className="text-2xs text-muted">
+                      WhatsApp no celular &rarr; Aparelhos conectados &rarr; Conectar um aparelho
+                    </p>
+                  </div>
                 </div>
               ) : (
-                <p className="text-2xs text-muted">
-                  Clique em &ldquo;Gerar QR Code&rdquo; para iniciar o pareamento.
-                </p>
+                <div className="space-y-2">
+                  <QrCode size={36} className="mx-auto text-muted/40" />
+                  <p className="text-2xs text-muted">
+                    Clique em &ldquo;Gerar QR Code&rdquo; para iniciar o pareamento.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -221,13 +272,11 @@ export default function ConnectionsView({ onWebhookSimulated }) {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={async () => {
-                  const res = await api.connectWhatsApp();
-                  setWaStatus(res);
-                }}
+                disabled={loadingWa}
+                onClick={handleConnectWa}
               >
-                <RefreshCw size={13} />
-                <span>Gerar QR Code</span>
+                <RefreshCw size={13} className={loadingWa ? 'animate-spin' : ''} />
+                <span>{loadingWa ? 'Gerando...' : 'Gerar QR Code'}</span>
               </Button>
 
               <Button
