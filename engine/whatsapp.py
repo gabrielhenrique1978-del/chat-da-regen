@@ -225,7 +225,7 @@ class WhatsAppService:
 
     async def send_text_message(self, phone: str, text: str) -> Dict[str, Any]:
         """Envia mensagem de texto real para o número de WhatsApp via Evolution API."""
-        clean_phone = "".join(ch for ch in phone if ch.isdigit())
+        clean_phone = phone if "@" in phone else "".join(ch for ch in phone if ch.isdigit())
         if not clean_phone:
             return {"success": False, "error": "Número de telefone inválido."}
 
@@ -252,7 +252,7 @@ class WhatsAppService:
 
     async def send_audio_message(self, phone: str, audio_base64: str) -> Dict[str, Any]:
         """Envia áudio como nota de voz humana oficial (PTT - Push to Talk)."""
-        clean_phone = "".join(ch for ch in phone if ch.isdigit())
+        clean_phone = phone if "@" in phone else "".join(ch for ch in phone if ch.isdigit())
         if not clean_phone:
             return {"success": False, "error": "Número de telefone inválido."}
 

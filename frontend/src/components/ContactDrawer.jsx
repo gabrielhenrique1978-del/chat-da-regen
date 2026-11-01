@@ -15,7 +15,10 @@ import {
   Instagram,
   MessageCircle,
   X,
+  Pencil,
+  Check,
 } from 'lucide-react';
+import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Avatar, Badge, Button, IconButton, SectionLabel, Segmented, StatusDot, fieldClass } from './ui';
 
@@ -59,6 +62,23 @@ export default function ContactDrawer({
 }) {
   const [newTag, setNewTag] = useState('');
   const [confirmErase, setConfirmErase] = useState(false);
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState(contact?.phone || '');
+  const [phoneSaving, setPhoneSaving] = useState(false);
+
+  const handleSavePhone = async () => {
+    if (!phoneInput.trim()) return;
+    setPhoneSaving(true);
+    try {
+      await api.updateContactDetails(contact.id, { phone: phoneInput.trim() });
+      contact.phone = phoneInput.trim();
+      setIsEditingPhone(false);
+    } catch (err) {
+      console.error('Erro ao atualizar telefone:', err);
+    } finally {
+      setPhoneSaving(false);
+    }
+  };
 
   if (!contact) return null;
 
@@ -101,9 +121,63 @@ export default function ContactDrawer({
           </div>
         </div>
         <div className="mt-3">
-          <Row icon={Phone} label="Telefone" mono>
-            {contact.phone || <span className="text-muted">—</span>}
-          </Row>
+          <div className="flex items-center justify-between py-1.5">
+            <div className="flex items-center gap-3">
+              <Phone size={14} className="shrink-0 text-muted" />
+              <span className="w-14 shrink-0 text-xs text-muted">Telefone</span>
+            </div>
+            {isEditingPhone ? (
+              <div className="flex items-center gap-1.5 flex-1 max-w-[200px]">
+                <input
+                  type="text"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  className="w-full rounded border border-line bg-canvas px-2 py-0.5 text-xs text-fg focus:outline-none focus:border-primary"
+                  placeholder="+55 19 99999-9999"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleSavePhone}
+                  disabled={phoneSaving}
+                  className="rounded p-1 text-primary hover:bg-surface-hover"
+                  title="Salvar"
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPhone(false)}
+                  className="rounded p-1 text-muted hover:bg-surface-hover"
+                  title="Cancelar"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-fg font-mono">
+                  {contact.phone || <span className="text-muted">—</span>}
+                </span>
+                {contact.phone && contact.phone.replace(/\D/g, '').length > 13 && (
+                  <span className="rounded bg-primary/10 px-1 py-0.5 text-3xs text-primary font-medium" title="Identificador Meta LID">
+                    Meta LID
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneInput(contact.phone || '');
+                    setIsEditingPhone(true);
+                  }}
+                  className="text-muted hover:text-fg p-0.5 rounded transition-colors"
+                  title="Editar telefone real"
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+            )}
+          </div>
           <Row icon={Mail} label="E-mail">
             {contact.email || <span className="text-muted">—</span>}
           </Row>

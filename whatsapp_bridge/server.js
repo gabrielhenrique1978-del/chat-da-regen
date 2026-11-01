@@ -32,8 +32,28 @@ let myLid = null;
 let myName = null;
 let isStarting = false;
 
-// Armazena catálogo de contatos e conversas da agenda em memória
+// Armazena catálogo de contatos em memória e mapeamento JID/LID
 const contactsMap = new Map();
+const jidMap = new Map();
+
+function getTargetJid(number) {
+  if (!number) return null;
+  const str = String(number).trim();
+  if (str.includes('@')) {
+    return str;
+  }
+  const clean = str.replace(/\D/g, '');
+  if (jidMap.has(clean)) {
+    return jidMap.get(clean);
+  }
+  if (jidMap.has(str)) {
+    return jidMap.get(str);
+  }
+  if (clean.length > 13) {
+    return `${clean}@lid`;
+  }
+  return `${clean}@s.whatsapp.net`;
+}
 
 async function notifyWebhook(payload) {
   try {
@@ -48,11 +68,11 @@ async function notifyWebhook(payload) {
 }
 
 function isSelfJid(jid) {
-  if (!jid) return true;
+  if (!jid) return false;
   const clean = jid.split('@')[0].split(':')[0];
   if (myPhoneNumber && clean === myPhoneNumber) return true;
   if (myLid && clean === myLid) return true;
-  if (clean.startsWith('7010')) return true; // LID do WhatsApp Web
+  if (clean.startsWith('7010')) return true;
   return false;
 }
 
@@ -62,13 +82,12 @@ async function processAndForwardMessage(msg) {
   const remoteJid = msg.key?.remoteJid;
   if (!remoteJid) return;
 
-  // Ignora grupos, status e mensagens enviadas para você mesmo (auto-chat)
-  if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast') || isSelfJid(remoteJid)) {
-    return;
-  }
+  const rawPhone = remoteJid.split('@')[0];
+  jidMap.set(rawPhone, remoteJid);
+  jidMap.set(remoteJid, remoteJid);
 
-  // Não aceita LIDs diretamente como telefone para não criar cliente fantasma
-  if (remoteJid.endsWith('@lid')) {
+  // Ignora grupos e stories
+  if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
     return;
   }
 
@@ -85,16 +104,29 @@ async function processAndForwardMessage(msg) {
 
   const fromMe = Boolean(msg.key?.fromMe);
 
-  // Se a mensagem foi enviada por mim, o pushName é o meu próprio nome, não o do cliente!
-  // Logo, recuperamos o nome real do cliente a partir da agenda (contactsMap)
-  const contactPhone = remoteJid.split('@')[0];
-  let clientName = contactsMap.get(contactPhone) || contactsMap.get(remoteJid);
-  if (!clientName) {
-    if (!fromMe && msg.pushName) {
-      clientName = msg.pushName;
-      contactsMap.set(contactPhone, clientName);
-    } else {
-      clientName = `WhatsApp (+${contactPhone})`;
+  let contactPhone = remoteJid.split('@')[0];
+  if (remoteJid.endsWith('@lid')) {
+    const altJid = msg.key?.participant || msg.participant;
+    if (altJid && altJid.includes('@s.whatsapp.net')) {
+      contactPhone = altJid.split('@')[0];
+    }
+  }
+
+  const isSelf = isSelfJid(remoteJid);
+  let clientName;
+  if (isSelf) {
+    // Quando o usuário envia mensagem para o próprio número para testar
+    clientName = 'Meu WhatsApp (Conversa de Teste)';
+    contactPhone = myPhoneNumber || contactPhone;
+  } else {
+    clientName = contactsMap.get(contactPhone) || contactsMap.get(remoteJid);
+    if (!clientName) {
+      if (!fromMe && msg.pushName) {
+        clientName = msg.pushName;
+        contactsMap.set(contactPhone, clientName);
+      } else {
+        clientName = `WhatsApp (+${contactPhone})`;
+      }
     }
   }
 
@@ -105,11 +137,12 @@ async function processAndForwardMessage(msg) {
     instance: 'regenflow',
     data: {
       key: {
-        remoteJid: remoteJid,
+        remoteJid: `${contactPhone}@s.whatsapp.net`,
         fromMe: fromMe,
         id: msg.key?.id,
       },
       pushName: clientName,
+      isSelf: isSelf,
       message: {
         conversation: text,
         ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
@@ -169,7 +202,7 @@ async function startWhatsAppSocket() {
       auth: state,
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
-      syncFullHistory: false, // Evita que o app móvel pause a sincronização
+      syncFullHistory: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: true,
       connectTimeoutMs: 60000,
@@ -254,9 +287,11 @@ async function startWhatsAppSocket() {
     });
 
     // Mensagens em tempo real
-    sock.ev.on('messages.upsert', async ({ messages }) => {
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      console.log(`⚡ [messages.upsert] Recebido evento (${type || 'unknown'}): ${messages?.length || 0} mensagens.`);
       if (!messages || !Array.isArray(messages)) return;
       for (const msg of messages) {
+        console.log(`   -> Mensagem detalhe: fromMe=${msg.key?.fromMe}, remoteJid=${msg.key?.remoteJid}, pushName=${msg.pushName}`);
         await processAndForwardMessage(msg);
       }
     });
@@ -381,11 +416,10 @@ app.post('/message/sendText/:instance', async (req, res) => {
       return res.status(400).json({ error: 'WhatsApp não está conectado.' });
     }
 
-    const cleanNumber = number.replace(/\D/g, '');
-    const jid = `${cleanNumber}@s.whatsapp.net`;
-
-    const sent = await sock.sendMessage(jid, { text });
-    res.json({ success: true, messageId: sent.key.id });
+    const targetJid = getTargetJid(number);
+    console.log(`🚀 [Baileys] Enviando mensagem de texto para ${targetJid}: "${text}"`);
+    const sent = await sock.sendMessage(targetJid, { text });
+    res.json({ success: true, messageId: sent.key.id, jid: targetJid });
   } catch (err) {
     console.error('Erro ao enviar mensagem:', err);
     res.status(500).json({ error: err.message });
@@ -399,17 +433,16 @@ app.post('/message/sendWhatsAppAudio/:instance', async (req, res) => {
       return res.status(400).json({ error: 'WhatsApp não está conectado.' });
     }
 
-    const cleanNumber = number.replace(/\D/g, '');
-    const jid = `${cleanNumber}@s.whatsapp.net`;
-
+    const targetJid = getTargetJid(number);
+    console.log(`🚀 [Baileys] Enviando áudio PTT para ${targetJid}`);
     const audioBuffer = Buffer.from(audio.replace(/^data:audio\/\w+;base64,/, ''), 'base64');
-    const sent = await sock.sendMessage(jid, {
+    const sent = await sock.sendMessage(targetJid, {
       audio: audioBuffer,
       mimetype: 'audio/mp4',
       ptt: true,
     });
 
-    res.json({ success: true, messageId: sent.key.id });
+    res.json({ success: true, messageId: sent.key.id, jid: targetJid });
   } catch (err) {
     console.error('Erro ao enviar áudio:', err);
     res.status(500).json({ error: err.message });

@@ -1468,6 +1468,31 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         await ws_manager.broadcast_event("tag_added", res["result"])
         return res["result"]
 
+    class UpdateContactDetailsRequest(BaseModel):
+        name: Optional[str] = None
+        phone: Optional[str] = None
+        email: Optional[str] = None
+        custom_fields: Optional[Dict[str, Any]] = None
+
+    @router.patch("/contacts/{contact_id}/details")
+    async def update_contact_details(contact_id: str, req: UpdateContactDetailsRequest):
+        contact = db.get_contact(contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+        if req.name is not None:
+            contact.name = req.name.strip()
+        if req.phone is not None:
+            contact.phone = req.phone.strip()
+        if req.email is not None:
+            contact.email = req.email.strip()
+        if req.custom_fields is not None:
+            fields = contact.custom_fields or {}
+            fields.update(req.custom_fields)
+            contact.custom_fields = fields
+        updated = db.update_contact(contact)
+        await ws_manager.broadcast_event("new_message", {"type": "contact_details_updated"})
+        return updated.model_dump()
+
     # -----------------------------------------------------------------
     # Mensagens, Notas Internas, Áudio/Mídia & Anti-Fragmentação
     # -----------------------------------------------------------------
@@ -1597,12 +1622,14 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         )
 
         # Envio em segundo plano para o WhatsApp real se o canal for WhatsApp
-        if contact.channel == "whatsapp" and not req.is_internal and contact.phone:
-            import asyncio
-            if req.media_type == "audio" and req.media_url:
-                asyncio.create_task(whatsapp_service.send_audio_message(contact.phone, req.media_url))
-            else:
-                asyncio.create_task(whatsapp_service.send_text_message(contact.phone, rendered_content))
+        if contact.channel == "whatsapp" and not req.is_internal:
+            target_number = (contact.custom_fields or {}).get("whatsapp_jid") or contact.phone
+            if target_number:
+                import asyncio
+                if req.media_type == "audio" and req.media_url:
+                    asyncio.create_task(whatsapp_service.send_audio_message(target_number, req.media_url))
+                else:
+                    asyncio.create_task(whatsapp_service.send_text_message(target_number, rendered_content))
 
         payload = {"message": msg.model_dump()}
         await ws_manager.broadcast_event("message_sent", payload)
@@ -1978,9 +2005,16 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         phone=f"+{clean_phone}",
                         channel="whatsapp",
                         tags=["whatsapp-teste"] if is_self else ["whatsapp-real"],
+                        custom_fields={"whatsapp_jid": remote_jid},
                     ),
                     create_default_deal=True,
                 )
+            else:
+                fields = contact.custom_fields or {}
+                if fields.get("whatsapp_jid") != remote_jid:
+                    fields["whatsapp_jid"] = remote_jid
+                    contact.custom_fields = fields
+                    db.update_contact(contact)
 
             if not from_me or is_self:
                 result = agent.process_incoming_message(
@@ -1993,7 +2027,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
                 return {"status": "processed", "contact_id": contact.id}
             else:
-                sent_msg = db.add_message(
+                sent_msg = db.create_message(
                     Message(
                         contact_id=contact.id,
                         sender="agent",

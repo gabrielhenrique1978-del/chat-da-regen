@@ -1094,15 +1094,15 @@ class Database:
             return cur.rowcount > 0
 
     def clear_demo_contacts(self) -> int:
-        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos) e contatos inválidos/self-LID."""
+        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos)."""
         demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
         deleted_count = 0
         contacts = self.list_contacts()
         for c in contacts:
             is_demo = (
                 (c.email and c.email.lower() in demo_emails)
-                or (c.phone and ("70102875644093" in c.phone or c.phone.startswith("+7010")))
-                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name or "Registro de Marcas" in c.name))
+                or (c.phone and "70102875644093" in c.phone)
+                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name))
             )
             if is_demo:
                 if self.delete_contact(c.id):
@@ -1188,15 +1188,15 @@ class Database:
             return cur.rowcount > 0
 
     def clear_demo_contacts(self) -> int:
-        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos) e contatos inválidos/self-LID."""
+        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos)."""
         demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
         deleted_count = 0
         contacts = self.list_contacts()
         for c in contacts:
             is_demo = (
                 (c.email and c.email.lower() in demo_emails)
-                or (c.phone and ("70102875644093" in c.phone or c.phone.startswith("+7010")))
-                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name or "Registro de Marcas" in c.name))
+                or (c.phone and "70102875644093" in c.phone)
+                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name))
             )
             if is_demo:
                 if self.delete_contact(c.id):
@@ -1258,15 +1258,15 @@ class Database:
             return cur.rowcount > 0
 
     def clear_demo_contacts(self) -> int:
-        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos) e contatos inválidos/self-LID."""
+        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos)."""
         demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
         deleted_count = 0
         contacts = self.list_contacts()
         for c in contacts:
             is_demo = (
                 (c.email and c.email.lower() in demo_emails)
-                or (c.phone and ("70102875644093" in c.phone or c.phone.startswith("+7010")))
-                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name or "Registro de Marcas" in c.name))
+                or (c.phone and "70102875644093" in c.phone)
+                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name))
             )
             if is_demo:
                 if self.delete_contact(c.id):
@@ -1582,6 +1582,8 @@ class Database:
                     (message.timestamp, message.contact_id),
                 )
         return message
+
+    add_message = create_message
 
     def list_messages(self, contact_id: Optional[str] = None, include_internal: bool = True) -> List[Message]:
         with self.connection() as conn:
