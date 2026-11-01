@@ -82,7 +82,22 @@ class WhatsAppService:
         self.instance_name = instance_name or os.getenv("EVOLUTION_INSTANCE_NAME", "regenflow")
         self._connected = False
         self._phone_number: Optional[str] = None
+        self._lid: Optional[str] = None
+        self._name: Optional[str] = None
         self._last_qrcode: Optional[str] = None
+
+    def is_self(self, identifier: Optional[str]) -> bool:
+        """Verifica se o identificador pertence ao próprio número/LID do WhatsApp conectado."""
+        if not identifier:
+            return False
+        clean = "".join(ch for ch in str(identifier) if ch.isdigit())
+        if self._phone_number and clean in self._phone_number:
+            return True
+        if self._lid and clean in self._lid:
+            return True
+        if clean.startswith("7010"):
+            return True
+        return False
 
     def simulate_scan(self, phone: str = "+55 (11) 98765-4321") -> Dict[str, Any]:
         """Simula a leitura bem-sucedida do QR Code pelo celular."""
@@ -266,8 +281,18 @@ class WhatsAppService:
             "message": "Áudio salvo no CRM como nota de voz.",
         }
 
-    def set_connection_state_from_webhook(self, state: str, phone: Optional[str] = None):
+    def set_connection_state_from_webhook(
+        self,
+        state: str,
+        phone: Optional[str] = None,
+        lid: Optional[str] = None,
+        name: Optional[str] = None,
+    ):
         """Atualiza estado interno com base nos eventos de webhook."""
         self._connected = state.lower() == "open"
         if phone:
             self._phone_number = phone
+        if lid:
+            self._lid = lid
+        if name:
+            self._name = name

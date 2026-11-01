@@ -28,7 +28,12 @@ let sock = null;
 let currentQR = null;
 let connectionState = 'close'; // 'open' | 'connecting' | 'close'
 let myPhoneNumber = null;
+let myLid = null;
+let myName = null;
 let isStarting = false;
+
+// Armazena catálogo de contatos e conversas da agenda em memória
+const contactsMap = new Map();
 
 async function notifyWebhook(payload) {
   try {
@@ -38,16 +43,33 @@ async function notifyWebhook(payload) {
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    // FastAPI pode estar ocupado ou inicializando
+    // Silencioso se FastAPI estiver ocupado
   }
+}
+
+function isSelfJid(jid) {
+  if (!jid) return true;
+  const clean = jid.split('@')[0].split(':')[0];
+  if (myPhoneNumber && clean === myPhoneNumber) return true;
+  if (myLid && clean === myLid) return true;
+  if (clean.startsWith('7010')) return true; // LID do WhatsApp Web
+  return false;
 }
 
 async function processAndForwardMessage(msg) {
   if (!msg || !msg.message) return;
 
   const remoteJid = msg.key?.remoteJid;
-  if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
-    return; // Ignora grupos e status stories
+  if (!remoteJid) return;
+
+  // Ignora grupos, status e mensagens enviadas para você mesmo (auto-chat)
+  if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast') || isSelfJid(remoteJid)) {
+    return;
+  }
+
+  // Não aceita LIDs diretamente como telefone para não criar cliente fantasma
+  if (remoteJid.endsWith('@lid')) {
+    return;
   }
 
   const text =
@@ -61,10 +83,22 @@ async function processAndForwardMessage(msg) {
   const isAudio = Boolean(msg.message.audioMessage);
   if (!text && !isAudio) return;
 
-  const pushName = msg.pushName || 'Contato WhatsApp';
   const fromMe = Boolean(msg.key?.fromMe);
 
-  console.log(`📩 [WhatsApp ${fromMe ? 'Enviada (App)' : 'Recebida'} (${remoteJid})]: ${text || '[Áudio]'}`);
+  // Se a mensagem foi enviada por mim, o pushName é o meu próprio nome, não o do cliente!
+  // Logo, recuperamos o nome real do cliente a partir da agenda (contactsMap)
+  const contactPhone = remoteJid.split('@')[0];
+  let clientName = contactsMap.get(contactPhone) || contactsMap.get(remoteJid);
+  if (!clientName) {
+    if (!fromMe && msg.pushName) {
+      clientName = msg.pushName;
+      contactsMap.set(contactPhone, clientName);
+    } else {
+      clientName = `WhatsApp (+${contactPhone})`;
+    }
+  }
+
+  console.log(`📩 [WhatsApp ${fromMe ? 'Enviada' : 'Recebida'} (${contactPhone})]: ${text || '[Áudio]'}`);
 
   await notifyWebhook({
     event: 'messages.upsert',
@@ -75,13 +109,37 @@ async function processAndForwardMessage(msg) {
         fromMe: fromMe,
         id: msg.key?.id,
       },
-      pushName: pushName,
+      pushName: clientName,
       message: {
         conversation: text,
         ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
       },
     },
   });
+}
+
+function processContactsList(contacts) {
+  if (!Array.isArray(contacts)) return [];
+  const validContacts = [];
+
+  for (const c of contacts) {
+    const jid = c.id || '';
+    if (!jid.endsWith('@s.whatsapp.net')) continue;
+    if (isSelfJid(jid)) continue;
+
+    const phone = jid.split('@')[0];
+    const name = c.name || c.notify || c.verifiedName;
+    if (name) {
+      contactsMap.set(phone, name);
+      contactsMap.set(jid, name);
+      validContacts.push({
+        id: jid,
+        phone,
+        name,
+      });
+    }
+  }
+  return validContacts;
 }
 
 async function startWhatsAppSocket() {
@@ -94,7 +152,6 @@ async function startWhatsAppSocket() {
   isStarting = true;
 
   try {
-    // Limpeza defensiva de conexões anteriores
     if (sock) {
       try {
         sock.ev.removeAllListeners();
@@ -112,7 +169,7 @@ async function startWhatsAppSocket() {
       auth: state,
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
-      syncFullHistory: false, // CRUCIAL: impede que o WhatsApp no celular fique pausado tentando sincronizar gigabytes
+      syncFullHistory: false, // Evita que o app móvel pause a sincronização
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: true,
       connectTimeoutMs: 60000,
@@ -147,11 +204,21 @@ async function startWhatsAppSocket() {
         connectionState = 'open';
         currentQR = null;
         myPhoneNumber = sock.user?.id ? sock.user.id.split(':')[0] : null;
-        console.log(`✅ [Baileys] WhatsApp Conectado com sucesso! Número: ${myPhoneNumber}`);
+        myLid = sock.user?.lid ? sock.user.lid.split(':')[0] : null;
+        myName = sock.user?.name || 'Regen Flow';
+
+        console.log(`✅ [Baileys] WhatsApp Conectado com sucesso!`);
+        console.log(`   Número: ${myPhoneNumber} | LID: ${myLid} | Nome: ${myName}`);
+
         await notifyWebhook({
           event: 'connection.update',
           instance: 'regenflow',
-          data: { state: 'open', phone: myPhoneNumber },
+          data: {
+            state: 'open',
+            phone: myPhoneNumber,
+            lid: myLid,
+            name: myName,
+          },
         });
       } else if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -167,6 +234,7 @@ async function startWhatsAppSocket() {
         if (statusCode === DisconnectReason.loggedOut) {
           currentQR = null;
           myPhoneNumber = null;
+          myLid = null;
           if (fs.existsSync(AUTH_DIR)) {
             fs.rmSync(AUTH_DIR, { recursive: true, force: true });
           }
@@ -176,7 +244,6 @@ async function startWhatsAppSocket() {
             data: { state: 'close' },
           });
         } else {
-          // Código 515 (restartRequired) ocorre logo após a leitura do QR Code
           const delay = statusCode === DisconnectReason.restartRequired ? 500 : 2500;
           console.log(`🔄 [Baileys] Restabelecendo socket em ${delay}ms...`);
           setTimeout(() => {
@@ -186,7 +253,7 @@ async function startWhatsAppSocket() {
       }
     });
 
-    // Recebimento de mensagens em tempo real
+    // Mensagens em tempo real
     sock.ev.on('messages.upsert', async ({ messages }) => {
       if (!messages || !Array.isArray(messages)) return;
       for (const msg of messages) {
@@ -194,11 +261,36 @@ async function startWhatsAppSocket() {
       }
     });
 
-    // Sincronização inicial de histórico das conversas recentes
+    // Sincronização da agenda de contatos reais do celular
+    sock.ev.on('contacts.upsert', async (contacts) => {
+      const valid = processContactsList(contacts);
+      if (valid.length > 0) {
+        console.log(`📇 [Baileys] Sincronizados ${valid.length} contatos da agenda.`);
+        await notifyWebhook({
+          event: 'contacts.sync',
+          instance: 'regenflow',
+          data: { contacts: valid },
+        });
+      }
+    });
+
+    sock.ev.on('contacts.set', async ({ contacts }) => {
+      const valid = processContactsList(contacts);
+      if (valid.length > 0) {
+        console.log(`📇 [Baileys] Agenda completa recebida: ${valid.length} contatos.`);
+        await notifyWebhook({
+          event: 'contacts.sync',
+          instance: 'regenflow',
+          data: { contacts: valid },
+        });
+      }
+    });
+
+    // Sincronização inicial das conversas recentes
     sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
-      console.log(`📥 [Baileys] Histórico sincronizado: ${chats?.length || 0} conversas, ${messages?.length || 0} mensagens.`);
+      if (contacts) processContactsList(contacts);
+      console.log(`📥 [Baileys] Histórico recebido: ${chats?.length || 0} conversas, ${messages?.length || 0} mensagens.`);
       if (messages && Array.isArray(messages)) {
-        // Envia as mensagens mais recentes para o CRM
         const recents = messages.slice(-100);
         for (const msg of recents) {
           try {
@@ -216,7 +308,7 @@ async function startWhatsAppSocket() {
 }
 
 // ---------------------------------------------------------------------
-// Endpoints compatíveis com Evolution API (consumidos pelo FastAPI backend)
+// Endpoints compatíveis com Evolution API
 // ---------------------------------------------------------------------
 
 app.get('/instance/connectionState/:instance', (req, res) => {
@@ -225,6 +317,7 @@ app.get('/instance/connectionState/:instance', (req, res) => {
       instanceName: req.params.instance,
       state: connectionState,
       phone: myPhoneNumber,
+      lid: myLid,
     },
   });
 });
@@ -267,6 +360,8 @@ app.delete('/instance/logout/:instance', async (req, res) => {
   connectionState = 'close';
   currentQR = null;
   myPhoneNumber = null;
+  myLid = null;
+  contactsMap.clear();
   if (sock) {
     try {
       sock.ev.removeAllListeners();

@@ -81,6 +81,7 @@ export const api = {
       body: JSON.stringify({ tag }),
     }),
   getContact24hWindow: (contactId) => apiRequest(`/contacts/${contactId}/window`),
+  clearDemoContacts: () => apiRequest('/contacts/clear-demo', { method: 'POST' }),
 
   // Mensagens, Áudio PTT, Templates HSM e Simulador
   sendMessage: (payload) =>

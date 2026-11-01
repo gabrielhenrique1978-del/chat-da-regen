@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Instagram,
   Copy,
+  Trash2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
@@ -289,6 +290,22 @@ export default function ConnectionsView({ onWebhookSimulated }) {
               >
                 <Zap size={13} />
                 <span>Simular leitura</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const res = await api.clearDemoContacts();
+                    alert(res.message || 'Contatos fictícios removidos com sucesso!');
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+              >
+                <Trash2 size={13} />
+                <span>Limpar contatos demo</span>
               </Button>
 
               {waStatus?.state === 'connected' && (

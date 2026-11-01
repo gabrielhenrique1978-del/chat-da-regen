@@ -1084,6 +1084,31 @@ class Database:
                     )
         return contact
 
+    def delete_contact(self, contact_id: str) -> bool:
+        """Exclui um contato e todos os seus relacionamentos associados."""
+        with self.connection() as conn:
+            conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM deals WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
+            cur = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+            return cur.rowcount > 0
+
+    def clear_demo_contacts(self) -> int:
+        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos) e contatos inválidos/self-LID."""
+        demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
+        deleted_count = 0
+        contacts = self.list_contacts()
+        for c in contacts:
+            is_demo = (
+                (c.email and c.email.lower() in demo_emails)
+                or (c.phone and ("70102875644093" in c.phone or c.phone.startswith("+7010")))
+                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name or "Registro de Marcas" in c.name))
+            )
+            if is_demo:
+                if self.delete_contact(c.id):
+                    deleted_count += 1
+        return deleted_count
+
     def get_contact(self, contact_id: str) -> Optional[Contact]:
         with self.connection() as conn:
             row = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
@@ -1153,6 +1178,31 @@ class Database:
             )
         return contact
 
+    def delete_contact(self, contact_id: str) -> bool:
+        """Exclui um contato e todos os seus relacionamentos associados."""
+        with self.connection() as conn:
+            conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM deals WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
+            cur = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+            return cur.rowcount > 0
+
+    def clear_demo_contacts(self) -> int:
+        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos) e contatos inválidos/self-LID."""
+        demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
+        deleted_count = 0
+        contacts = self.list_contacts()
+        for c in contacts:
+            is_demo = (
+                (c.email and c.email.lower() in demo_emails)
+                or (c.phone and ("70102875644093" in c.phone or c.phone.startswith("+7010")))
+                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name or "Registro de Marcas" in c.name))
+            )
+            if is_demo:
+                if self.delete_contact(c.id):
+                    deleted_count += 1
+        return deleted_count
+
     def set_contact_handoff(
         self,
         contact_id: str,
@@ -1197,6 +1247,31 @@ class Database:
                 contact.lead_score = min(100, contact.lead_score + 20)
             self.update_contact(contact)
         return contact
+
+    def delete_contact(self, contact_id: str) -> bool:
+        """Exclui um contato e todos os seus relacionamentos associados."""
+        with self.connection() as conn:
+            conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM deals WHERE contact_id = ?", (contact_id,))
+            conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
+            cur = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+            return cur.rowcount > 0
+
+    def clear_demo_contacts(self) -> int:
+        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos) e contatos inválidos/self-LID."""
+        demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
+        deleted_count = 0
+        contacts = self.list_contacts()
+        for c in contacts:
+            is_demo = (
+                (c.email and c.email.lower() in demo_emails)
+                or (c.phone and ("70102875644093" in c.phone or c.phone.startswith("+7010")))
+                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name or "Registro de Marcas" in c.name))
+            )
+            if is_demo:
+                if self.delete_contact(c.id):
+                    deleted_count += 1
+        return deleted_count
 
     def update_contact_custom_fields(self, contact_id: str, fields: Dict[str, Any]) -> Optional[Contact]:
         contact = self.get_contact(contact_id)

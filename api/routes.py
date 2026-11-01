@@ -1941,61 +1941,111 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             remote_jid = str(key.get("remoteJid", ""))
             clean_phone = remote_jid.split("@")[0].replace("+", "").strip()
 
-            if clean_phone and clean_phone != "status" and not clean_phone.endswith("g.us"):
-                push_name = data.get("pushName") or msg_obj.get("pushName") or f"WhatsApp ({clean_phone[-4:]})"
-                text_content = (
-                    msg_obj.get("conversation")
-                    or msg_obj.get("extendedTextMessage", {}).get("text")
-                    or msg_obj.get("audioMessage", {}).get("caption")
-                    or ""
-                )
-                media_type = "audio" if "audioMessage" in msg_obj else "text"
-                if not text_content and media_type != "audio":
-                    return {"status": "ignored_empty"}
+            # Bloqueia números próprios (self-LID ou self-phone) para nunca cadastrar o usuário do WhatsApp como cliente
+            if (
+                not clean_phone
+                or clean_phone == "status"
+                or clean_phone.endswith("g.us")
+                or clean_phone.startswith("7010")
+                or whatsapp_service.is_self(clean_phone)
+            ):
+                return {"status": "ignored_self_or_group"}
 
-                contact = db.find_contact_by_phone(clean_phone)
-                if not contact:
-                    contact = db.create_contact(
+            push_name = data.get("pushName")
+            if not push_name or push_name == whatsapp_service._name:
+                push_name = f"WhatsApp (+{clean_phone})"
+
+            text_content = (
+                msg_obj.get("conversation")
+                or msg_obj.get("extendedTextMessage", {}).get("text")
+                or msg_obj.get("audioMessage", {}).get("caption")
+                or ""
+            )
+            media_type = "audio" if "audioMessage" in msg_obj else "text"
+            if not text_content and media_type != "audio":
+                return {"status": "ignored_empty"}
+
+            contact = db.find_contact_by_phone(clean_phone)
+            if not contact:
+                contact = db.create_contact(
+                    Contact(
+                        name=push_name,
+                        phone=f"+{clean_phone}",
+                        channel="whatsapp",
+                        tags=["whatsapp-real"],
+                    ),
+                    create_default_deal=True,
+                )
+
+            if not from_me:
+                result = agent.process_incoming_message(
+                    contact_id=contact.id,
+                    content=text_content or "Áudio recebido via WhatsApp",
+                    channel="whatsapp",
+                    media_type=media_type,
+                )
+                await ws_manager.broadcast_event("message_processed", result)
+                await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
+                return {"status": "processed", "contact_id": contact.id}
+            else:
+                sent_msg = db.add_message(
+                    Message(
+                        contact_id=contact.id,
+                        sender="agent",
+                        content=text_content or "Áudio enviado via WhatsApp",
+                        channel="whatsapp",
+                        media_type=media_type,
+                    )
+                )
+                payload = {"message": sent_msg.model_dump()}
+                await ws_manager.broadcast_event("message_sent", payload)
+                await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
+                return {"status": "mirrored", "contact_id": contact.id}
+
+        elif "CONTACTS" in event and "SYNC" in event:
+            contacts_list = data.get("contacts") or []
+            synced_count = 0
+            for c in contacts_list:
+                c_phone = str(c.get("phone", "")).strip().replace("+", "")
+                c_name = str(c.get("name", "")).strip()
+                if not c_phone or not c_name or whatsapp_service.is_self(c_phone):
+                    continue
+                existing = db.find_contact_by_phone(c_phone)
+                if existing:
+                    if existing.name.startswith("WhatsApp (") and c_name:
+                        existing.name = c_name
+                        db.update_contact(existing)
+                        synced_count += 1
+                else:
+                    db.create_contact(
                         Contact(
-                            name=push_name,
-                            phone=f"+{clean_phone}",
+                            name=c_name,
+                            phone=f"+{c_phone}",
                             channel="whatsapp",
                             tags=["whatsapp-real"],
                         ),
                         create_default_deal=True,
                     )
-
-                if not from_me:
-                    result = agent.process_incoming_message(
-                        contact_id=contact.id,
-                        content=text_content or "Áudio recebido via WhatsApp",
-                        channel="whatsapp",
-                        media_type=media_type,
-                    )
-                    await ws_manager.broadcast_event("message_processed", result)
-                    await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
-                    return {"status": "processed", "contact_id": contact.id}
-                else:
-                    # Espelhar mensagem enviada pelo próprio usuário no celular para a interface
-                    sent_msg = db.add_message(
-                        Message(
-                            contact_id=contact.id,
-                            sender="agent",
-                            content=text_content or "Áudio enviado via WhatsApp",
-                            channel="whatsapp",
-                            media_type=media_type,
-                        )
-                    )
-                    payload = {"message": sent_msg.model_dump()}
-                    await ws_manager.broadcast_event("message_sent", payload)
-                    await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
-                    return {"status": "mirrored", "contact_id": contact.id}
+                    synced_count += 1
+            if synced_count > 0:
+                await ws_manager.broadcast_event("new_message", {"type": "contacts_synced"})
+            return {"status": "contacts_synced", "count": synced_count}
 
         elif "CONNECTION" in event and "UPDATE" in event:
             state = data.get("state", "disconnected")
             phone = data.get("phone")
-            whatsapp_service.set_connection_state_from_webhook(state, phone)
+            lid = data.get("lid")
+            name = data.get("name")
+            whatsapp_service.set_connection_state_from_webhook(state, phone=phone, lid=lid, name=name)
+
+            if state.lower() == "open":
+                # Ao conectar um WhatsApp real, limpa automaticamente clientes fakes/demonstrativos
+                deleted = db.clear_demo_contacts()
+                if deleted > 0:
+                    logger.info(f"Removidos {deleted} contatos de demonstração após sincronização real.")
+
             await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state, "phone": phone})
+            await ws_manager.broadcast_event("new_message", {"type": "whatsapp_status_sync"})
 
         elif "QRCODE" in event:
             qrcode = data.get("qrcode", {}).get("base64") or data.get("base64")
@@ -2004,6 +2054,13 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 await ws_manager.broadcast_event("whatsapp_qr_updated", {"qrcode": qrcode})
 
         return {"status": "event_acknowledged"}
+
+    @router.post("/contacts/clear-demo")
+    async def clear_demo_contacts_endpoint():
+        """Remove manualmente todos os contatos fictícios do seed e clientes espelhados do próprio número."""
+        deleted = db.clear_demo_contacts()
+        await ws_manager.broadcast_event("new_message", {"type": "contacts_cleaned"})
+        return {"success": True, "deleted": deleted, "message": f"{deleted} contatos fictícios removidos."}
 
     # -----------------------------------------------------------------
     # API Oficial da Meta (Graph API v21.0 - WhatsApp Cloud & Instagram)
