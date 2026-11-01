@@ -6,7 +6,11 @@ import { Avatar, IconButton, StatusDot } from './ui';
 
 const brl = (v) => Number(v || 0).toLocaleString('pt-BR');
 
-export default function KanbanView({ onOpenContactInInbox }) {
+export default function KanbanView({
+  onOpenContactInInbox,
+  isSupervisorMode = true,
+  activeSeller = null,
+}) {
   const [board, setBoard] = useState(null);
   const [selectedPipelineId, setSelectedPipelineId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -35,8 +39,26 @@ export default function KanbanView({ onOpenContactInInbox }) {
     await loadBoard(selectedPipelineId);
   };
 
-  const stages = board?.stages || [];
+  const rawStages = board?.stages || [];
   const pipelines = board?.pipelines || [];
+
+  // Se for vendedor comum, enclausura estritamente apenas os negócios deste vendedor
+  const stages = isSupervisorMode
+    ? rawStages
+    : rawStages.map((st) => ({
+        ...st,
+        deals: (st.deals || []).filter((deal) => {
+          const c = deal.contact || {};
+          const sellerName = activeSeller?.name?.toLowerCase() || '';
+          const sellerId = activeSeller?.id;
+          return (
+            (sellerId && c.seller_id === sellerId) ||
+            (sellerName && (c.assignee || '').toLowerCase() === sellerName) ||
+            (sellerId && deal.seller_id === sellerId)
+          );
+        }),
+      }));
+
   const totalDeals = stages.reduce((n, st) => n + (st.deals?.length || 0), 0);
   const totalValue = stages.reduce((n, st) => n + Number(st.total_value || 0), 0);
 
@@ -45,7 +67,9 @@ export default function KanbanView({ onOpenContactInInbox }) {
       {/* Cabeçalho da página */}
       <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line px-6">
         <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="text-sm font-semibold text-fg">Funil de vendas</h1>
+          <h1 className="text-sm font-semibold text-fg">
+            Funil de vendas {!isSupervisorMode && activeSeller ? `(${activeSeller.name})` : ''}
+          </h1>
           {!loading && (
             <span className="truncate text-xs tabular-nums text-muted">
               {totalDeals} negócios · R$ {brl(totalValue)}

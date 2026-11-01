@@ -100,6 +100,14 @@ export default function App() {
     localStorage.setItem('ocf_supervisor_mode', String(isSupervisorMode));
   }, [isSupervisorMode]);
 
+  // Bloqueio de Segurança: Vendedor comum é estritamente restrito a 'inbox' e 'kanban'
+  useEffect(() => {
+    const isSupervisor = isSupervisorMode || activeSeller?.role === 'supervisor';
+    if (!isSupervisor && ['sellers', 'connections', 'settings'].includes(activeTab)) {
+      setActiveTab('inbox');
+    }
+  }, [activeTab, isSupervisorMode, activeSeller]);
+
   // Load Active Sellers for Selectors
   const loadSellers = useCallback(async () => {
     try {
@@ -610,6 +618,8 @@ export default function App() {
 
           {activeTab === 'kanban' && (
             <KanbanView
+              isSupervisorMode={isSupervisorMode}
+              activeSeller={effectiveSeller || activeSeller}
               onOpenContactInInbox={(contactId) => {
                 setSelectedContactId(contactId);
                 setActiveTab('inbox');

@@ -50,6 +50,7 @@ export default function ContactDrawer({
   stages = [],
   sellers = [],
   windowInfo,
+  isSupervisorMode = true,
   canReassignSeller = true,
   onAssignSeller,
   onChangeTemperature,
@@ -396,7 +397,7 @@ export default function ContactDrawer({
             </Button>
           )}
 
-          {onExportLgpd && (
+          {isSupervisorMode && onExportLgpd && (
             <Button
               variant="ghost"
               className="w-full justify-start"
@@ -407,7 +408,7 @@ export default function ContactDrawer({
             </Button>
           )}
 
-          {onAnonymizeLgpd && consent !== 'anonymized' && !confirmErase && (
+          {isSupervisorMode && onAnonymizeLgpd && consent !== 'anonymized' && !confirmErase && (
             <Button
               variant="ghost"
               className="w-full justify-start"
@@ -419,7 +420,7 @@ export default function ContactDrawer({
           )}
         </div>
 
-        {onAnonymizeLgpd && consent !== 'anonymized' && confirmErase && (
+        {isSupervisorMode && onAnonymizeLgpd && consent !== 'anonymized' && confirmErase && (
           <div className="space-y-2.5 rounded-lg border border-accent/30 bg-accent-deep/20 p-3">
             <div className="flex items-start gap-2">
               <ShieldAlert size={14} className="mt-0.5 shrink-0 text-accent" />

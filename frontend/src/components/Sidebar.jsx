@@ -36,14 +36,20 @@ export default function Sidebar({
 }) {
   const isSuperAdmin =
     authUser?.role === 'super_admin' || authUser?.is_super_admin;
+  const isSupervisor =
+    isSupervisorMode || activeSeller?.role === 'supervisor';
 
-  const navItems = [
+  const allNavItems = [
     { id: 'inbox', label: 'Atendimento', icon: MessageSquare, count: stats?.total_contacts },
     { id: 'kanban', label: 'Funil de vendas', icon: Kanban, count: stats?.open_deals_count },
-    { id: 'sellers', label: 'Equipe', icon: Users, count: sellers?.length },
-    { id: 'connections', label: 'Conexões', icon: Smartphone },
-    { id: 'settings', label: isSuperAdmin ? 'Administração' : 'Configurações', icon: Settings },
+    { id: 'sellers', label: 'Equipe', icon: Users, count: sellers?.length, supervisorOnly: true },
+    { id: 'connections', label: 'Conexões', icon: Smartphone, supervisorOnly: true },
+    { id: 'settings', label: isSuperAdmin ? 'Administração' : 'Configurações', icon: Settings, supervisorOnly: true },
   ];
+
+  const navItems = isSupervisor
+    ? allNavItems
+    : allNavItems.filter((item) => !item.supervisorOnly);
 
   return (
     <aside

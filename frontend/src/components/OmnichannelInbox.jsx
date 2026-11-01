@@ -79,9 +79,15 @@ export default function OmnichannelInbox({
   onOpenSellersModal,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all, mine, waiting, others, bot
+  const [statusFilter, setStatusFilter] = useState(() => (isSupervisorMode ? 'all' : 'mine'));
   const [channelFilter, setChannelFilter] = useState(''); // '', whatsapp, instagram
   const [supervisorSellerFilter, setSupervisorSellerFilter] = useState(''); // '', seller_id
+
+  useEffect(() => {
+    if (!isSupervisorMode && statusFilter !== 'mine' && statusFilter !== 'waiting') {
+      setStatusFilter('mine');
+    }
+  }, [isSupervisorMode, statusFilter]);
   const [chatSubTab, setChatSubTab] = useState('attendance'); // attendance, notes, simulator
   const [messageText, setMessageText] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -172,35 +178,28 @@ export default function OmnichannelInbox({
   const filteredContacts = contacts.filter((c) => {
     if (channelFilter && c.channel !== channelFilter) return false;
 
-    if (isSupervisorMode && supervisorSellerFilter) {
-      const targetS = sellers.find((s) => s.id === supervisorSellerFilter);
-      const matchSeller =
-        c.seller_id === supervisorSellerFilter ||
-        (targetS &&
-          (c.assignee || '').toLowerCase() === targetS.name.toLowerCase());
-      if (!matchSeller) return false;
+    // BLOQUEIO ESTRITO: Vendedor comum JAMAIS vê chats de colegas ou IA
+    if (!isSupervisorMode) {
+      if (statusFilter === 'waiting') {
+        if (!cIsWaiting) return false;
+      } else {
+        if (!cIsMine) return false;
+      }
+    } else {
+      if (supervisorSellerFilter) {
+        const targetS = sellers.find((s) => s.id === supervisorSellerFilter);
+        const matchSeller =
+          c.seller_id === supervisorSellerFilter ||
+          (targetS &&
+            (c.assignee || '').toLowerCase() === targetS.name.toLowerCase());
+        if (!matchSeller) return false;
+      }
+
+      if (statusFilter === 'mine' && !cIsMine) return false;
+      if (statusFilter === 'waiting' && !cIsWaiting) return false;
+      if (statusFilter === 'others' && !cIsOthers) return false;
+      if (statusFilter === 'bot' && !cIsBot) return false;
     }
-
-    const cIsMine =
-      (c.attendance_status === 'human' || c.ai_enabled === false) &&
-      (c.seller_id === effectiveSeller?.id || c.assignee === activeSellerName);
-    const cIsWaiting =
-      c.attendance_status === 'waiting' ||
-      c.assignee === 'Fila de Espera Humana';
-    const cIsOthers =
-      (c.attendance_status === 'human' || c.ai_enabled === false) &&
-      c.assignee &&
-      !cIsMine &&
-      c.assignee !== 'Agente IA' &&
-      c.assignee !== 'Fila de Espera Humana';
-    const cIsBot =
-      (c.attendance_status === 'bot' || !c.attendance_status) &&
-      c.ai_enabled !== false;
-
-    if (statusFilter === 'mine' && !cIsMine) return false;
-    if (statusFilter === 'waiting' && !cIsWaiting) return false;
-    if (statusFilter === 'others' && !cIsOthers) return false;
-    if (statusFilter === 'bot' && !cIsBot) return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -456,17 +455,23 @@ export default function OmnichannelInbox({
 
           {/* Abas de status */}
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
-            {[
-              { id: 'all', label: 'Todos', count: contacts.length },
-              {
-                id: 'mine',
-                label: impersonatedSeller ? 'Conta' : 'Meus',
-                count: countMine,
-              },
-              { id: 'waiting', label: 'Fila', count: countWaiting },
-              { id: 'others', label: 'Colegas', count: countOthers },
-              { id: 'bot', label: 'IA' },
-            ].map((tab) => {
+            {(isSupervisorMode
+              ? [
+                  { id: 'all', label: 'Todos', count: contacts.length },
+                  {
+                    id: 'mine',
+                    label: impersonatedSeller ? 'Conta' : 'Meus',
+                    count: countMine,
+                  },
+                  { id: 'waiting', label: 'Fila', count: countWaiting },
+                  { id: 'others', label: 'Colegas', count: countOthers },
+                  { id: 'bot', label: 'IA' },
+                ]
+              : [
+                  { id: 'mine', label: 'Meus atendimentos', count: countMine },
+                  { id: 'waiting', label: 'Fila de espera', count: countWaiting },
+                ]
+            ).map((tab) => {
               const active = statusFilter === tab.id;
               return (
                 <button
@@ -1161,7 +1166,8 @@ export default function OmnichannelInbox({
           stages={stages}
           sellers={sellers}
           windowInfo={windowInfo}
-          canReassignSeller={Boolean(isSupervisorMode || !isLockedForMe)}
+          isSupervisorMode={isSupervisorMode}
+          canReassignSeller={Boolean(isSupervisorMode)}
           onAssignSeller={(payload) =>
             onAssignContact(currentContact.id, {
               ...payload,
