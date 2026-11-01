@@ -1,1 +1,1 @@
-"""API transport layer for OpenChatFunnel."""
+"""API transport layer for Regen Flow."""

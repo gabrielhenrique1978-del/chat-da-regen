@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chat da Regen — Plataforma Executiva de Atendimento & CRM</title>
+  <title>REGEN FLOW — Plataforma Executiva de Atendimento & CRM</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -78,7 +78,7 @@
   <!-- ===================================================================== -->
   <aside class="w-20 bg-[#243E30] text-white flex flex-col items-center justify-between py-6 shrink-0 z-40 shadow-sm">
     <div class="flex flex-col items-center gap-6 w-full">
-      <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-xl bg-[#365945] hover:bg-[#416B53] flex items-center justify-center transition shadow-inner border border-white/10" title="Chat da Regen">
+      <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-xl bg-[#365945] hover:bg-[#416B53] flex items-center justify-center transition shadow-inner border border-white/10" title="REGEN FLOW">
         <i class="fa-solid fa-leaf text-emerald-300 text-lg"></i>
       </button>
 
@@ -1203,7 +1203,7 @@
 
         <div class="bg-[#F6F8F7] rounded-xl p-3.5 border border-[#E3E8E5] space-y-2 text-xs">
           <div class="flex justify-between"><span class="text-[#63756A]">Status da Sessão:</span><span class="font-bold text-emerald-700">Online (open)</span></div>
-          <div class="flex justify-between"><span class="text-[#63756A]">Instância:</span><span class="font-mono text-[#1A2B21]">openchatfunnel</span></div>
+          <div class="flex justify-between"><span class="text-[#63756A]">Instância:</span><span class="font-mono text-[#1A2B21]">regenflow</span></div>
           <div class="flex justify-between"><span class="text-[#63756A]">Webhook Integrado:</span><span class="text-[#243E30] font-medium">/api/webhooks/evolution</span></div>
         </div>
 
@@ -1628,7 +1628,7 @@
           </div>
           <div>
             <span class="text-[10px] font-bold text-blue-800 uppercase">Verify Token (hub.verify_token):</span>
-            <input id="meta-cfg-verify-token" type="text" value="openchatfunnel_meta_verify_2026" class="w-full bg-white border border-blue-200 rounded p-1.5 font-mono text-[11px] text-blue-950" />
+            <input id="meta-cfg-verify-token" type="text" value="regenflow_meta_verify_2026" class="w-full bg-white border border-blue-200 rounded p-1.5 font-mono text-[11px] text-blue-950" />
           </div>
         </div>
       </div>
@@ -1720,8 +1720,8 @@
     let allContacts = [];
     let allStages = [];
     let allSellers = [];
-    let currentSellerName = localStorage.getItem('openchatfunnel_active_seller') || 'Lucas Silva';
-    let currentSellerId = localStorage.getItem('openchatfunnel_active_seller_id') || '';
+    let currentSellerName = localStorage.getItem('regenflow_active_seller') || 'Lucas Silva';
+    let currentSellerId = localStorage.getItem('regenflow_active_seller_id') || '';
     let quickRepliesCache = [];
     let draggedDealId = null;
     let currentStatusFilter = 'all'; // 'all' | 'mine' | 'waiting' | 'others' | 'bot'
@@ -2646,8 +2646,8 @@
       if (activeSeller) {
         currentSellerId = activeSeller.id;
         currentSellerName = activeSeller.name;
-        localStorage.setItem('openchatfunnel_active_seller_id', currentSellerId);
-        localStorage.setItem('openchatfunnel_active_seller', currentSellerName);
+        localStorage.setItem('regenflow_active_seller_id', currentSellerId);
+        localStorage.setItem('regenflow_active_seller', currentSellerName);
       }
 
       const optionsHtml = allSellers.map(s => `
@@ -2679,8 +2679,8 @@
       } else {
         currentSellerName = sellerIdOrName;
       }
-      localStorage.setItem('openchatfunnel_active_seller_id', currentSellerId);
-      localStorage.setItem('openchatfunnel_active_seller', currentSellerName);
+      localStorage.setItem('regenflow_active_seller_id', currentSellerId);
+      localStorage.setItem('regenflow_active_seller', currentSellerName);
       renderSellerSelector();
       renderContactsList();
       if (currentContactId) {
@@ -3755,7 +3755,7 @@
     // ===============================================================
     // NOTIFICAÇÕES SONORAS (WEB AUDIO API CHIME)
     // ===============================================================
-    let soundEnabled = localStorage.getItem('chat_da_regen_sound_enabled') !== 'false';
+    let soundEnabled = localStorage.getItem('regen_flow_sound_enabled') !== 'false';
 
     function updateSoundIcon() {
       const icon = document.getElementById('sound-icon');
@@ -3772,7 +3772,7 @@
 
     function toggleSoundNotification() {
       soundEnabled = !soundEnabled;
-      localStorage.setItem('chat_da_regen_sound_enabled', soundEnabled ? 'true' : 'false');
+      localStorage.setItem('regen_flow_sound_enabled', soundEnabled ? 'true' : 'false');
       updateSoundIcon();
       if (soundEnabled) playChime();
     }
@@ -4090,7 +4090,7 @@
     // ===============================================================
     // IDENTIDADE DE LOGIN (SUPER ADMIN MASTER VS TENANT) & API META
     // ===============================================================
-    let currentAuthUser = JSON.parse(localStorage.getItem('openchatfunnel_auth_user') || 'null') || {
+    let currentAuthUser = JSON.parse(localStorage.getItem('regenflow_auth_user') || 'null') || {
       role: 'super_admin',
       is_super_admin: true,
       client_name: 'Proprietário Master (Super Admin)',
@@ -4161,8 +4161,8 @@
           return;
         }
         currentAuthUser = data.user;
-        localStorage.setItem('openchatfunnel_auth_token', data.access_token);
-        localStorage.setItem('openchatfunnel_auth_user', JSON.stringify(data.user));
+        localStorage.setItem('regenflow_auth_token', data.access_token);
+        localStorage.setItem('regenflow_auth_user', JSON.stringify(data.user));
         applyAuthIdentityUI();
         closeAuthLoginModal();
         showEventToast(
@@ -4194,8 +4194,8 @@
           return;
         }
         currentAuthUser = data.user;
-        localStorage.setItem('openchatfunnel_auth_token', data.access_token);
-        localStorage.setItem('openchatfunnel_auth_user', JSON.stringify(data.user));
+        localStorage.setItem('regenflow_auth_token', data.access_token);
+        localStorage.setItem('regenflow_auth_user', JSON.stringify(data.user));
         applyAuthIdentityUI();
         closeAuthLoginModal();
         showEventToast(`Autenticado com sucesso como ${currentAuthUser.client_name} (${currentAuthUser.role})!`);
@@ -4218,7 +4218,7 @@
         document.getElementById('meta-cfg-phone-id').value = cfg.phone_number_id || '';
         document.getElementById('meta-cfg-waba-id').value = cfg.waba_id || '';
         document.getElementById('meta-cfg-ig-id').value = cfg.ig_account_id || '';
-        document.getElementById('meta-cfg-verify-token').value = cfg.verify_token || 'openchatfunnel_meta_verify_2026';
+        document.getElementById('meta-cfg-verify-token').value = cfg.verify_token || 'regenflow_meta_verify_2026';
       } catch (e) {}
     }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI Administrativo de Gestão de Clientes - OpenChatFunnel / Chat da Regen.
+CLI Administrativo de Gestão de Clientes - REGEN FLOW.
 Permite provisionar contas manualmente, gerar senhas provisórias seguras
 e revogar/reativar o acesso imediatamente por inadimplência ou controle de status.
 """
@@ -51,7 +51,7 @@ from core.security import generate_secure_password, hash_password
 def get_db(db_path: Optional[str] = None) -> Database:
     from dotenv import load_dotenv
     load_dotenv()
-    resolved_path = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+    resolved_path = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "regenflow.db")
     return Database(db_path=resolved_path, auto_seed=False)
 
 
@@ -171,7 +171,7 @@ def main():
     parser.add_argument(
         "--db",
         default=None,
-        help="Caminho personalizado do banco SQLite (padrão: env DATABASE_PATH ou openchatfunnel.db)",
+        help="Caminho personalizado do banco SQLite (padrão: env DATABASE_PATH ou regenflow.db)",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True, help="Subcomandos disponíveis")

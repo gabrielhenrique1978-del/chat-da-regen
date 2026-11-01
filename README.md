@@ -1,4 +1,4 @@
-# 🚀 OpenChatFunnel — SaaS Omnichannel, CRM Conversacional & Meta Cloud API
+# 🚀 Regen Flow — SaaS Omnichannel, CRM Conversacional & Meta Cloud API
 
 [![React](https://img.shields.io/badge/React-18.3%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)

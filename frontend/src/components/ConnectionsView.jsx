@@ -18,7 +18,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
     waba_id: '',
     ig_account_id: '',
     access_token: '',
-    verify_token: 'openchatfunnel_meta_verify_2026',
+    verify_token: 'regenflow_meta_verify_2026',
     app_secret: '',
   });
   const [metaTestResult, setMetaTestResult] = useState(null);
@@ -36,7 +36,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
         phone_number_id: meta.phone_number_id || '',
         waba_id: meta.waba_id || '',
         ig_account_id: meta.ig_account_id || '',
-        verify_token: meta.verify_token || 'openchatfunnel_meta_verify_2026',
+        verify_token: meta.verify_token || 'regenflow_meta_verify_2026',
       }));
     } catch (err) {
       console.error(err);

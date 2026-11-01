@@ -26,7 +26,7 @@ def run_neon_connection_test() -> None:
         sys.exit(1)
 
     print("=====================================================================")
-    print("☁️  TESTE DE CONEXÃO POSTGRESQL (NEON CLOUD) - OPENCHATFUNNEL")
+    print("☁️  TESTE DE CONEXÃO POSTGRESQL (NEON CLOUD) - REGENFLOW")
     print("=====================================================================")
 
     db = Database(auto_seed=True)

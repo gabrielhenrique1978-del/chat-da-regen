@@ -39,9 +39,9 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
     if (isSuperAdmin) {
       try {
         // Garante token de super_admin se ainda não houver no localStorage
-        if (!localStorage.getItem('openchatfunnel_auth_token')) {
+        if (!localStorage.getItem('regenflow_auth_token')) {
           const sw = await api.quickSwitchProfile('super_admin');
-          localStorage.setItem('openchatfunnel_auth_token', sw.access_token);
+          localStorage.setItem('regenflow_auth_token', sw.access_token);
         }
         const data = await api.getTenants();
         setTenants(data.tenants || []);

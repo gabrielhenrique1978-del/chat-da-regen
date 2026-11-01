@@ -1,1 +1,1 @@
-"""Test suite package for OpenChatFunnel."""
+"""Test suite package for Regen Flow."""

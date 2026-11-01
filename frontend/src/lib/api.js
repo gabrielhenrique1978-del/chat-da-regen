@@ -6,7 +6,7 @@
 const API_BASE = '/api';
 
 export async function apiRequest(endpoint, options = {}) {
-  const token = localStorage.getItem('openchatfunnel_auth_token');
+  const token = localStorage.getItem('regenflow_auth_token');
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

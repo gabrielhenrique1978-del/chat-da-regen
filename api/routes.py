@@ -263,7 +263,7 @@ class SaveMetaConfigRequest(BaseModel):
     waba_id: Optional[str] = None
     ig_account_id: Optional[str] = None
     access_token: Optional[str] = None
-    verify_token: Optional[str] = "openchatfunnel_meta_verify_2026"
+    verify_token: Optional[str] = "regenflow_meta_verify_2026"
     app_secret: Optional[str] = None
     enabled: bool = True
 
@@ -418,9 +418,9 @@ def require_super_admin(user: User = Depends(get_current_active_user)) -> User:
 def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI:
     from dotenv import load_dotenv
     load_dotenv()
-    resolved_db_path = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+    resolved_db_path = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "regenflow.db")
     app = FastAPI(
-        title="Chat da Regen CRM & MCP Server v2.0",
+        title="REGEN FLOW — Omnichannel, CRM & MCP Server v2.0",
         description="Plataforma Executiva de Atendimento, CRM Conversacional, Kanban Drag & Drop, Handoff Humano, Broadcast e Servidor MCP",
         version="2.0.0",
     )
@@ -448,7 +448,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "microphone=(self), camera=()"
-        response.headers["X-Data-Protection"] = "OpenChatFunnel-AES256-Encrypted"
+        response.headers["X-Data-Protection"] = "RegenFlow-AES256-Encrypted"
         return response
 
     db = Database(db_path=resolved_db_path, auto_seed=True)
@@ -604,7 +604,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         email="superadmin@master.com",
                         password_hash=hash_password("Master@2026"),
                         client_name="Proprietário Master (Super Admin)",
-                        company_name="OpenChatFunnel SaaS Master",
+                        company_name="Regen Flow SaaS Master",
                         role="super_admin",
                         tenant_id=None,
                         is_active=True,
@@ -2010,7 +2010,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             waba_id=req.waba_id.strip() if req.waba_id else current.waba_id,
             ig_account_id=req.ig_account_id.strip() if req.ig_account_id else current.ig_account_id,
             access_token=req.access_token.strip() if req.access_token else current.access_token,
-            verify_token=(req.verify_token or "openchatfunnel_meta_verify_2026").strip(),
+            verify_token=(req.verify_token or "regenflow_meta_verify_2026").strip(),
             app_secret=req.app_secret.strip() if req.app_secret else current.app_secret,
             enabled=req.enabled,
         )
@@ -2453,6 +2453,6 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                     "Expires": "0",
                 },
             )
-        return HTMLResponse("<h1>OpenChatFunnel SaaS API Online</h1>")
+        return HTMLResponse("<h1>REGEN FLOW SaaS API Online</h1>")
 
     return app

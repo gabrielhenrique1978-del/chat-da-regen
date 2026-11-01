@@ -152,7 +152,7 @@ class Appointment(BaseModel):
     title: str
     scheduled_at: str = Field(default_factory=lambda: future_iso(24))
     duration_minutes: int = 30
-    meeting_link: str = "https://meet.openchatfunnel.local/demo-call"
+    meeting_link: str = "https://meet.regenflow.local/demo-call"
     status: str = "scheduled"  # scheduled, completed, cancelled
     notes: str = ""
     created_at: str = Field(default_factory=utc_now_iso)
@@ -227,7 +227,7 @@ class MetaConfig(BaseModel):
     waba_id: Optional[str] = None
     ig_account_id: Optional[str] = None
     access_token: Optional[str] = None
-    verify_token: str = "openchatfunnel_meta_verify_2026"
+    verify_token: str = "regenflow_meta_verify_2026"
     app_secret: Optional[str] = None
     enabled: bool = True
     updated_at: str = Field(default_factory=utc_now_iso)
@@ -273,14 +273,14 @@ class _PostgresConnectionAdapter:
 
 
 class Database:
-    """Gerenciador de persistência transacional (PostgreSQL Neon / SQLite) para o OpenChatFunnel."""
+    """Gerenciador de persistência transacional (PostgreSQL Neon / SQLite) para o REGEN FLOW."""
 
     def __init__(self, db_path: Optional[str] = None, auto_seed: bool = True):
         load_dotenv()
         env_database_url = os.getenv("DATABASE_URL", "").strip()
 
-        if db_path is None or db_path == "openchatfunnel.db":
-            resolved_target = env_database_url or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+        if db_path is None or db_path == "regenflow.db":
+            resolved_target = env_database_url or os.getenv("DATABASE_PATH", "regenflow.db")
         else:
             resolved_target = db_path
 
@@ -441,7 +441,7 @@ class Database:
                     waba_id TEXT,
                     ig_account_id TEXT,
                     access_token TEXT,
-                    verify_token TEXT NOT NULL DEFAULT 'openchatfunnel_meta_verify_2026',
+                    verify_token TEXT NOT NULL DEFAULT 'regenflow_meta_verify_2026',
                     app_secret TEXT,
                     enabled INTEGER NOT NULL DEFAULT 1,
                     updated_at TEXT NOT NULL
@@ -2501,7 +2501,7 @@ class Database:
             waba_id=row["waba_id"],
             ig_account_id=row["ig_account_id"],
             access_token=decrypt_field(row["access_token"]) if row["access_token"] else None,
-            verify_token=row["verify_token"] or "openchatfunnel_meta_verify_2026",
+            verify_token=row["verify_token"] or "regenflow_meta_verify_2026",
             app_secret=decrypt_field(row["app_secret"]) if row["app_secret"] else None,
             enabled=bool(row["enabled"]),
             updated_at=row["updated_at"],
@@ -2524,7 +2524,7 @@ class Database:
                 waba_id=os.getenv("META_WABA_ID"),
                 ig_account_id=os.getenv("META_IG_ACCOUNT_ID"),
                 access_token=os.getenv("META_ACCESS_TOKEN"),
-                verify_token=os.getenv("META_VERIFY_TOKEN", "openchatfunnel_meta_verify_2026"),
+                verify_token=os.getenv("META_VERIFY_TOKEN", "regenflow_meta_verify_2026"),
                 app_secret=os.getenv("META_APP_SECRET"),
                 enabled=True,
             )

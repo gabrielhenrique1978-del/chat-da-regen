@@ -14,7 +14,7 @@ import bcrypt
 from cryptography.fernet import Fernet, InvalidToken
 import jwt
 
-logger = logging.getLogger("openchatfunnel.security")
+logger = logging.getLogger("regenflow.security")
 
 # Prefixo identificador para dados cifrados em repouso
 CIPHER_PREFIX = "enc:v1:"
@@ -26,7 +26,7 @@ def get_or_create_master_key() -> bytes:
     Obtém a chave mestre de criptografia do ambiente ou do arquivo local persistente.
     Se não existir, gera uma chave criptográfica forte de 256 bits (base64 URL-safe).
     """
-    env_key = os.getenv("OPENCHATFUNNEL_SECRET_KEY") or os.getenv("ENCRYPTION_KEY")
+    env_key = os.getenv("REGENFLOW_SECRET_KEY") or os.getenv("ENCRYPTION_KEY")
     if env_key:
         key_bytes = env_key.strip().encode("utf-8")
         try:
@@ -163,7 +163,7 @@ def mask_pii(value: Optional[str], kind: str = "phone") -> str:
 
 
 def get_security_overview() -> Dict[str, Any]:
-    """Retorna o panorama do ecossistema criptográfico e segurança de dados do OpenChatFunnel."""
+    """Retorna o panorama do ecossistema criptográfico e segurança de dados do REGEN FLOW."""
     return {
         "status": "active",
         "cipher_algorithm": "AES-128/256-CBC + HMAC-SHA256 (Fernet Authenticated)",
@@ -186,7 +186,7 @@ def get_security_overview() -> Dict[str, Any]:
 # Autenticação, Senhas e Tokens JWT
 # =====================================================================
 
-_JWT_SECRET = os.getenv("OPENCHATFUNNEL_SECRET_KEY") or _MASTER_KEY.decode("utf-8")
+_JWT_SECRET = os.getenv("REGENFLOW_SECRET_KEY") or _MASTER_KEY.decode("utf-8")
 JWT_ALGORITHM = "HS256"
 JWT_DEFAULT_EXPIRE_HOURS = 24
 

@@ -63,7 +63,7 @@ export default function App() {
     role: 'super_admin',
     is_super_admin: true,
     name: 'Gabriel Henrique / Otavio Santana (Super Admin)',
-    email: 'root@openchatfunnel.io',
+    email: 'root@regenflow.io',
     tenant_id: 'master',
   });
   const [suspendedDetail, setSuspendedDetail] = useState(null);
@@ -514,7 +514,7 @@ export default function App() {
     try {
       const res = await api.quickSwitchProfile(normalizedRole);
       if (res.access_token) {
-        localStorage.setItem('openchatfunnel_auth_token', res.access_token);
+        localStorage.setItem('regenflow_auth_token', res.access_token);
       }
       if (res.user) {
         setAuthUser(res.user);

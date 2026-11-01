@@ -272,7 +272,7 @@ def test_5_mcp_protocol_tools_and_rest_api_integration():
 
 def test_6_handoff_internal_notes_appointments_broadcast_and_webhook():
     """
-    Valida as funcionalidades avançadas estilo ChatFunnel v2.0:
+    Valida as funcionalidades avançadas estilo Regen Flow v2.0:
     - Webhook WhatsApp criando lead automaticamente
     - Agendamento de reunião via intenção no chat
     - Handoff Humano ("falar com atendente") pausando respostas automáticas
@@ -384,7 +384,7 @@ def test_7_whatsapp_real_connector_and_evolution_webhook():
     # 5. Webhook Evolution API recebendo mensagem do WhatsApp real
     evo_webhook_payload = {
         "event": "messages.upsert",
-        "instance": "openchatfunnel",
+        "instance": "regenflow",
         "data": {
             "key": {
                 "remoteJid": "5511988887777@s.whatsapp.net",
@@ -486,4 +486,4 @@ def test_8_data_encryption_at_rest_and_security_headers():
     assert resp.status_code == 200
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("X-Frame-Options") == "SAMEORIGIN"
-    assert resp.headers.get("X-Data-Protection") == "OpenChatFunnel-AES256-Encrypted"
+    assert resp.headers.get("X-Data-Protection") == "RegenFlow-AES256-Encrypted"

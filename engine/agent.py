@@ -449,7 +449,7 @@ class ConversationalAgent:
                     )
                 elif to_st == "Qualificação" and not kb_hits:
                     reply_parts.append(
-                        "Ótima pergunta! No OpenChatFunnel centralizamos WhatsApp, Instagram e Web com Kanban automático. Quantos atendentes vocês têm hoje?"
+                        "Ótima pergunta! No Regen Flow centralizamos WhatsApp, Instagram e Web com Kanban automático. Quantos atendentes vocês têm hoje?"
                     )
 
             if not reply_parts:

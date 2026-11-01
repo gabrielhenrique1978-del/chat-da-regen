@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script de Inicialização do Usuário Super Admin (Master)
-Plataforma SaaS Multi-Tenant - Chat da Regen / OpenChatFunnel.
+Plataforma SaaS Multi-Tenant - REGEN FLOW.
 
 Cria ou verifica o usuário Master com role="super_admin", garantindo permissões
 globais irrestritas para gerenciar empresas clientes (Tenants), inadimplência e bloqueios.
@@ -52,7 +52,7 @@ from core.security import generate_secure_password, hash_password
 def init_superadmin(email: str, name: str, password: str = None, force: bool = False, db_path: str = None):
     from dotenv import load_dotenv
     load_dotenv()
-    resolved_db = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "openchatfunnel.db")
+    resolved_db = db_path or os.getenv("DATABASE_URL") or os.getenv("DATABASE_PATH", "regenflow.db")
     db = Database(db_path=resolved_db, auto_seed=False)
 
     email_clean = (email or os.getenv("SUPERADMIN_EMAIL", "superadmin@master.com")).strip().lower()
@@ -165,7 +165,7 @@ def main():
     parser.add_argument(
         "--db",
         default=None,
-        help="Caminho do arquivo SQLite (padrão: openchatfunnel.db)",
+        help="Caminho do arquivo SQLite (padrão: regenflow.db)",
     )
 
     args = parser.parse_args()

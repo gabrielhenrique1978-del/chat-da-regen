@@ -3,7 +3,7 @@ version: "3.8"
 services:
   evolution-api:
     image: atendai/evolution-api:v2.1.2
-    container_name: openchatfunnel-whatsapp
+    container_name: regenflow-whatsapp
     restart: always
     ports:
       - "8080:8080"
@@ -12,7 +12,7 @@ services:
       - SERVER_PORT=8080
       - SERVER_URL=http://localhost:8080
       - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=OPENCHATFUNNEL_SECRET_KEY_2026
+      - AUTHENTICATION_API_KEY=REGENFLOW_SECRET_KEY_2026
       - LOG_LEVEL=ERROR,WARN,INFO
       - DEL_INSTANCE=false
       - DATABASE_ENABLED=false

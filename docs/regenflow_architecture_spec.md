@@ -1,8 +1,8 @@
-# Especificação de Engenharia Reversa e Arquitetura: OpenChatFunnel
+# Especificação de Engenharia Reversa e Arquitetura: Regen Flow
 
 ## 1. Visão Geral da Engenharia Reversa (Clean-Room Design)
 
-Esta especificação documenta a decomposição comportamental e arquitetural da plataforma de CRM e automação comercial [ChatFunnel](https://chatfunnel.com.br/), seguida pela concepção e implementação do projeto de código aberto **OpenChatFunnel**.
+Esta especificação documenta a decomposição comportamental e arquitetural da plataforma de CRM e automação comercial [Regen Flow](https://regenflow.com.br/), seguida pela concepção e implementação do projeto de código aberto **Regen Flow**.
 
 A metodologia aplicada segue o princípio de **Clean-Room Software Engineering**: nenhum código proprietário foi descompilado ou infringido; a reconstrução baseou-se exclusivamente na observação de fluxos operacionais públicos, contratos de interface (APIs e MCP), documentação técnica e requisitos funcionais de CRM conversacional.
 
@@ -12,7 +12,7 @@ A metodologia aplicada segue o princípio de **Clean-Room Software Engineering**
 
 O software comercial original integra subsistemas fundamentais:
 
-| Módulo | Comportamento Observado | Especificação Reversa para o OpenChatFunnel |
+| Módulo | Comportamento Observado | Especificação Reversa para o Regen Flow |
 | :--- | :--- | :--- |
 | **Inbox & Canais** | Fila única para WhatsApp e Instagram com atribuição a atendentes e histórico cronológico. | Repositório central de contatos e mensagens com suporte a múltiplos canais (`whatsapp`, `instagram`, `web`), handoff humano e notas internas (`whisper`). |
 | **Anti-Fragmentação** | Buffer de mensagens para evitar disparos múltiplos quando o cliente envia frases picadas no chat. | Módulo `MessageDebouncer` com janela temporal configurável (2 segundos) agrupando mensagens concorrentes. |

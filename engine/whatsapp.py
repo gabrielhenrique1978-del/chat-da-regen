@@ -5,10 +5,10 @@ import os
 from typing import Any, Dict, Optional
 import httpx
 
-logger = logging.getLogger("openchatfunnel.whatsapp")
+logger = logging.getLogger("regenflow.whatsapp")
 
 
-def generate_whatsapp_pairing_qr_svg(text: str = "chatdaregen-whatsapp-session") -> str:
+def generate_whatsapp_pairing_qr_svg(text: str = "regenflow-whatsapp-session") -> str:
     """Gera um QR Code SVG estilizado em Data-URI de alta fidelidade para pareamento imediato."""
     matrix_size = 25
     matrix = [[0] * matrix_size for _ in range(matrix_size)]
@@ -78,8 +78,8 @@ class WhatsAppService:
     ):
         resolved_url = base_url or os.getenv("EVOLUTION_API_URL", "http://localhost:8080")
         self.base_url = resolved_url.rstrip("/")
-        self.api_key = api_key or os.getenv("EVOLUTION_API_KEY", "OPENCHATFUNNEL_SECRET_KEY_2026")
-        self.instance_name = instance_name or os.getenv("EVOLUTION_INSTANCE_NAME", "openchatfunnel")
+        self.api_key = api_key or os.getenv("EVOLUTION_API_KEY", "REGENFLOW_SECRET_KEY_2026")
+        self.instance_name = instance_name or os.getenv("EVOLUTION_INSTANCE_NAME", "regenflow")
         self._connected = False
         self._phone_number: Optional[str] = None
         self._last_qrcode: Optional[str] = None
