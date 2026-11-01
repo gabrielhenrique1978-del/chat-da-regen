@@ -1997,6 +1997,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             if not text_content and media_type != "audio":
                 return {"status": "ignored_empty"}
 
+            canonical_jid = f"{clean_phone}@lid" if (len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))) else (remote_jid or f"{clean_phone}@s.whatsapp.net")
+
             contact = db.find_contact_by_phone(clean_phone)
             if not contact:
                 contact = db.create_contact(
@@ -2005,14 +2007,14 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         phone=f"+{clean_phone}",
                         channel="whatsapp",
                         tags=["whatsapp-teste"] if is_self else ["whatsapp-real"],
-                        custom_fields={"whatsapp_jid": remote_jid},
+                        custom_fields={"whatsapp_jid": canonical_jid},
                     ),
                     create_default_deal=True,
                 )
             else:
                 fields = contact.custom_fields or {}
-                if fields.get("whatsapp_jid") != remote_jid:
-                    fields["whatsapp_jid"] = remote_jid
+                if fields.get("whatsapp_jid") != canonical_jid:
+                    fields["whatsapp_jid"] = canonical_jid
                     contact.custom_fields = fields
                     db.update_contact(contact)
 

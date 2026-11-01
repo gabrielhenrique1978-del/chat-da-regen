@@ -64,6 +64,15 @@ function getTargetJid(number) {
   if (!number) return null;
   const str = String(number).trim();
   if (str.includes('@')) {
+    const [raw, domain] = str.split('@');
+    const clean = raw.replace(/\D/g, '');
+    // Se o domínio for lid ou tiver mais de 13 dígitos, é obrigatoriamente LID
+    if (domain === 'lid' || clean.length > 13) {
+      return `${clean}@lid`;
+    }
+    if (jidMap.has(clean)) {
+      return jidMap.get(clean);
+    }
     return str;
   }
   const clean = str.replace(/\D/g, '');
