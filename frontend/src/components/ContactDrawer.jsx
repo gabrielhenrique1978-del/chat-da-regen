@@ -2,22 +2,43 @@ import React, { useState } from 'react';
 import {
   Phone,
   Mail,
-  Tag,
   Plus,
   Flame,
   Sun,
   Snowflake,
-  UserCheck,
-  Briefcase,
   Clock,
   Shield,
-  ChevronRight,
+  PanelRightClose,
   Download,
   Trash2,
   ShieldAlert,
-  CheckCircle2,
+  Instagram,
+  MessageCircle,
+  X,
 } from 'lucide-react';
-import { cn, getInitials } from '../lib/utils';
+import { cn } from '../lib/utils';
+import { Avatar, Badge, Button, IconButton, SectionLabel, Segmented, StatusDot, fieldClass } from './ui';
+
+function Row({ icon: Icon, label, children, mono = false }) {
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <Icon size={14} className="shrink-0 text-muted" />
+      <span className="w-14 shrink-0 text-xs text-muted">{label}</span>
+      <span className={cn('min-w-0 flex-1 truncate text-xs text-fg', mono && 'tabular-nums')}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function Section({ title, action, children, className }) {
+  return (
+    <section className={cn('space-y-2.5 border-b border-line px-4 py-4', className)}>
+      <SectionLabel action={action}>{title}</SectionLabel>
+      {children}
+    </section>
+  );
+}
 
 export default function ContactDrawer({
   contact,
@@ -52,59 +73,47 @@ export default function ContactDrawer({
     (s) => s.id === contact.seller_id || s.name === contact.assignee
   );
 
+  const ChannelIcon = contact.channel === 'instagram' ? Instagram : MessageCircle;
+  const consent = contact.consent_status;
+
   return (
-    <aside className="w-72 xl:w-80 h-full border-l border-[#1E293B] bg-[#121824] text-[#F8FAFC] flex flex-col shrink-0 overflow-y-auto">
-      {/* Cabeçalho da Gaveta (Alinhado em h-16 com as demais colunas) */}
-      <div className="h-16 px-4 border-b border-[#1E293B] bg-[#121824] flex items-center justify-between shrink-0">
-        <span className="text-xs font-bold uppercase tracking-wider text-[#94A3B8]">
-          Detalhes do Lead & CRM
-        </span>
+    <aside className="flex h-full w-80 shrink-0 flex-col overflow-y-auto border-l border-line bg-surface text-fg">
+      {/* Cabeçalho */}
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
+        <span className="text-sm font-medium text-fg">Detalhes</span>
         {onClose && (
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] transition"
-            title="Recolher gaveta lateral"
-          >
-            <ChevronRight size={16} />
-          </button>
+          <IconButton label="Recolher painel" size="sm" onClick={onClose}>
+            <PanelRightClose size={16} />
+          </IconButton>
         )}
       </div>
 
-      {/* Perfil do Contato */}
-      <div className="p-5 border-b border-[#1E293B] flex flex-col items-center text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#1B2333] border border-[#1E293B] text-[#00D2FF] flex items-center justify-center text-lg font-bold mb-3 shadow-subtle">
-          {getInitials(contact.name)}
+      {/* Identificação */}
+      <div className="border-b border-line px-4 py-4">
+        <div className="flex items-center gap-3">
+          <Avatar name={contact.name} size="lg" />
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-fg">{contact.name}</h3>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-muted">
+              <ChannelIcon size={12} />
+              {contact.channel}
+            </p>
+          </div>
         </div>
-        <h3 className="font-semibold text-sm text-[#F8FAFC]">
-          {contact.name}
-        </h3>
-        <span className="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#0A0D14] border border-[#1E293B] text-[#94A3B8] uppercase">
-          {contact.channel}
-        </span>
-
-        <div className="w-full mt-4 space-y-2 text-left text-xs">
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-[#F8FAFC]">
-            <Phone size={14} className="text-[#00D2FF] shrink-0" />
-            <span className="truncate font-mono">
-              {contact.phone || 'Sem telefone'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-[#F8FAFC]">
-            <Mail size={14} className="text-[#00D2FF] shrink-0" />
-            <span className="truncate">
-              {contact.email || 'E-mail não informado'}
-            </span>
-          </div>
+        <div className="mt-3">
+          <Row icon={Phone} label="Telefone" mono>
+            {contact.phone || <span className="text-muted">—</span>}
+          </Row>
+          <Row icon={Mail} label="E-mail">
+            {contact.email || <span className="text-muted">—</span>}
+          </Row>
         </div>
       </div>
 
-      {/* Seletor Dinâmico do Vendedor Responsável (Alimentado por GET /api/sellers) */}
-      <div className="p-4 border-b border-[#1E293B] space-y-2">
-        <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-          <UserCheck size={14} className="text-[#00D2FF]" />
-          Vendedor Responsável (Posse)
-        </label>
+      {/* Responsável */}
+      <Section title="Responsável">
         <select
+          aria-label="Vendedor responsável"
           disabled={!canReassignSeller}
           value={currentSellerObj?.id || contact.assignee || 'Agente IA'}
           onChange={(e) => {
@@ -128,40 +137,38 @@ export default function ContactDrawer({
               }
             }
           }}
-          className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className={fieldClass}
         >
-          <option value="Agente IA">🤖 Agente IA (Automático)</option>
+          <option value="Agente IA">Agente IA (automático)</option>
           {sellers.map((s) => (
             <option key={s.id} value={s.id}>
-              👤 {s.name}
+              {s.name}
             </option>
           ))}
         </select>
-        <p className="text-[11px] text-[#94A3B8]">
-          Ao atribuir a um vendedor, o chat fica exclusivo para ele e bloqueado
-          para os demais colegas.
+        <p className="text-2xs leading-relaxed text-muted">
+          Ao atribuir, a conversa fica exclusiva do vendedor.
         </p>
-      </div>
+      </Section>
 
-      {/* Etapa do Funil CRM */}
-      <div className="p-4 border-b border-[#1E293B] space-y-2.5">
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-            <Briefcase size={14} className="text-[#00D2FF]" />
-            Etapa do Funil CRM
-          </label>
-          {deal && (
-            <span className="text-xs font-bold text-[#00D2FF]">
-              R$ {Number(deal.value || 0).toLocaleString('pt-BR')}
+      {/* Negócio */}
+      <Section
+        title="Negócio"
+        action={
+          deal && (
+            <span className="text-xs font-medium tabular-nums text-fg">
+              <span className="text-muted">R$ </span>
+              {Number(deal.value || 0).toLocaleString('pt-BR')}
             </span>
-          )}
-        </div>
-
+          )
+        }
+      >
         {deal && stages.length > 0 ? (
           <select
+            aria-label="Etapa do funil"
             value={stage?.id || deal.stage_id || ''}
             onChange={(e) => onMoveStage(deal.id, e.target.value, deal.value)}
-            className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] transition"
+            className={fieldClass}
           >
             {stages.map((st) => (
               <option key={st.id} value={st.id}>
@@ -170,216 +177,178 @@ export default function ContactDrawer({
             ))}
           </select>
         ) : (
-          <div className="text-xs text-[#94A3B8] italic">
-            Sem negócio ativo vinculado
+          <p className="text-xs text-muted">Nenhum negócio vinculado.</p>
+        )}
+      </Section>
+
+      {/* Qualificação */}
+      <Section
+        title="Qualificação"
+        action={
+          <span className="text-2xs tabular-nums text-muted">
+            Score <span className="font-medium text-fg">{contact.lead_score || 50}</span>/100
+          </span>
+        }
+      >
+        <Segmented
+          className="w-full"
+          value={contact.temperature}
+          onChange={(id) => onChangeTemperature(id)}
+          items={[
+            {
+              id: 'hot',
+              label: 'Quente',
+              icon: Flame,
+              iconClass: contact.temperature === 'hot' ? 'text-primary' : '',
+            },
+            {
+              id: 'warm',
+              label: 'Morno',
+              icon: Sun,
+              iconClass: contact.temperature === 'warm' ? 'text-accent' : '',
+            },
+            { id: 'cold', label: 'Frio', icon: Snowflake },
+          ]}
+        />
+      </Section>
+
+      {/* Tags */}
+      <Section title="Tags">
+        {(contact.tags || []).length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {contact.tags.map((t) => (
+              <Badge key={t} variant="neutral">
+                {t}
+              </Badge>
+            ))}
           </div>
         )}
-      </div>
-
-      {/* Temperatura & Lead Score */}
-      <div className="p-4 border-b border-[#1E293B] space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-            Qualificação / Temperatura
-          </span>
-          <span className="text-xs font-semibold text-[#00D2FF]">
-            Score: {contact.lead_score || 50}/100
-          </span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { id: 'hot', label: 'Quente', icon: Flame, color: 'text-rose-400 bg-rose-950/40 border-rose-500/40' },
-            { id: 'warm', label: 'Morno', icon: Sun, color: 'text-amber-300 bg-amber-950/40 border-amber-500/40' },
-            { id: 'cold', label: 'Frio', icon: Snowflake, color: 'text-[#00D2FF] bg-[#1B2333] border-[#00D2FF]/40' },
-          ].map((temp) => {
-            const Icon = temp.icon;
-            const active = contact.temperature === temp.id;
-            return (
-              <button
-                key={temp.id}
-                onClick={() => onChangeTemperature(temp.id)}
-                className={cn(
-                  'flex flex-col items-center justify-center py-2 px-2 rounded-xl border text-[11px] font-semibold transition',
-                  active
-                    ? temp.color
-                    : 'border-[#1E293B] bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC]'
-                )}
-              >
-                <Icon size={15} className="mb-1" />
-                {temp.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Tags do Contato */}
-      <div className="p-4 border-b border-[#1E293B] space-y-2.5">
-        <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-          <Tag size={14} className="text-[#00D2FF]" />
-          Tags do Cliente
-        </label>
-
-        <div className="flex flex-wrap gap-1.5">
-          {(contact.tags || []).map((t) => (
-            <span
-              key={t}
-              className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/20"
-            >
-              #{t}
-            </span>
-          ))}
-        </div>
-
-        <form onSubmit={handleTagSubmit} className="flex gap-1.5 pt-1">
+        <form onSubmit={handleTagSubmit} className="flex gap-1.5">
           <input
             type="text"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}
-            placeholder="Nova tag (ex: vip)..."
-            className="flex-1 rounded-xl border border-[#1E293B] bg-[#0A0D14] px-2.5 py-1.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
+            placeholder="Adicionar tag"
+            className={fieldClass}
           />
-          <button
+          <IconButton
             type="submit"
-            className="px-3 py-1.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold flex items-center transition"
+            label="Adicionar tag"
+            disabled={!newTag.trim()}
+            className="border border-line-strong"
           >
             <Plus size={14} />
-          </button>
+          </IconButton>
         </form>
-      </div>
+      </Section>
 
-      {/* Status da Janela Oficial de 24h da Meta */}
+      {/* Janela de 24h */}
       {windowInfo && (
-        <div className="p-4 border-b border-[#1E293B] space-y-1.5">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-            <Clock size={14} className="text-[#00D2FF]" />
-            Janela Oficial Meta (24h)
+        <Section title="Janela Meta (24h)">
+          <div className="flex items-start gap-2 text-xs leading-relaxed">
+            <Clock
+              size={14}
+              className={cn('mt-0.5 shrink-0', windowInfo.window_open ? 'text-primary' : 'text-accent')}
+            />
+            <span className={windowInfo.window_open ? 'text-fg' : 'text-muted'}>
+              {windowInfo.reason}
+            </span>
           </div>
-          <div
-            className={cn(
-              'p-2.5 rounded-xl border text-xs',
-              windowInfo.window_open
-                ? 'bg-[#1B2333] border-[#1E293B] text-[#F8FAFC]'
-                : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
-            )}
-          >
-            {windowInfo.reason}
-          </div>
-        </div>
+        </Section>
       )}
 
-      {/* Governança LGPD & Direitos do Titular (Art. 18, Lei 13.709/2018) */}
-      <div className="p-4 space-y-3 bg-[#0A0D14]/40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#F8FAFC]">
-            <Shield size={14} className="text-[#00D2FF]" />
-            Privacidade & LGPD
-          </div>
-          <span
-            className={cn(
-              'px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border',
-              contact.consent_status === 'opted_out'
-                ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
-                : contact.consent_status === 'anonymized'
-                ? 'bg-rose-950/60 text-rose-300 border-rose-500/40'
-                : 'bg-[#1B2333] text-[#00D2FF] border-[#00D2FF]/30'
-            )}
-          >
-            {contact.consent_status === 'opted_out'
-              ? 'Opt-Out (Bloqueado)'
-              : contact.consent_status === 'anonymized'
+      {/* Privacidade (LGPD) */}
+      <Section
+        title="Privacidade (LGPD)"
+        className="border-b-0"
+        action={
+          <span className="inline-flex items-center gap-1.5 text-2xs text-muted">
+            <StatusDot
+              tone={consent === 'anonymized' ? 'muted' : consent === 'opted_out' ? 'accent' : 'primary'}
+            />
+            {consent === 'opted_out'
+              ? 'Opt-out'
+              : consent === 'anonymized'
               ? 'Anonimizado'
-              : 'Consentimento Ativo'}
+              : 'Consentimento ativo'}
           </span>
+        }
+      >
+        <div className="space-y-1">
+          {onToggleConsent && consent !== 'anonymized' && (
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() =>
+                onToggleConsent(contact.id, consent === 'opted_out' ? 'opted_in' : 'opted_out')
+              }
+            >
+              <Shield size={13} />
+              {consent === 'opted_out' ? 'Reativar consentimento' : 'Registrar opt-out'}
+            </Button>
+          )}
+
+          {onExportLgpd && (
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => onExportLgpd(contact.id)}
+            >
+              <Download size={13} />
+              Exportar dados (JSON)
+            </Button>
+          )}
+
+          {onAnonymizeLgpd && consent !== 'anonymized' && !confirmErase && (
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => setConfirmErase(true)}
+            >
+              <Trash2 size={13} />
+              Anonimizar titular
+            </Button>
+          )}
         </div>
 
-        {/* Toggle de Consentimento (Opt-In / Opt-Out de Campanhas) */}
-        {onToggleConsent && contact.consent_status !== 'anonymized' && (
-          <button
-            type="button"
-            onClick={() =>
-              onToggleConsent(
-                contact.id,
-                contact.consent_status === 'opted_out'
-                  ? 'opted_in'
-                  : 'opted_out'
-              )
-            }
-            className="w-full py-2 px-3 rounded-xl border border-[#1E293B] bg-[#121824] hover:bg-[#1B2333] text-[11px] font-semibold text-[#F8FAFC] flex items-center justify-center gap-1.5 transition"
-          >
-            <CheckCircle2 size={13} className="text-[#00D2FF]" />
-            <span>
-              {contact.consent_status === 'opted_out'
-                ? 'Reativar Consentimento (Opt-In)'
-                : 'Registrar Opt-Out (Bloquear Campanhas)'}
-            </span>
-          </button>
-        )}
-
-        {/* Exportar Dossiê de Portabilidade (Art. 18, V) */}
-        {onExportLgpd && (
-          <button
-            type="button"
-            onClick={() => onExportLgpd(contact.id)}
-            className="w-full py-2 px-3 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:bg-[#1B2333]/80 text-[11px] font-semibold text-[#F8FAFC] flex items-center justify-center gap-1.5 transition"
-          >
-            <Download size={13} className="text-[#00D2FF]" />
-            <span>Exportar Dossiê LGPD (JSON)</span>
-          </button>
-        )}
-
-        {/* Direito ao Esquecimento / Anonimização Irreversível (Art. 18, VI) */}
-        {onAnonymizeLgpd && contact.consent_status !== 'anonymized' && (
-          <>
-            {!confirmErase ? (
-              <button
-                type="button"
-                onClick={() => setConfirmErase(true)}
-                className="w-full py-2 px-3 rounded-xl border border-rose-500/20 bg-rose-950/20 hover:bg-rose-950/40 text-[11px] font-semibold text-rose-300 flex items-center justify-center gap-1.5 transition"
-              >
-                <Trash2 size={13} />
-                <span>Anonimizar Titular (Esquecimento)</span>
-              </button>
-            ) : (
-              <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 space-y-2 text-[11px]">
-                <div className="flex items-center gap-1.5 font-bold text-rose-200">
-                  <ShieldAlert size={14} className="shrink-0" />
-                  <span>Confirmar exclusão LGPD irreversível?</span>
-                </div>
-                <p className="text-[10px] text-rose-300">
-                  O nome, telefone, e-mail e histórico de mensagens serão
-                  apagados permanentemente.
+        {onAnonymizeLgpd && consent !== 'anonymized' && confirmErase && (
+          <div className="space-y-2.5 rounded-lg border border-accent/30 bg-accent-deep/20 p-3">
+            <div className="flex items-start gap-2">
+              <ShieldAlert size={14} className="mt-0.5 shrink-0 text-accent" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-fg">Anonimizar de forma irreversível?</p>
+                <p className="mt-0.5 text-2xs leading-relaxed text-muted">
+                  Nome, telefone, e-mail e histórico serão apagados permanentemente.
                 </p>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmErase(false)}
-                    className="flex-1 py-1.5 rounded-lg border border-[#1E293B] bg-[#121824] text-[#F8FAFC] font-semibold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await onAnonymizeLgpd(contact.id);
-                      setConfirmErase(false);
-                    }}
-                    className="flex-1 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold"
-                  >
-                    Confirmar
-                  </button>
-                </div>
               </div>
-            )}
-          </>
+              <IconButton label="Cancelar" size="sm" onClick={() => setConfirmErase(false)}>
+                <X size={13} />
+              </IconButton>
+            </div>
+            <div className="flex gap-1.5">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => setConfirmErase(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                className="flex-1"
+                onClick={async () => {
+                  await onAnonymizeLgpd(contact.id);
+                  setConfirmErase(false);
+                }}
+              >
+                Anonimizar
+              </Button>
+            </div>
+          </div>
         )}
 
-        <div className="flex items-center gap-1 text-[10px] text-[#94A3B8] pt-1">
-          <Shield size={11} className="text-[#00D2FF] shrink-0" />
-          <span>Criptografia AES-256 + Blind Index HMAC</span>
-        </div>
-      </div>
+        <p className="flex items-center gap-1.5 pt-1 text-2xs text-muted/70">
+          <Shield size={11} />
+          AES-256 em repouso · índice cego HMAC
+        </p>
+      </Section>
     </aside>
   );
 }

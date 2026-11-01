@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Kanban,
-  DollarSign,
-  UserCheck,
-  Flame,
-  ArrowRight,
-  MessageSquare,
-} from 'lucide-react';
+import { ArrowRight, MessageSquare, Inbox } from 'lucide-react';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
+import { Avatar, IconButton, StatusDot } from './ui';
+
+const brl = (v) => Number(v || 0).toLocaleString('pt-BR');
 
 export default function KanbanView({ onOpenContactInInbox }) {
   const [board, setBoard] = useState(null);
@@ -41,133 +37,145 @@ export default function KanbanView({ onOpenContactInInbox }) {
 
   const stages = board?.stages || [];
   const pipelines = board?.pipelines || [];
+  const totalDeals = stages.reduce((n, st) => n + (st.deals?.length || 0), 0);
+  const totalValue = stages.reduce((n, st) => n + Number(st.total_value || 0), 0);
 
   return (
-    <div className="flex-1 h-full flex flex-col overflow-hidden bg-[#0A0D14] text-[#F8FAFC] p-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-[#F8FAFC] flex items-center gap-2.5">
-            <Kanban className="text-[#00D2FF]" size={22} />
-            Funil Comercial CRM (Kanban)
-          </h1>
-          <p className="text-xs text-[#94A3B8] mt-1">
-            Acompanhe negócios em tempo real sincronizados com as conversas do
-            WhatsApp e Instagram.
-          </p>
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-canvas text-fg">
+      {/* Cabeçalho da página */}
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line px-6">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="text-sm font-semibold text-fg">Funil de vendas</h1>
+          {!loading && (
+            <span className="truncate text-xs tabular-nums text-muted">
+              {totalDeals} negócios · R$ {brl(totalValue)}
+            </span>
+          )}
         </div>
+        <select
+          aria-label="Selecionar funil"
+          value={selectedPipelineId}
+          onChange={(e) => {
+            setSelectedPipelineId(e.target.value);
+            loadBoard(e.target.value);
+          }}
+          className="h-8 min-w-[180px] rounded-md border border-line-strong bg-surface px-2.5 text-xs text-fg focus:border-primary/60 focus:outline-none"
+        >
+          {pipelines.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </header>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedPipelineId}
-            onChange={(e) => {
-              setSelectedPipelineId(e.target.value);
-              loadBoard(e.target.value);
-            }}
-            className="rounded-xl border border-[#1E293B] bg-[#121824] px-3.5 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
-          >
-            {pipelines.map((p) => (
-              <option key={p.id} value={p.id}>
-                Funil: {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Colunas do Kanban */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-xs text-[#94A3B8]">
-          Carregando funil...
+        <div className="flex flex-1 gap-3 overflow-hidden p-6">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-64 w-72 shrink-0 animate-pulse rounded-lg bg-surface/60" />
+          ))}
         </div>
       ) : (
-        <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
+        <div className="flex flex-1 gap-3 overflow-x-auto p-6">
           {stages.map((st, idx) => {
             const nextStage = stages[idx + 1];
+            const deals = st.deals || [];
             return (
-              <div
+              <section
                 key={st.id}
-                className="w-80 shrink-0 flex flex-col rounded-2xl bg-[#121824] border border-[#1E293B] overflow-hidden shadow-subtle"
+                className="flex w-72 shrink-0 flex-col rounded-lg border border-line bg-surface/60"
               >
-                {/* Topo da Coluna */}
-                <div className="p-3.5 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-xs text-[#F8FAFC]">
-                      {st.name}
-                    </span>
-                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#1B2333] text-[#94A3B8] border border-[#1E293B]">
-                      {st.deals?.length || 0}
-                    </span>
+                {/* Cabeçalho da coluna */}
+                <div className="flex h-10 shrink-0 items-center justify-between gap-2 px-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-xs font-medium text-fg">{st.name}</span>
+                    <span className="text-2xs tabular-nums text-muted">{deals.length}</span>
                   </div>
-                  <span className="text-xs font-bold text-[#00D2FF]">
-                    R$ {Number(st.total_value || 0).toLocaleString('pt-BR')}
-                  </span>
+                  <span className="text-2xs tabular-nums text-muted">R$ {brl(st.total_value)}</span>
                 </div>
 
                 {/* Cards */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-                  {(st.deals || []).map((deal) => {
-                    const c = deal.contact || {};
-                    return (
-                      <div
-                        key={deal.id}
-                        className="p-3.5 rounded-xl bg-[#0A0D14] border border-[#1E293B] space-y-2.5 hover:border-[#00D2FF]/40 hover:bg-[#1B2333]/40 transition shadow-subtle"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h4 className="font-semibold text-xs text-[#F8FAFC]">
-                              {c.name || deal.title}
-                            </h4>
-                            <p className="text-[11px] text-[#94A3B8]">
-                              {c.phone || deal.title}
-                            </p>
-                          </div>
-                          <span className="text-xs font-bold text-[#00D2FF] flex items-center">
-                            <DollarSign size={12} />
-                            {Number(deal.value || 0).toLocaleString('pt-BR')}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#121824] border border-[#1E293B] text-[#94A3B8] font-medium">
-                            <UserCheck size={11} className="text-[#00D2FF]" />
-                            {c.assignee || 'Agente IA'}
-                          </span>
-                          {c.temperature === 'hot' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 font-semibold">
-                              <Flame size={11} /> Quente
+                <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+                  {deals.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-line py-8 text-center">
+                      <Inbox size={14} className="mb-1.5 text-muted/60" />
+                      <span className="text-2xs text-muted">Nenhum negócio</span>
+                    </div>
+                  ) : (
+                    deals.map((deal) => {
+                      const c = deal.contact || {};
+                      return (
+                        <article
+                          key={deal.id}
+                          className="group rounded-md border border-line bg-surface p-3 transition-colors hover:border-line-strong hover:bg-elevated/50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="truncate text-[13px] font-medium text-fg">
+                                {c.name || deal.title}
+                              </h4>
+                              <p className="mt-0.5 truncate text-2xs text-muted">
+                                {c.name ? deal.title : c.phone}
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-xs font-medium tabular-nums text-fg">
+                              <span className="text-muted">R$ </span>
+                              {brl(deal.value)}
                             </span>
-                          )}
-                        </div>
+                          </div>
 
-                        <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2">
-                          <button
-                            onClick={() =>
-                              c.id && onOpenContactInInbox?.(c.id)
-                            }
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00D2FF] hover:underline"
-                          >
-                            <MessageSquare size={12} /> Abrir Chat
-                          </button>
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <Avatar name={c.assignee || 'IA'} size="xs" />
+                              <span className="truncate text-2xs text-muted">
+                                {c.assignee || 'Agente IA'}
+                              </span>
+                              {c.temperature && (
+                                <StatusDot
+                                  tone={
+                                    c.temperature === 'hot'
+                                      ? 'primary'
+                                      : c.temperature === 'warm'
+                                      ? 'accent'
+                                      : 'muted'
+                                  }
+                                  className="ml-0.5"
+                                />
+                              )}
+                            </span>
 
-                          {nextStage && (
-                            <button
-                              onClick={() =>
-                                handleMove(deal.id, nextStage.id, deal.value)
-                              }
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-[10px] font-bold transition"
-                              title={`Avançar para ${nextStage.name}`}
+                            <div
+                              className={cn(
+                                'flex items-center gap-0.5 transition-opacity',
+                                'opacity-60 group-hover:opacity-100'
+                              )}
                             >
-                              <span>Avançar</span>
-                              <ArrowRight size={11} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                              {c.id && (
+                                <IconButton
+                                  label="Abrir conversa"
+                                  size="sm"
+                                  onClick={() => onOpenContactInInbox?.(c.id)}
+                                >
+                                  <MessageSquare size={13} />
+                                </IconButton>
+                              )}
+                              {nextStage && (
+                                <IconButton
+                                  label={`Avançar para ${nextStage.name}`}
+                                  size="sm"
+                                  onClick={() => handleMove(deal.id, nextStage.id, deal.value)}
+                                >
+                                  <ArrowRight size={13} />
+                                </IconButton>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
                 </div>
-              </div>
+              </section>
             );
           })}
         </div>

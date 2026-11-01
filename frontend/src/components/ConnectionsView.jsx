@@ -240,7 +240,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   const res = await api.disconnectWhatsApp();
                   setWaStatus(res);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-500/30 text-rose-300 hover:bg-rose-950/30 text-xs font-semibold ml-auto transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-accent/30 text-fg hover:bg-accent-deep/30 text-xs font-semibold ml-auto transition"
               >
                 <LogOut size={14} />
                 <span>Desconectar</span>
@@ -389,9 +389,9 @@ export default function ConnectionsView({ onWebhookSimulated }) {
               <button
                 type="button"
                 onClick={handleSimulateInstagramCommentWebhook}
-                className="px-3 py-2 rounded-xl border border-[#1E293B] bg-[#1B2333] hover:border-pink-500/40 text-pink-300 text-xs font-semibold transition"
+                className="px-3 py-2 rounded-xl border border-line-strong bg-elevated hover:border-primary/40 text-fg text-xs font-semibold transition"
               >
-                📸 Simular Comentário Insta
+                Simular Comentário Insta
               </button>
             </div>
             <button

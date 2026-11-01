@@ -1,43 +1,72 @@
 /** @type {import('tailwindcss').Config} */
+/**
+ * REGEN FLOW — Design Tokens
+ * Paleta estrita. Toda cor da interface deve sair daqui.
+ * Bordas ("line") são derivadas do texto secundário #94A3B8 com transparência,
+ * mantendo-se dentro da paleta oficial.
+ */
 export default {
   darkMode: 'class',
-  content: [
-    './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
-        regen: {
-          bg: '#0A0D14',       // Dark Obsidian (Fundo Principal / Canvas)
-          card: '#121824',     // Dark Navy (Superfícies / Cards / Sidebar)
-          hover: '#1B2333',    // Superfícies Elevadas / Hover
-          cyan: '#00D2FF',     // Primária / Ação Principal
-          cyanHover: '#38BDF8',// Hover da Primária
-          blue: '#0072FF',     // Secundária / Destaques
-          indigo: '#6366F1',   // Acento / Gradientes
-          deepIndigo: '#4C1D95',
-          text: '#F8FAFC',     // Texto Principal
-          muted: '#94A3B8',    // Texto Secundário / Metadados
+        canvas: '#0A0D14', // Fundo principal
+        surface: '#121824', // Cards, sidebar, painéis
+        elevated: '#1B2333', // Hover, selecionado, superfícies elevadas
+        primary: {
+          DEFAULT: '#00D2FF', // Ação principal, não lido, seleção ativa
+          hover: '#38BDF8',
         },
-        brand: {
-          50: '#ECFEFF',
-          100: '#CFFAFE',
-          500: '#00D2FF',
-          600: '#0072FF',
-          700: '#4C1D95',
+        secondary: '#0072FF', // Saída da empresa (balões), destaques
+        accent: {
+          DEFAULT: '#6366F1', // Supervisão, interno, bloqueado
+          deep: '#4C1D95', // Confirmação destrutiva
+        },
+        fg: '#F8FAFC', // Texto principal
+        muted: '#94A3B8', // Texto secundário, legendas, horários
+        line: {
+          DEFAULT: 'rgba(148, 163, 184, 0.10)',
+          strong: 'rgba(148, 163, 184, 0.18)',
+          primary: 'rgba(0, 210, 255, 0.08)',
+        },
+
+        // Aliases legados (mantidos para compatibilidade)
+        regen: {
+          bg: '#0A0D14',
+          card: '#121824',
+          hover: '#1B2333',
+          cyan: '#00D2FF',
+          cyanHover: '#38BDF8',
+          blue: '#0072FF',
+          indigo: '#6366F1',
+          deepIndigo: '#4C1D95',
+          text: '#F8FAFC',
+          muted: '#94A3B8',
         },
       },
+      fontSize: {
+        '2xs': ['11px', { lineHeight: '16px' }],
+      },
+      borderRadius: {
+        DEFAULT: '6px',
+      },
       boxShadow: {
-        subtle: '0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.24)',
-        card: '0 4px 12px rgba(0, 0, 0, 0.35)',
-        accent: '0 2px 8px rgba(0, 210, 255, 0.12)',
-        neon: '0 1px 6px rgba(0, 210, 255, 0.16)',
-        'neon-strong': '0 2px 10px rgba(0, 210, 255, 0.25)',
-        'neon-indigo': '0 2px 10px rgba(99, 102, 241, 0.2)',
+        subtle: '0 1px 2px rgba(0, 0, 0, 0.32)',
+        card: '0 8px 24px -8px rgba(0, 0, 0, 0.5)',
+        popover: '0 12px 32px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(148, 163, 184, 0.10)',
+      },
+      keyframes: {
+        'fade-in': {
+          from: { opacity: '0', transform: 'translateY(2px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 140ms ease-out',
       },
     },
   },

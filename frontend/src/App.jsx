@@ -18,6 +18,7 @@ import {
   LogOut,
   Crown,
 } from 'lucide-react';
+import { Modal, Button, Field, fieldClass, IconButton } from './components/ui';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inbox');
@@ -648,193 +649,159 @@ export default function App() {
         </main>
       </div>
 
-      {/* Modal de Autenticação por PIN Individual (Vendedor Travado vs Supervisor) */}
+      {/* Modal de Autenticação por PIN Individual */}
       {showPinModal && (
-        <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <form
-            onSubmit={handleAuthenticatePin}
-            className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-card"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/20 flex items-center justify-center">
-                  <KeyRound size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[#F8FAFC]">
-                    Identidade do Operador & PIN
-                  </h3>
-                  <p className="text-[11px] text-[#94A3B8]">
-                    Garante que cada vendedor opere apenas no próprio nome
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
+        <Modal
+          title="Identidade do operador e PIN"
+          description="Selecione sua conta individual para operar em seu próprio nome ou entre como supervisor."
+          onClose={() => setShowPinModal(false)}
+          as="form"
+          onSubmit={handleAuthenticatePin}
+          footer={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowPinModal(false)}
-                className="text-[#94A3B8] hover:text-[#F8FAFC]"
               >
-                <X size={18} />
-              </button>
-            </div>
-
+                Cancelar
+              </Button>
+              <Button type="submit" variant="primary" size="sm">
+                Confirmar e travar sessão
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
             {pinError && (
-              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs font-semibold text-rose-300">
-                {pinError}
+              <div
+                role="alert"
+                className="p-3 rounded-lg border border-accent/30 bg-accent-deep/20 text-xs text-fg flex items-center gap-2"
+              >
+                <AlertCircle size={14} className="text-accent shrink-0" />
+                <span>{pinError}</span>
               </div>
             )}
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
-                  Selecionar Perfil / Conta
-                </label>
-                <select
-                  value={pinSellerId}
-                  onChange={(e) => setPinSellerId(e.target.value)}
-                  className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3.5 py-2.5 text-xs font-medium text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
-                >
-                  <option value="__SUPERVISOR_MASTER__">
-                    👑 MODO SUPERVISOR GLOBAL (Acessar todas as contas)
+            <Field label="Selecionar conta / perfil">
+              <select
+                value={pinSellerId}
+                onChange={(e) => setPinSellerId(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="__SUPERVISOR_MASTER__">
+                  Modo Supervisor Global (todas as contas)
+                </option>
+                {sellers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.role === 'supervisor' ? 'Supervisor' : 'Vendedor'})
                   </option>
-                  {sellers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      🔒 Vendedor Travado: {s.name} (
-                      {s.role === 'supervisor' ? 'Supervisor' : 'Vendedor'})
-                    </option>
-                  ))}
-                </select>
-              </div>
+                ))}
+              </select>
+            </Field>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-[#94A3B8] mb-1">
-                  PIN de Acesso Individual (Padrão: 1234)
-                </label>
-                <input
-                  type="password"
-                  autoFocus
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Digite seu PIN (ex: 1234)"
-                  className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] px-3.5 py-2.5 text-xs font-mono font-medium text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowPinModal(false)}
-                className="px-4 py-2 rounded-xl border border-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] text-xs font-medium transition"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] shadow-subtle text-xs font-bold transition"
-              >
-                Confirmar e Travar Sessão
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Quick Sellers Management Modal */}
-      {showSellersModal && (
-        <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0A0D14]/70">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/20 flex items-center justify-center">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[#F8FAFC]">
-                    Gestão de Vendedores, PIN Individual & Espelhamento de Contas
-                  </h3>
-                  <p className="text-[11px] text-[#94A3B8]">
-                    Cadastre vendedores, defina o PIN individual ou clique em "Entrar na Conta" como Supervisor
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowSellersModal(false)}
-                className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#00D2FF] hover:bg-[#1B2333] transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <SellersView
-                contacts={contacts}
-                activeSeller={activeSeller}
-                isSupervisorMode={isSupervisorMode}
-                impersonatedSeller={impersonatedSeller}
-                onImpersonateSeller={handleImpersonateSeller}
-                onLockToSeller={(s) => {
-                  handleLockToSeller(s);
-                  setShowSellersModal(false);
-                }}
-                onOpenPinModal={() => {
-                  setShowSellersModal(false);
-                  setPinSellerId('__SUPERVISOR_MASTER__');
-                  setPinError('');
-                  setPinInput('');
-                  setShowPinModal(true);
-                }}
-                onSellersUpdated={() => {
-                  loadSellers();
-                  loadContacts();
-                  if (selectedContactId) loadContactDetail(selectedContactId);
-                }}
+            <Field
+              label="PIN de acesso (Padrão: 1234)"
+              hint="Código numérico de 4 a 8 dígitos."
+            >
+              <input
+                type="password"
+                autoFocus
+                inputMode="numeric"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                placeholder="Ex: 1234"
+                className={cn(fieldClass, 'font-mono tracking-widest')}
               />
-            </div>
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Suspended Tenant Overlay (HTTP 403 Lockout) */}
+      {/* Modal de Gestão Rápida de Equipe */}
+      {showSellersModal && (
+        <Modal
+          title="Gestão de vendedores e supervisão"
+          description="Cadastre membros, altere o PIN individual ou entre na conta de um operador."
+          onClose={() => setShowSellersModal(false)}
+          size="xl"
+        >
+          <div className="-m-5">
+            <SellersView
+              contacts={contacts}
+              activeSeller={activeSeller}
+              isSupervisorMode={isSupervisorMode}
+              impersonatedSeller={impersonatedSeller}
+              onImpersonateSeller={handleImpersonateSeller}
+              onLockToSeller={(s) => {
+                handleLockToSeller(s);
+                setShowSellersModal(false);
+              }}
+              onOpenPinModal={() => {
+                setShowSellersModal(false);
+                setPinSellerId('__SUPERVISOR_MASTER__');
+                setPinError('');
+                setPinInput('');
+                setShowPinModal(true);
+              }}
+              onSellersUpdated={() => {
+                loadSellers();
+                loadContacts();
+                if (selectedContactId) loadContactDetail(selectedContactId);
+              }}
+            />
+          </div>
+        </Modal>
+      )}
+
+      {/* Bloqueio de Acesso por Suspensão de Tenant (HTTP 403) */}
       {suspendedDetail && (
-        <div className="fixed inset-0 z-50 bg-[#0A0D14]/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#121824] border border-rose-500/40 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto">
-              <ShieldAlert className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 bg-canvas/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface border border-accent/40 rounded-xl max-w-md w-full p-6 text-center space-y-4 shadow-card">
+            <div className="w-10 h-10 rounded-full bg-accent/15 flex items-center justify-center mx-auto text-accent">
+              <ShieldAlert size={20} />
             </div>
-            <h3 className="text-base font-extrabold text-[#F8FAFC]">
-              Acesso da Empresa Suspenso (HTTP 403)
+            <h3 className="text-sm font-semibold text-fg">
+              Acesso da empresa suspenso
             </h3>
-            <p className="text-xs text-[#94A3B8] leading-relaxed">
+            <p className="text-xs text-muted leading-relaxed">
               {suspendedDetail}
             </p>
             <div className="pt-2">
-              <button
+              <Button
+                variant="primary"
+                className="w-full"
                 onClick={() => handleSwitchAuthRole('super_admin')}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] shadow-subtle text-xs font-bold transition"
               >
-                Voltar para Identidade Super Admin (Proprietário)
-              </button>
+                Voltar para perfil Super Admin (Proprietário)
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Global Toast Notification */}
+      {/* Notificação Toast Global */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-card border text-xs font-semibold animate-fade-in bg-[#121824] text-[#F8FAFC] border-[#1E293B]">
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-line-strong bg-surface text-xs font-medium text-fg shadow-card animate-fade-in"
+        >
           {toast.type === 'error' ? (
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle size={15} className="text-accent shrink-0" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 text-[#00D2FF] shrink-0" />
+            <CheckCircle2 size={15} className="text-primary shrink-0" />
           )}
           <span>{toast.message}</span>
-          <button
+          <IconButton
+            label="Fechar notificação"
+            size="sm"
             onClick={() => setToast(null)}
-            className="ml-2 text-[#94A3B8] hover:text-[#F8FAFC]"
+            className="-mr-1.5"
           >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+            <X size={13} />
+          </IconButton>
+        </aside>
       )}
     </div>
   );

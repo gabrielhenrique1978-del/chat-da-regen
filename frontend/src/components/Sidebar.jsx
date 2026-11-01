@@ -5,18 +5,16 @@ import {
   Users,
   Smartphone,
   Settings,
-  ChevronLeft,
-  ChevronRight,
-  Sun,
-  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Crown,
   Building2,
-  Award,
-  Lock,
   Eye,
   KeyRound,
+  Lock,
 } from 'lucide-react';
-import { cn, getInitials } from '../lib/utils';
+import { cn } from '../lib/utils';
+import { Avatar, IconButton, StatusDot } from './ui';
 import regenLogo from '../assets/logo.png';
 
 export default function Sidebar({
@@ -24,8 +22,6 @@ export default function Sidebar({
   setActiveTab,
   collapsed,
   setCollapsed,
-  darkMode,
-  setDarkMode,
   sellers = [],
   activeSeller,
   isSupervisorMode,
@@ -42,201 +38,139 @@ export default function Sidebar({
     authUser?.role === 'super_admin' || authUser?.is_super_admin;
 
   const navItems = [
-    {
-      id: 'inbox',
-      label: 'Atendimento',
-      icon: MessageSquare,
-      badge: stats?.total_contacts || null,
-    },
-    {
-      id: 'kanban',
-      label: 'CRM / Funil',
-      icon: Kanban,
-      badge: stats?.open_deals_count || null,
-    },
-    {
-      id: 'sellers',
-      label: 'Vendedores & Equipe',
-      icon: Users,
-      badge: sellers?.length || null,
-    },
-    {
-      id: 'connections',
-      label: 'WhatsApp & Meta',
-      icon: Smartphone,
-    },
-    {
-      id: 'settings',
-      label: isSuperAdmin ? 'Super Admin & Config' : 'Configurações',
-      icon: Settings,
-    },
+    { id: 'inbox', label: 'Atendimento', icon: MessageSquare, count: stats?.total_contacts },
+    { id: 'kanban', label: 'Funil de vendas', icon: Kanban, count: stats?.open_deals_count },
+    { id: 'sellers', label: 'Equipe', icon: Users, count: sellers?.length },
+    { id: 'connections', label: 'Conexões', icon: Smartphone },
+    { id: 'settings', label: isSuperAdmin ? 'Administração' : 'Configurações', icon: Settings },
   ];
 
   return (
     <aside
       className={cn(
-        'h-full flex flex-col border-r border-[#1E293B] bg-[#121824] text-[#F8FAFC] transition-all duration-300 select-none shrink-0 z-20',
-        collapsed ? 'w-20' : 'w-64'
+        'z-20 flex h-full shrink-0 select-none flex-col border-r border-line bg-surface text-fg transition-[width] duration-200',
+        collapsed ? 'w-16' : 'w-60'
       )}
     >
-      {/* Topo / Logomarca Oficial REGEN FLOW (Alinhado em h-16 com todas as colunas) */}
-      <div className="h-16 px-4 flex items-center justify-between border-b border-[#1E293B] shrink-0">
-        <div className="flex items-center gap-3 overflow-hidden group cursor-pointer">
-          <div className="w-9 h-9 rounded-xl bg-[#0A0D14] border border-[#1E293B] p-1 flex items-center justify-center shrink-0 group-hover:border-[#00D2FF]/40 transition duration-200 overflow-hidden shadow-subtle">
+      {/* Marca */}
+      <div
+        className={cn(
+          'flex h-14 shrink-0 items-center border-b border-line',
+          collapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'
+        )}
+      >
+        {!collapsed && (
+          <div className="group flex min-w-0 items-center gap-2.5">
             <img
               src={regenLogo}
               alt="REGEN FLOW"
-              className="w-full h-full object-contain rounded-lg group-hover:scale-105 transition-transform duration-200"
+              className="h-7 w-7 shrink-0 rounded-md object-contain transition-opacity group-hover:opacity-90"
+            />
+            <span className="truncate text-sm font-semibold tracking-tight text-fg">
+              Regen Flow
+            </span>
+            <StatusDot
+              tone={wsConnected ? 'primary' : 'muted'}
+              pulse={!wsConnected}
+              className="ml-0.5"
             />
           </div>
-          {!collapsed && (
-            <div className="truncate">
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-sm tracking-wide bg-gradient-to-r from-[#00D2FF] via-[#38BDF8] to-[#6366F1] bg-clip-text text-transparent">
-                  REGEN FLOW
-                </span>
-                <span
-                  className={cn(
-                    'w-2 h-2 rounded-full shrink-0',
-                    wsConnected
-                      ? 'bg-[#00D2FF]'
-                      : 'bg-amber-400'
-                  )}
-                  title={
-                    wsConnected
-                      ? 'WebSocket conectado em tempo real'
-                      : 'Reconectando...'
-                  }
-                />
-              </div>
-              <p className="text-[11px] text-[#94A3B8] truncate">
-                Omnichannel & AI CRM
-              </p>
-            </div>
-          )}
-        </div>
-
-        <button
+        )}
+        <IconButton
+          label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          size="sm"
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] transition"
-          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </IconButton>
       </div>
 
-      {/* Identidade do Operador: Sessão Travada (Vendedor) vs Modo Supervisor (Espelhamento) */}
-      <div className="p-3 border-b border-[#1E293B] space-y-2">
-        {isSupervisorMode ? (
-          <div
-            className={cn(
-              'rounded-xl bg-[#0A0D14] border border-[#1E293B] p-2.5 space-y-2 shadow-subtle',
-              collapsed && 'flex flex-col items-center p-2'
-            )}
+      {/* Operador */}
+      <div className={cn('border-b border-line', collapsed ? 'p-2' : 'p-3')}>
+        {collapsed ? (
+          <button
+            onClick={onOpenPinModal}
+            title={
+              isSupervisorMode
+                ? impersonatedSeller
+                  ? `Supervisor espelhando ${impersonatedSeller.name}`
+                  : 'Modo supervisor'
+                : activeSeller?.name
+            }
+            className="mx-auto flex h-9 w-9 items-center justify-center rounded-md hover:bg-elevated"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6366F1] to-[#4C1D95] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                  <Eye size={15} />
-                </div>
-                {!collapsed && (
-                  <div className="min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">
-                      {impersonatedSeller
-                        ? 'Espelhando Vendedor:'
-                        : 'Modo Supervisor'}
-                    </span>
-                    <span className="block text-xs font-bold text-[#F8FAFC] truncate">
-                      {impersonatedSeller
-                        ? impersonatedSeller.name
-                        : 'Visão Geral da Equipe'}
-                    </span>
-                  </div>
-                )}
-              </div>
-              {!collapsed && (
-                <button
-                  onClick={onOpenPinModal}
-                  className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#00D2FF] hover:bg-[#1B2333] transition"
-                  title="Travar sessão em um único vendedor (Modo Vendedor)"
-                >
-                  <KeyRound size={14} />
-                </button>
-              )}
-            </div>
-
-            {!collapsed && (
-              <div className="space-y-1.5 pt-1.5 border-t border-[#1E293B]">
-                <label className="block text-[10px] font-medium text-[#94A3B8]">
-                  Entrar na conta de (Auditoria):
-                </label>
-                <select
-                  value={impersonatedSeller?.id || '__SUPERVISOR_ALL__'}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '__SUPERVISOR_ALL__') {
-                      onExitImpersonation?.();
-                    } else {
-                      const found = sellers.find(
-                        (s) => String(s.id) === String(val)
-                      );
-                      if (found) onImpersonateSeller?.(found);
-                    }
-                  }}
-                  className="w-full rounded-lg bg-[#121824] border border-[#1E293B] px-2.5 py-1.5 text-xs font-medium text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] cursor-pointer"
-                >
-                  <option value="__SUPERVISOR_ALL__">
-                    👑 Supervisor (Ver Todos)
-                  </option>
-                  {sellers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      🎧 Conta de: {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {isSupervisorMode ? (
+              <Eye size={16} className="text-accent" />
+            ) : (
+              <Avatar name={activeSeller?.name || 'Vendedor'} size="sm" tone="primary" />
             )}
-          </div>
+          </button>
         ) : (
-          /* MODO VENDEDOR TRAVADO: O vendedor só pode usar seu próprio nome */
-          <div
-            className={cn(
-              'rounded-xl bg-[#0A0D14] border border-[#1E293B] p-2.5 space-y-2 shadow-subtle',
-              collapsed && 'flex flex-col items-center p-2'
-            )}
-          >
+          <div className="space-y-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#00D2FF] to-[#0072FF] text-[#0A0D14] flex items-center justify-center text-xs font-extrabold shrink-0">
-                {getInitials(activeSeller?.name || 'Vendedor')}
-              </div>
-              {!collapsed && (
-                <div className="flex-1 min-w-0">
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#00D2FF]">
-                    <Lock size={10} /> Conta Ativa:
-                  </span>
-                  <div className="text-xs font-bold text-[#F8FAFC] truncate">
-                    {activeSeller?.name || 'Vendedor'}
-                  </div>
-                </div>
+              {isSupervisorMode ? (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/15">
+                  <Eye size={14} className="text-accent" />
+                </span>
+              ) : (
+                <Avatar name={activeSeller?.name || 'Vendedor'} size="sm" tone="primary" />
               )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-fg">
+                  {isSupervisorMode
+                    ? impersonatedSeller
+                      ? impersonatedSeller.name
+                      : 'Supervisor'
+                    : activeSeller?.name || 'Vendedor'}
+                </p>
+                <p className="flex items-center gap-1 truncate text-2xs text-muted">
+                  {isSupervisorMode ? (
+                    impersonatedSeller ? 'Espelhando conta' : 'Visão da equipe'
+                  ) : (
+                    <>
+                      <Lock size={10} /> Sessão pessoal
+                    </>
+                  )}
+                </p>
+              </div>
+              <IconButton
+                label={isSupervisorMode ? 'Travar em um vendedor' : 'Trocar operador'}
+                size="sm"
+                onClick={onOpenPinModal}
+              >
+                <KeyRound size={14} />
+              </IconButton>
             </div>
 
-            {!collapsed && (
-              <button
-                onClick={onOpenPinModal}
-                className="w-full py-1.5 px-2.5 rounded-lg bg-[#121824] border border-[#1E293B] text-[11px] font-medium text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] flex items-center justify-center gap-1.5 transition"
-                title="Exige PIN do vendedor ou credencial de Supervisor"
+            {isSupervisorMode && (
+              <select
+                aria-label="Espelhar conta de vendedor"
+                value={impersonatedSeller?.id || '__SUPERVISOR_ALL__'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '__SUPERVISOR_ALL__') {
+                    onExitImpersonation?.();
+                  } else {
+                    const found = sellers.find((s) => String(s.id) === String(val));
+                    if (found) onImpersonateSeller?.(found);
+                  }
+                }}
+                className="h-7 w-full rounded-md border border-line bg-canvas px-2 text-2xs text-fg focus:border-primary/60 focus:outline-none"
               >
-                <KeyRound size={12} />
-                <span>Trocar Operador / Supervisor</span>
-              </button>
+                <option value="__SUPERVISOR_ALL__">Todas as contas</option>
+                {sellers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
         )}
       </div>
 
-      {/* Navegação Principal: Sóbria, com indicador ativo nítido */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      {/* Navegação */}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = activeTab === item.id;
@@ -245,90 +179,67 @@ export default function Sidebar({
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               title={collapsed ? item.label : undefined}
+              aria-current={active ? 'page' : undefined}
               className={cn(
-                'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-colors relative group',
-                active
-                  ? 'bg-[#1B2333] text-[#F8FAFC]'
-                  : 'text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333]/50',
-                collapsed && 'justify-center px-2'
+                'group relative flex h-8 w-full items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors',
+                collapsed ? 'justify-center px-0' : 'px-2.5',
+                active ? 'bg-elevated text-fg' : 'text-muted hover:bg-elevated/60 hover:text-fg'
               )}
             >
-              {/* Indicador sutil de item ativo na navegação lateral (traço vertical) */}
               {active && (
-                <span className="absolute left-0 top-2 bottom-2 w-1 bg-[#00D2FF] rounded-r-full" />
+                <span className="absolute -left-2 top-1.5 bottom-1.5 w-0.5 rounded-r bg-primary" />
               )}
-              <div className="flex items-center gap-3">
-                <Icon
-                  size={18}
-                  className={cn(
-                    'shrink-0 transition-colors',
-                    active ? 'text-[#00D2FF]' : 'text-[#94A3B8] group-hover:text-[#F8FAFC]'
+              <Icon
+                size={16}
+                strokeWidth={active ? 2 : 1.75}
+                className={cn('shrink-0', active ? 'text-primary' : 'text-muted group-hover:text-fg')}
+              />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 truncate text-left">{item.label}</span>
+                  {Number(item.count) > 0 && (
+                    <span className="text-2xs tabular-nums text-muted">{item.count}</span>
                   )}
-                />
-                {!collapsed && <span>{item.label}</span>}
-              </div>
-              {!collapsed && item.badge !== null && item.badge !== undefined && (
-                <span
-                  className={cn(
-                    'px-2 py-0.5 rounded-full text-[10px] font-semibold',
-                    active
-                      ? 'bg-[#00D2FF]/15 text-[#00D2FF] border border-[#00D2FF]/20'
-                      : 'bg-[#0A0D14] text-[#94A3B8] border border-[#1E293B]'
-                  )}
-                >
-                  {item.badge}
-                </span>
+                </>
               )}
             </button>
           );
         })}
       </nav>
 
-      {/* Identidade Super Admin vs Tenant & Tema */}
-      <div className="p-3 border-t border-[#1E293B] space-y-2">
+      {/* Ambiente e créditos */}
+      <div className="space-y-2 border-t border-line p-2">
         <button
           onClick={onOpenAuthModal}
+          title="Ambiente e perfil de acesso"
           className={cn(
-            'w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition',
-            isSuperAdmin
-              ? 'bg-[#0A0D14] border-[#1E293B] text-[#F8FAFC] hover:border-[#00D2FF]/40'
-              : 'bg-[#0A0D14] border-[#1E293B] text-[#F8FAFC] hover:border-[#6366F1]/40',
+            'flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-elevated',
             collapsed && 'justify-center'
           )}
-          title="Alternar ou autenticar perfil (Super Admin Master vs Tenant)"
         >
-          {isSuperAdmin ? (
-            <Crown size={16} className="text-[#00D2FF] shrink-0" />
-          ) : (
-            <Building2 size={16} className="text-[#6366F1] shrink-0" />
-          )}
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-canvas">
+            {isSuperAdmin ? (
+              <Crown size={14} className="text-primary" />
+            ) : (
+              <Building2 size={14} className="text-muted" />
+            )}
+          </span>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-bold truncate">
-                {isSuperAdmin
-                  ? 'Super Admin Master'
-                  : authUser?.tenant_name || 'Empresa Cliente'}
-              </div>
-              <div className="text-[10px] text-[#94A3B8] truncate">
-                {isSuperAdmin ? 'Acesso Global B2B' : 'Ambiente Tenant'}
-              </div>
+              <p className="truncate text-xs font-medium text-fg">
+                {isSuperAdmin ? 'Super Admin' : authUser?.tenant_name || 'Empresa'}
+              </p>
+              <p className="truncate text-2xs text-muted">
+                {isSuperAdmin ? 'Acesso global' : 'Ambiente da empresa'}
+              </p>
             </div>
           )}
         </button>
 
-        {/* Créditos & Licença Oficial */}
         {!collapsed && (
-          <div className="pt-1 px-1 text-[10px] text-[#94A3B8] leading-tight flex items-start gap-1.5">
-            <Award size={13} className="text-[#00D2FF] shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-[#F8FAFC]">
-                REGEN FLOW • Licença MIT
-              </span>
-              <br />
-              Desenvolvido por <strong>Gabriel Henrique</strong> &{' '}
-              <strong>Otavio Santana</strong>
-            </div>
-          </div>
+          <p className="px-2 pb-1 text-[10px] leading-snug text-muted/70">
+            Regen Flow · MIT · por Gabriel Henrique & Otavio Santana
+          </p>
         )}
       </div>
     </aside>

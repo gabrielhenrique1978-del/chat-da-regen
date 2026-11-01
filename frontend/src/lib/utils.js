@@ -1,5 +1,15 @@
 import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// Registra o tamanho tipográfico customizado (text-2xs) para que o merge
+// não o confunda com uma cor de texto e o descarte.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      'font-size': [{ text: ['2xs'] }],
+    },
+  },
+});
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));

@@ -146,9 +146,9 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
       </div>
 
       {feedback && (
-        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs font-semibold flex justify-between">
+        <div className="p-3 rounded-lg bg-surface border border-line-strong text-fg text-xs font-medium flex justify-between items-center">
           <span>{feedback.text}</span>
-          <button onClick={() => setFeedback(null)}>✕</button>
+          <button onClick={() => setFeedback(null)} className="text-muted hover:text-fg">✕</button>
         </div>
       )}
 
@@ -265,13 +265,13 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
                           className={cn(
                             'px-2 py-0.5 rounded-full text-[10px] font-semibold border',
                             t.is_active
-                              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
-                              : 'bg-rose-950/40 text-rose-300 border-rose-500/30'
+                              ? 'bg-elevated text-primary border-primary/30'
+                              : 'bg-accent/15 text-accent border-accent/30'
                           )}
                         >
                           {t.is_active
-                            ? 'Ativo (Adimplente)'
-                            : 'Suspenso (Inadimplente 403)'}
+                            ? 'Ativo'
+                            : 'Suspenso (403)'}
                         </span>
                       </div>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
@@ -285,19 +285,19 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
                       className={cn(
                         'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition border',
                         t.is_active
-                          ? 'border-rose-500/30 bg-rose-950/20 text-rose-300 hover:bg-rose-950/40'
-                          : 'border-emerald-500/30 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-950/40'
+                          ? 'border-accent/30 bg-accent-deep/20 text-fg hover:bg-accent-deep/40'
+                          : 'border-primary/30 bg-elevated text-primary hover:bg-elevated/80'
                       )}
                     >
                       {t.is_active ? (
                         <>
                           <Lock size={13} />
-                          <span>Bloquear por Inadimplência</span>
+                          <span>Suspender</span>
                         </>
                       ) : (
                         <>
                           <Unlock size={13} />
-                          <span>Desbloquear Acesso</span>
+                          <span>Reativar Acesso</span>
                         </>
                       )}
                     </button>

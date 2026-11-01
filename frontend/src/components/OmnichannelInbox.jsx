@@ -8,10 +8,9 @@ import {
   UserCheck,
   ArrowRightLeft,
   Bot,
-  Hand,
   Check,
   CheckCheck,
-  AlertTriangle,
+  AlertCircle,
   PanelRightOpen,
   PanelRightClose,
   Sparkles,
@@ -25,10 +24,29 @@ import {
   Square,
   Shuffle,
   FileText,
-  Image as ImageIcon,
+  Instagram,
+  X,
+  Inbox,
+  CornerDownRight,
 } from 'lucide-react';
-import { cn, formatTime, getInitials } from '../lib/utils';
+import { cn, formatTime } from '../lib/utils';
 import ContactDrawer from './ContactDrawer';
+import {
+  Avatar,
+  Badge,
+  Button,
+  CountPill,
+  EmptyState,
+  Field,
+  IconButton,
+  Modal,
+  SectionLabel,
+  Segmented,
+  StatusDot,
+  Tabs,
+  fieldClass,
+  textareaClass,
+} from './ui';
 import regenLogo from '../assets/logo.png';
 
 export default function OmnichannelInbox({
@@ -123,13 +141,12 @@ export default function OmnichannelInbox({
         activeSellerName.toLowerCase());
 
   const isLockedForMe = isAssignedHuman && !isMine;
-  // Bloqueia o input se for outro vendedor E o supervisor não tiver ativado intervenção direta
   const isInputBlocked =
     isLockedForMe &&
     chatSubTab === 'attendance' &&
     !(isSupervisorMode && supervisorIntervention);
 
-  // Contadores de filtros baseados na conta ativa (ou conta espelhada pelo Supervisor)
+  // Contadores de filtros
   const countMine = contacts.filter(
     (c) =>
       (c.attendance_status === 'human' || c.ai_enabled === false) &&
@@ -197,7 +214,6 @@ export default function OmnichannelInbox({
     return true;
   });
 
-  // Separação de mensagens externas vs notas internas
   const displayedMessages = messages.filter((m) => {
     if (chatSubTab === 'notes') {
       return m.is_internal || m.sender === 'internal';
@@ -227,7 +243,7 @@ export default function OmnichannelInbox({
     } else if (chatSubTab === 'notes') {
       await onSendMessage({
         contact_id: currentContact.id,
-        content: `🔒 [Nota de ${senderLabel}]: ${text}`,
+        content: `[Nota de ${senderLabel}]: ${text}`,
         sender: 'internal',
         sender_name: activeSellerName,
         is_internal: true,
@@ -264,7 +280,7 @@ export default function OmnichannelInbox({
     setTransferReason('');
   };
 
-  // Gravação de Áudio PTT (Microfone Real ou Fallback Sintetizado em Ambientes sem Microfone)
+  // Gravação de Áudio PTT
   const handleToggleAudioRecording = async () => {
     if (!currentContact || isInputBlocked) return;
 
@@ -317,11 +333,10 @@ export default function OmnichannelInbox({
         setRecordingSeconds((s) => s + 1);
       }, 1000);
     } catch {
-      // Fallback caso o navegador não tenha permissão de microfone física
       if (onSendMessage) {
         await onSendMessage({
           contact_id: currentContact.id,
-          content: '🎙️ [Nota de Voz Enviada (0:06)]',
+          content: '[Nota de Voz (0:06)]',
           sender: 'human',
           sender_name: activeSellerName,
           media_type: 'audio',
@@ -334,7 +349,6 @@ export default function OmnichannelInbox({
     }
   };
 
-  // Anexo de Arquivos (Imagens, PDFs, Catálogos, Comprovantes)
   const handleFileAttachmentChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !currentContact || isInputBlocked) return;
@@ -347,10 +361,8 @@ export default function OmnichannelInbox({
       await onSendMessage({
         contact_id: currentContact.id,
         content: isImg
-          ? `📷 [Imagem Anexada: ${file.name}]`
-          : `📎 [Documento Anexado: ${file.name} (${Math.round(
-              file.size / 1024
-            )} KB)]`,
+          ? `[Imagem: ${file.name}]`
+          : `[Documento: ${file.name} (${Math.round(file.size / 1024)} KB)]`,
         sender: 'human',
         sender_name: activeSellerName,
         media_type: isImg ? 'image' : 'document',
@@ -364,149 +376,145 @@ export default function OmnichannelInbox({
     reader.readAsDataURL(file);
   };
 
+  const ChannelIcon = currentContact?.channel === 'instagram' ? Instagram : MessageCircle;
+
   return (
-    <div className="flex-1 flex h-full overflow-hidden bg-[#0A0D14] text-[#F8FAFC]">
+    <div className="flex-1 flex h-full overflow-hidden bg-canvas text-fg">
       {/* =================================================================== */}
-      {/* COLUNA 1: PAINEL DE CONVERSAS (FILA OMNICHANNEL)                     */}
+      {/* COLUNA 1: FILA DE CONVERSAS                                         */}
       {/* =================================================================== */}
-      <div className="w-80 h-full border-r border-[#1E293B] bg-[#121824] flex flex-col shrink-0">
-        {/* Topo da Lista (Alinhado em h-16 com Sidebar, Chat e Gaveta) */}
-        <div className="h-16 px-4 border-b border-[#1E293B] flex items-center justify-between shrink-0">
-          <div className="min-w-0 flex items-center gap-2.5">
-            <img
-              src={regenLogo}
-              alt="REGEN FLOW"
-              className="w-7 h-7 rounded-lg object-contain border border-[#1E293B] shrink-0"
-            />
-            <div className="min-w-0">
-              <h2 className="font-bold text-sm text-[#F8FAFC] truncate">
-                Conversas & Fila
-              </h2>
-              <p className="text-[11px] text-[#94A3B8] truncate">
-                WhatsApp Oficial & Instagram
-              </p>
-            </div>
+      <div className="w-80 h-full border-r border-line bg-surface flex flex-col shrink-0">
+        {/* Topo da lista (h-14) */}
+        <div className="h-14 px-4 border-b border-line flex items-center justify-between shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-fg truncate">
+              Conversas
+            </h2>
+            <p className="text-2xs text-muted truncate">
+              {contacts.length} contatos ativos
+            </p>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onOpenSellersModal}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] text-[#F8FAFC] hover:text-[#00D2FF] border border-[#1E293B] text-xs font-semibold hover:border-[#00D2FF]/30 transition shrink-0"
             title="Gerenciar equipe de vendedores"
           >
-            <Users size={13} className="text-[#00D2FF]" />
+            <Users size={14} />
             <span>Equipe</span>
-          </button>
+          </Button>
         </div>
 
-        {/* Barra de Busca e Filtros */}
-        <div className="p-3 border-b border-[#1E293B] space-y-2 shrink-0 bg-[#0A0D14]/60">
-          {/* Busca Rápida */}
+        {/* Busca e Filtros */}
+        <div className="p-3 border-b border-line space-y-2.5 shrink-0 bg-canvas/40">
+          {/* Campo de busca */}
           <div className="relative">
             <Search
-              size={14}
-              className="absolute left-3 top-2.5 text-[#94A3B8]"
+              size={13}
+              className="absolute left-2.5 top-2.5 text-muted pointer-events-none"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar cliente, telefone ou #tag..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-[#1E293B] bg-[#121824] text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF] transition"
+              placeholder="Buscar cliente, telefone ou tag..."
+              className={cn(fieldClass, 'pl-8')}
             />
           </div>
 
-          {/* Filtro Exclusivo de Supervisor: Inspecionar Carteira por Vendedor + Roleta Round-Robin */}
+          {/* Filtro do Supervisor: Carteira + Roleta */}
           {isSupervisorMode && (
             <div className="flex items-center gap-1.5">
               <select
+                aria-label="Filtrar por carteira do vendedor"
                 value={supervisorSellerFilter}
                 onChange={(e) => setSupervisorSellerFilter(e.target.value)}
-                className="flex-1 min-w-0 rounded-xl border border-[#1E293B] bg-[#121824] px-2.5 py-1.5 text-[11px] font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF] cursor-pointer"
+                className="flex-1 min-w-0 h-7 rounded-md border border-line bg-canvas px-2 text-2xs text-fg focus:border-primary/60 focus:outline-none cursor-pointer"
               >
-                <option value="">
-                  👑 Supervisor: Todas Carteiras ({contacts.length})
-                </option>
+                <option value="">Todas as carteiras ({contacts.length})</option>
                 {sellers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    🎧 Carteira de: {s.name}
+                    Carteira: {s.name}
                   </option>
                 ))}
               </select>
 
               {onRoundRobinAssign && countWaiting > 0 && (
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => onRoundRobinAssign(activeSellerName)}
-                  className="px-2.5 py-1.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-[10px] font-bold inline-flex items-center gap-1 shrink-0 transition"
-                  title="Distribuir clientes da Fila de Espera automaticamente entre os vendedores ativos (Roleta Round-Robin)"
+                  title="Distribuir fila de espera automaticamente entre vendedores"
+                  className="h-7 text-2xs"
                 >
-                  <Shuffle size={12} />
+                  <Shuffle size={11} />
                   <span>Roleta ({countWaiting})</span>
-                </button>
+                </Button>
               )}
             </div>
           )}
 
-          {/* Filtros de Status / Posse */}
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {/* Abas de status */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
             {[
-              { id: 'all', label: `Todos (${contacts.length})` },
+              { id: 'all', label: 'Todos', count: contacts.length },
               {
                 id: 'mine',
-                label: impersonatedSeller
-                  ? `Dele (${countMine})`
-                  : `Meus (${countMine})`,
+                label: impersonatedSeller ? 'Conta' : 'Meus',
+                count: countMine,
               },
-              { id: 'waiting', label: `Fila (${countWaiting})` },
-              { id: 'others', label: `Colegas (${countOthers})` },
+              { id: 'waiting', label: 'Fila', count: countWaiting },
+              { id: 'others', label: 'Colegas', count: countOthers },
               { id: 'bot', label: 'IA' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setStatusFilter(tab.id)}
-                className={cn(
-                  'px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition',
-                  statusFilter === tab.id
-                    ? 'bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/40'
-                    : 'bg-[#121824] text-[#94A3B8] border border-[#1E293B] hover:bg-[#1B2333] hover:text-[#F8FAFC]'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ].map((tab) => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    'px-2 py-1 rounded text-2xs font-medium whitespace-nowrap transition-colors',
+                    active
+                      ? 'bg-elevated text-fg border border-line-strong'
+                      : 'text-muted hover:text-fg hover:bg-elevated/40'
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span className="ml-1 text-muted tabular-nums">
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Filtro por Canal */}
-          <div className="grid grid-cols-3 gap-1 text-[11px]">
-            {[
-              { id: '', label: 'Todos Canais' },
-              { id: 'whatsapp', label: 'WhatsApp' },
-              { id: 'instagram', label: 'Instagram' },
-            ].map((ch) => (
-              <button
-                key={ch.id}
-                onClick={() => setChannelFilter(ch.id)}
-                className={cn(
-                  'py-1 rounded-lg font-medium border transition text-center truncate',
-                  channelFilter === ch.id
-                    ? 'border-[#00D2FF]/40 bg-[#1B2333] text-[#00D2FF]'
-                    : 'border-transparent text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333]'
-                )}
-              >
-                {ch.label}
-              </button>
-            ))}
-          </div>
+          {/* Filtro segmentado de canais */}
+          <Segmented
+            className="w-full"
+            value={channelFilter}
+            onChange={(id) => setChannelFilter(id)}
+            items={[
+              { id: '', label: 'Todos canais' },
+              { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
+              { id: 'instagram', label: 'Instagram', icon: Instagram },
+            ]}
+          />
         </div>
 
-        {/* Lista de Contatos */}
-        <div className="flex-1 overflow-y-auto divide-y divide-[#1E293B]/60">
+        {/* Lista de Conversas */}
+        <div className="flex-1 overflow-y-auto divide-y divide-line/60">
           {filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#94A3B8]">
-              Nenhuma conversa encontrada para este filtro.
-            </div>
+            <EmptyState
+              icon={Inbox}
+              title="Nenhuma conversa"
+              description="Nenhum contato encontrado para o filtro atual."
+            />
           ) : (
             filteredContacts.map((c) => {
               const selected = c.id === selectedContactId;
+              const unread = Number(c.unread_count || 0);
               const cIsMine =
                 (c.attendance_status === 'human' || c.ai_enabled === false) &&
                 (c.seller_id === effectiveSeller?.id ||
@@ -518,59 +526,73 @@ export default function OmnichannelInbox({
                 c.assignee !== 'Agente IA' &&
                 c.assignee !== 'Fila de Espera Humana';
 
+              const CIcon = c.channel === 'instagram' ? Instagram : MessageCircle;
+
               return (
                 <button
                   key={c.id}
                   onClick={() => onSelectContact(c.id)}
                   className={cn(
-                    'w-full p-3.5 text-left flex items-start gap-3 transition-colors',
+                    'relative w-full p-3 text-left flex items-start gap-3 transition-colors',
                     selected
-                      ? 'bg-[#1B2333] border-l-2 border-l-[#00D2FF]'
-                      : 'hover:bg-[#1B2333]/60'
+                      ? 'bg-elevated'
+                      : 'hover:bg-elevated/50'
                   )}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-[#00D2FF] font-bold text-xs flex items-center justify-center shrink-0">
-                    {getInitials(c.name)}
-                  </div>
+                  {selected && (
+                    <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-primary" />
+                  )}
+
+                  <Avatar
+                    name={c.name}
+                    size="md"
+                    tone={unread > 0 ? 'primary' : 'neutral'}
+                  />
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-xs text-[#F8FAFC] truncate">
+                      <span
+                        className={cn(
+                          'truncate text-xs',
+                          unread > 0 ? 'font-semibold text-fg' : 'font-medium text-fg'
+                        )}
+                      >
                         {c.name}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {Number(c.unread_count || 0) > 0 && !selected && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-[#00D2FF] text-[#0A0D14] text-[9px] font-extrabold">
-                            {c.unread_count}
-                          </span>
+                        {unread > 0 && !selected && (
+                          <CountPill value={unread} />
                         )}
-                        <span className="text-[10px] text-[#94A3B8]">
+                        <span className="text-2xs tabular-nums text-muted">
                           {formatTime(c.updated_at)}
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-[11px] text-[#94A3B8] truncate mt-0.5">
+                    <div className="text-2xs text-muted truncate mt-0.5">
                       {c.phone || c.email || 'Canal digital'}
                     </div>
 
-                    {/* Badges de Posse do Vendedor e Canal */}
-                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-[#0A0D14] border border-[#1E293B] text-[#94A3B8]">
-                        {c.channel}
+                    {/* Metadados de posse e canal */}
+                    <div className="flex items-center gap-2 mt-1.5 text-2xs text-muted">
+                      <span className="flex items-center gap-1 shrink-0">
+                        <CIcon size={11} className="text-muted" />
+                        <span className="capitalize">{c.channel}</span>
                       </span>
-                      {cIsMine ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#00D2FF]/10 text-[#00D2FF] border border-[#00D2FF]/20">
-                          ✓ {impersonatedSeller ? 'Conta Espelhada' : 'Seu'} ({c.assignee})
-                        </span>
-                      ) : cIsOther ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#1B2333] text-[#A5B4FC] border border-[#6366F1]/30">
-                          🔒 Com: {c.assignee}
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#0A0D14] text-[#94A3B8] border border-[#1E293B]">
-                          🤖 Agente IA
-                        </span>
-                      )}
+
+                      <span>·</span>
+
+                      <span className="truncate">
+                        {cIsMine ? (
+                          <span className="text-primary font-medium">
+                            {impersonatedSeller ? `Espelhado (${c.assignee})` : 'Com você'}
+                          </span>
+                        ) : cIsOther ? (
+                          <span>Com {c.assignee}</span>
+                        ) : (
+                          <span className="text-muted">Agente IA</span>
+                        )}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -581,58 +603,58 @@ export default function OmnichannelInbox({
       </div>
 
       {/* =================================================================== */}
-      {/* COLUNA 2: ÁREA CENTRAL DE CHAT OMNICHANNEL                          */}
+      {/* COLUNA 2: FEED DE CHAT & BARRA DE ENVIO                             */}
       {/* =================================================================== */}
-      <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0A0D14]">
+      <div className="flex-1 flex flex-col h-full min-w-0 bg-canvas">
         {!currentContact ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-[#121824] border border-[#1E293B] p-2 mb-4 shadow-card">
+            <div className="w-16 h-16 rounded-xl border border-line bg-surface p-2.5 mb-3 flex items-center justify-center">
               <img
                 src={regenLogo}
                 alt="REGEN FLOW"
-                className="w-full h-full object-cover rounded-xl"
+                className="w-full h-full object-contain rounded-md"
               />
             </div>
-            <h3 className="font-bold text-sm text-[#F8FAFC]">
-              Selecione uma conversa ao lado
+            <h3 className="text-sm font-semibold text-fg">
+              Selecione uma conversa
             </h3>
-            <p className="text-xs text-[#94A3B8] max-w-sm mt-1">
-              Assuma atendimentos em 1 clique, transfira para colegas da equipe
-              ou acompanhe a qualificação automática da IA.
+            <p className="text-xs text-muted max-w-sm mt-1 leading-relaxed">
+              Assuma atendimentos, transfira para colegas da equipe ou acompanhe as respostas automáticas da IA em tempo real.
             </p>
           </div>
         ) : (
           <>
-            {/* Cabeçalho do Chat (Alinhado em h-16 com as demais colunas) */}
-            <header className="h-16 px-4 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between gap-3 shrink-0">
+            {/* Cabeçalho do Chat (h-14) */}
+            <header className="h-14 px-4 bg-surface border-b border-line flex items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-9 h-9 rounded-xl bg-[#1B2333] border border-[#1E293B] text-[#00D2FF] font-bold text-xs flex items-center justify-center shrink-0">
-                  {getInitials(currentContact.name)}
-                </div>
+                <Avatar name={currentContact.name} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="font-semibold text-sm text-[#F8FAFC] truncate">
+                    <h3 className="font-semibold text-sm text-fg truncate">
                       {currentContact.name}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-[#0A0D14] text-[#94A3B8] border border-[#1E293B] shrink-0">
-                      {currentContact.channel}
-                    </span>
+                    <Badge variant="outline">
+                      <ChannelIcon size={11} />
+                      <span className="capitalize">{currentContact.channel}</span>
+                    </Badge>
                   </div>
-                  <p className="text-[11px] text-[#94A3B8] truncate">
+                  <p className="text-2xs text-muted truncate">
                     {isMine
-                      ? `🎧 Fixado com ${currentContact.assignee}`
+                      ? `Atendimento fixado com ${currentContact.assignee}`
                       : isLockedForMe
-                      ? `🔒 Em atendimento por ${currentContact.assignee}`
-                      : '🤖 Qualificação Automática IA'}
+                      ? `Em atendimento por ${currentContact.assignee}`
+                      : 'Qualificação automática da IA'}
                   </p>
                 </div>
               </div>
 
-              {/* Botões de Posse, Espelhamento de Supervisor e Gaveta */}
+              {/* Ações do cabeçalho */}
               <div className="flex items-center gap-1.5 shrink-0">
                 {isMine ? (
                   <>
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         const colleagues = sellers.filter(
                           (s) => s.id !== effectiveSeller?.id
@@ -640,12 +662,13 @@ export default function OmnichannelInbox({
                         setTransferTargetId(colleagues[0]?.id || '');
                         setShowTransferModal(true);
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#1B2333] hover:border-[#00D2FF]/40 text-xs font-semibold text-[#F8FAFC] whitespace-nowrap transition"
                     >
-                      <ArrowRightLeft size={13} className="text-[#00D2FF]" />
+                      <ArrowRightLeft size={13} />
                       <span>Transferir</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() =>
                         onAssignContact(currentContact.id, {
                           assignee: 'Agente IA',
@@ -655,16 +678,17 @@ export default function OmnichannelInbox({
                           operator_name: activeSellerName,
                         })
                       }
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#0A0D14] hover:bg-[#1B2333] text-xs font-semibold text-[#94A3B8] hover:text-[#F8FAFC] whitespace-nowrap transition"
                     >
-                      <Bot size={14} className="text-[#00D2FF]" />
-                      <span className="hidden xl:inline">Devolver à IA</span>
-                    </button>
+                      <Bot size={13} />
+                      <span className="hidden md:inline">Devolver à IA</span>
+                    </Button>
                   </>
                 ) : isLockedForMe ? (
                   isSupervisorMode ? (
                     <div className="flex items-center gap-1.5">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => {
                           const ownerObj = sellers.find(
                             (s) =>
@@ -676,14 +700,14 @@ export default function OmnichannelInbox({
                             onImpersonateSeller?.(ownerObj);
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] hover:bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#A5B4FC] text-xs font-semibold whitespace-nowrap transition"
                         title={`Entrar na conta de ${currentContact.assignee} para operar como ele`}
                       >
-                        <Eye size={13} className="text-[#6366F1]" />
-                        <span>Espelhar Conta</span>
-                      </button>
-
-                      <button
+                        <Eye size={13} className="text-accent" />
+                        <span>Espelhar conta</span>
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => {
                           const colleagues = sellers.filter(
                             (s) => s.name !== currentContact.assignee
@@ -691,21 +715,21 @@ export default function OmnichannelInbox({
                           setTransferTargetId(colleagues[0]?.id || '');
                           setShowTransferModal(true);
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold whitespace-nowrap transition"
-                        title="Como Supervisor, você pode reatribuir ou destravar este atendimento"
                       >
                         <ArrowRightLeft size={13} />
                         <span>Transferir</span>
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2333] border border-[#1E293B] text-[#94A3B8] text-xs font-semibold whitespace-nowrap">
-                      <Lock size={12} />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-elevated border border-line text-2xs font-medium text-muted">
+                      <Lock size={11} />
                       <span>Com {currentContact.assignee.split(' ')[0]}</span>
                     </span>
                   )
                 ) : (
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() =>
                       onAssignContact(currentContact.id, {
                         assignee: activeSellerName,
@@ -715,86 +739,54 @@ export default function OmnichannelInbox({
                         operator_name: activeSellerName,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold whitespace-nowrap transition shadow-xs"
                   >
-                    <UserCheck size={14} />
-                    <span>Assumir Conversa</span>
-                  </button>
+                    <UserCheck size={13} />
+                    <span>Assumir conversa</span>
+                  </Button>
                 )}
 
-                <button
+                <IconButton
+                  label={drawerOpen ? 'Ocultar detalhes' : 'Mostrar detalhes'}
+                  size="sm"
                   onClick={() => setDrawerOpen(!drawerOpen)}
-                  className="p-1.5 rounded-lg border border-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#1B2333] shrink-0 transition"
-                  title={
-                    drawerOpen
-                      ? 'Ocultar gaveta de detalhes'
-                      : 'Mostrar gaveta de detalhes'
-                  }
                 >
                   {drawerOpen ? (
                     <PanelRightClose size={16} />
                   ) : (
                     <PanelRightOpen size={16} />
                   )}
-                </button>
+                </IconButton>
               </div>
             </header>
 
-            {/* Sub-Abas do Chat (Atendimento Oficial / Notas Internas / Simulador) */}
-            <div className="px-4 py-2 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between gap-2 shrink-0">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                {[
-                  {
-                    id: 'attendance',
-                    label: 'Atendimento',
-                    icon: MessageCircle,
-                  },
-                  {
-                    id: 'notes',
-                    label: 'Notas da Equipe',
-                    icon: StickyNote,
-                  },
-                  {
-                    id: 'simulator',
-                    label: 'Simulador',
-                    icon: FlaskConical,
-                  },
-                ].map((t) => {
-                  const Icon = t.icon;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setChatSubTab(t.id)}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition',
-                        chatSubTab === t.id
-                          ? 'bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/30'
-                          : 'text-[#94A3B8] hover:bg-[#1B2333]/50 hover:text-[#F8FAFC]'
-                      )}
-                    >
-                      <Icon size={13} />
-                      <span>{t.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Sub-Abas do Chat */}
+            <div className="h-10 px-4 bg-surface border-b border-line flex items-center justify-between gap-3 shrink-0">
+              <Tabs
+                value={chatSubTab}
+                onChange={(id) => setChatSubTab(id)}
+                items={[
+                  { id: 'attendance', label: 'Atendimento', icon: MessageCircle },
+                  { id: 'notes', label: 'Notas internas', icon: StickyNote },
+                  { id: 'simulator', label: 'Simulador', icon: FlaskConical },
+                ]}
+              />
 
-              <div className="flex items-center gap-2 shrink-0 text-[11px]">
+              <div className="flex items-center gap-2 text-2xs text-muted shrink-0">
                 {impersonatedSeller ? (
-                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#1B2333] border border-[#6366F1]/30 text-[#A5B4FC] font-medium">
-                    <Eye size={12} className="text-[#6366F1]" />
-                    <span>Conta de: {impersonatedSeller.name}</span>
+                  <span className="inline-flex items-center gap-1.5 text-accent font-medium">
+                    <Eye size={12} />
+                    <span>Conta de {impersonatedSeller.name}</span>
                     <button
                       onClick={onExitImpersonation}
-                      className="ml-1 px-1.5 py-0.5 rounded bg-[#6366F1]/30 text-[#F8FAFC] text-[10px] hover:bg-[#6366F1]/50 transition"
+                      className="ml-1 text-2xs underline hover:text-fg"
                     >
                       Sair
                     </button>
-                  </div>
+                  </span>
                 ) : (
-                  <span className="text-[#94A3B8] hidden md:inline">
-                    {isSupervisorMode ? '👑 Supervisor:' : '🔒 Vendedor:'}{' '}
-                    <strong className="text-[#F8FAFC]">
+                  <span className="hidden md:inline">
+                    {isSupervisorMode ? 'Supervisor' : 'Vendedor'}:{' '}
+                    <strong className="text-fg font-medium">
                       {activeSellerName}
                     </strong>
                   </span>
@@ -803,11 +795,13 @@ export default function OmnichannelInbox({
             </div>
 
             {/* Feed de Mensagens */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-[#0A0D14]">
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-canvas">
               {displayedMessages.length === 0 ? (
-                <div className="text-center py-12 text-xs text-[#94A3B8]">
-                  Nenhuma mensagem registrada nesta aba ainda.
-                </div>
+                <EmptyState
+                  icon={Inbox}
+                  title="Nenhuma mensagem nesta aba"
+                  description="As mensagens do cliente, notas da equipe ou simulações aparecerão aqui."
+                />
               ) : (
                 displayedMessages.map((m) => {
                   const isCustomer = m.sender === 'contact';
@@ -816,109 +810,121 @@ export default function OmnichannelInbox({
                   const isIgComment = m.media_type === 'ig_comment';
                   const isIgCommentReply = m.media_type === 'ig_comment_reply';
 
+                  if (isSystem) {
+                    return (
+                      <div
+                        key={m.id}
+                        className="my-3 flex items-center justify-center text-center"
+                      >
+                        <span className="inline-block px-3 py-1 rounded-full border border-line bg-surface text-2xs text-muted max-w-md">
+                          {m.content} · {formatTime(m.timestamp)}
+                        </span>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div
                       key={m.id}
                       className={cn(
-                        'flex flex-col max-w-[78%] rounded-2xl px-4 py-3 text-xs leading-relaxed border shadow-subtle',
-                        isIgComment
-                          ? 'mr-auto bg-[#1B2333] border-pink-500/40 text-[#F8FAFC]'
-                          : isCustomer
-                          ? 'mr-auto bg-[#1B2333] border-[#1E293B] text-[#F8FAFC]'
-                          : isSystem
-                          ? 'mx-auto max-w-lg bg-[#121824] border-[#1E293B] text-[#94A3B8] text-center'
+                        'flex flex-col max-w-[76%] rounded-lg px-3.5 py-2.5 text-xs leading-relaxed border transition-colors',
+                        isCustomer
+                          ? 'mr-auto bg-elevated border-line text-fg rounded-tl-none'
                           : isInternal
-                          ? 'ml-auto bg-[#1a1c24] border-amber-500/30 text-amber-200'
+                          ? 'ml-auto bg-accent/10 border-accent/30 text-fg rounded-tr-none'
                           : isIgCommentReply
-                          ? 'ml-auto bg-gradient-to-r from-[#831843] to-[#4c1d95] text-[#F8FAFC] border-pink-500/30'
-                          : 'ml-auto bg-[#0c2a4d] border border-[#0072FF]/30 text-[#F8FAFC]'
+                          ? 'ml-auto bg-secondary/15 border-secondary/30 text-fg rounded-tr-none'
+                          : 'ml-auto bg-secondary/15 border-secondary/30 text-fg rounded-tr-none'
                       )}
                     >
-                      <div className="flex items-center justify-between gap-4 mb-1 text-[10px] font-medium text-[#94A3B8]">
-                        <span className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-4 mb-1 text-2xs text-muted font-medium">
+                        <span className="flex items-center gap-1.5 truncate">
                           {isCustomer
                             ? currentContact.name
-                            : isSystem
-                            ? 'Sistema'
                             : isInternal
-                            ? '🔒 Nota Interna da Equipe'
+                            ? 'Nota interna da equipe'
                             : m.sender === 'agent'
-                            ? '🤖 Assistente IA'
-                            : `👤 ${currentContact.assignee || activeSellerName}`}
+                            ? 'Agente IA'
+                            : currentContact.assignee || activeSellerName}
+
                           {isIgComment && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-pink-700 text-white text-[9px] font-bold">
-                              📸 Comentário no Post/Reels
-                            </span>
+                            <Badge variant="outline">
+                              <Instagram size={10} /> Comentário
+                            </Badge>
                           )}
                           {isIgCommentReply && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-white/15 text-white text-[9px] font-bold">
-                              💬 Resposta Pública no Post
-                            </span>
+                            <Badge variant="outline">
+                              Resposta pública
+                            </Badge>
                           )}
                         </span>
-                        <span className="flex items-center gap-1">
+
+                        <span className="flex items-center gap-1 tabular-nums shrink-0">
                           {formatTime(m.timestamp)}
-                          {!isCustomer && !isSystem && (
+                          {!isCustomer && (
                             <>
                               {m.delivery_status === 'read' ? (
-                                <CheckCheck size={13} className="text-[#00D2FF]" />
+                                <CheckCheck size={13} className="text-primary" />
                               ) : m.delivery_status === 'failed' ? (
-                                <AlertTriangle
-                                  size={13}
-                                  className="text-rose-400"
-                                />
+                                <AlertCircle size={13} className="text-accent" />
                               ) : (
-                                <Check size={13} />
+                                <Check size={13} className="text-muted" />
                               )}
                             </>
                           )}
                         </span>
                       </div>
-                      <div className="whitespace-pre-line break-words text-[#F8FAFC]">
+
+                      <div className="whitespace-pre-line break-words text-fg">
                         {m.content}
                       </div>
+
                       {m.media_type === 'audio' && m.media_url && (
-                        <div className="mt-2 pt-1.5">
+                        <div className="mt-2 pt-1.5 border-t border-line">
                           <audio
                             controls
                             src={m.media_url}
-                            className="h-8 max-w-full rounded-lg"
+                            className="h-8 max-w-full rounded"
                           />
                         </div>
                       )}
+
                       {m.media_type === 'image' && m.media_url && (
                         <div className="mt-2">
                           <img
                             src={m.media_url}
-                            alt="Anexo de imagem"
-                            className="max-h-56 rounded-xl border border-white/10 object-cover"
+                            alt="Anexo"
+                            className="max-h-56 rounded border border-line object-cover"
                           />
                         </div>
                       )}
+
                       {m.media_type === 'document' && m.media_url && (
                         <div className="mt-2">
                           <a
                             href={m.media_url}
-                            download="anexo-documento"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/20 hover:bg-black/30 text-[11px] font-medium underline"
+                            download="documento"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-line bg-canvas text-2xs font-medium text-fg hover:bg-elevated transition"
                           >
                             <FileText size={13} />
-                            <span>Baixar Arquivo Anexado</span>
+                            <span>Baixar arquivo anexado</span>
                           </a>
                         </div>
                       )}
+
                       {isIgComment && !isInputBlocked && (
-                        <div className="mt-2.5 pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-medium text-[#94A3B8]">
-                            Responder no Post + Puxar para o Direct (Comment-to-DM)
+                        <div className="mt-2.5 pt-2 border-t border-line flex items-center justify-between gap-2">
+                          <span className="text-2xs text-muted">
+                            Responder no Post + Direct
                           </span>
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setShowIgCommentModal(true)}
-                            className="px-2.5 py-1 rounded-lg bg-pink-700 hover:bg-pink-600 text-white text-[10px] font-bold transition shrink-0"
                           >
-                            💬 Responder Post + Direct
-                          </button>
+                            <CornerDownRight size={11} />
+                            <span>Responder no Direct</span>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -928,74 +934,64 @@ export default function OmnichannelInbox({
               <div ref={feedEndRef} />
             </div>
 
-            {/* Banner quando outro vendedor é dono da conversa: Diferencia Vendedor Comum vs Supervisor */}
+            {/* Banner de posse quando bloqueado */}
             {isLockedForMe && chatSubTab === 'attendance' && (
-              <div
-                className={cn(
-                  'px-5 py-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs',
-                  isSupervisorMode
-                    ? 'bg-[#121824] border-[#1E293B] text-[#F8FAFC]'
-                    : 'bg-[#121824] border-amber-500/30 text-amber-200'
-                )}
-              >
-                <div className="flex items-center gap-2">
+              <div className="px-4 py-2.5 border-t border-line bg-surface flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-muted">
                   {isSupervisorMode ? (
-                    <Crown size={16} className="text-[#00D2FF] shrink-0" />
+                    <Crown size={15} className="text-primary shrink-0" />
                   ) : (
-                    <Lock size={16} className="text-amber-400 shrink-0" />
+                    <Lock size={15} className="text-accent shrink-0" />
                   )}
                   <span>
                     {isSupervisorMode ? (
                       <>
-                        <strong>Supervisão de Carteira:</strong> Este cliente
-                        está em atendimento por{' '}
-                        <strong className="text-[#00D2FF]">
+                        Cliente em atendimento por{' '}
+                        <strong className="text-fg font-medium">
                           {currentContact.assignee}
                         </strong>
-                        . Como Supervisor, você pode entrar na conta dele ou
-                        intervir diretamente.
+                        . Como supervisor você pode intervir diretamente.
                       </>
                     ) : (
                       <>
-                        <strong>Chat Bloqueado:</strong> Este cliente pertence
-                        exclusivamente à carteira de{' '}
-                        <strong>{currentContact.assignee}</strong>. Sua sessão
-                        está travada como <strong>{activeSellerName}</strong>{' '}
-                        (somente leitura).
+                        Chat bloqueado — exclusivo de{' '}
+                        <strong className="text-fg font-medium">
+                          {currentContact.assignee}
+                        </strong>
+                        .
                       </>
                     )}
                   </span>
                 </div>
 
                 {isSupervisorMode && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSupervisorIntervention(!supervisorIntervention)
-                      }
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg font-bold text-[11px] transition',
-                        supervisorIntervention
-                          ? 'bg-[#00D2FF] text-[#0A0D14]'
-                          : 'bg-[#1B2333] border border-[#1E293B] text-[#F8FAFC] hover:border-[#00D2FF]/40'
-                      )}
-                    >
-                      {supervisorIntervention
-                        ? '✓ Intervenção Liberada'
-                        : 'Liberar Digitação (Supervisor)'}
-                    </button>
-                  </div>
+                  <Button
+                    variant={supervisorIntervention ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() =>
+                      setSupervisorIntervention(!supervisorIntervention)
+                    }
+                  >
+                    {supervisorIntervention
+                      ? 'Intervenção ativa'
+                      : 'Liberar digitação'}
+                  </Button>
                 )}
               </div>
             )}
 
-            {/* Popup de Respostas Rápidas (/) */}
+            {/* Menu flutuante de respostas rápidas */}
             {showQuickReplies && (
-              <div className="mx-5 mb-2 p-3 rounded-2xl bg-[#121824] border border-[#1E293B] shadow-card max-h-48 overflow-y-auto space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-bold text-[#00D2FF] pb-1 border-b border-[#1E293B]">
-                  <span>⚡ Respostas Rápidas (Clique para usar)</span>
-                  <button onClick={() => setShowQuickReplies(false)} className="text-[#94A3B8] hover:text-[#F8FAFC]">✕</button>
+              <div className="mx-4 mb-2 p-2 rounded-lg bg-surface border border-line-strong shadow-popover max-h-48 overflow-y-auto space-y-1">
+                <div className="flex items-center justify-between px-2 py-1 text-2xs font-medium text-muted border-b border-line">
+                  <span>Atalhos de respostas rápidas</span>
+                  <IconButton
+                    label="Fechar atalhos"
+                    size="sm"
+                    onClick={() => setShowQuickReplies(false)}
+                  >
+                    <X size={12} />
+                  </IconButton>
                 </div>
                 {quickReplies.map((qr) => (
                   <button
@@ -1004,17 +1000,17 @@ export default function OmnichannelInbox({
                       setMessageText(qr.content);
                       setShowQuickReplies(false);
                     }}
-                    className="w-full text-left p-2 rounded-lg hover:bg-[#1B2333] text-xs flex items-center justify-between gap-2 transition"
+                    className="w-full text-left p-2 rounded hover:bg-elevated text-xs flex items-center justify-between gap-2 transition"
                   >
-                    <div>
-                      <span className="font-mono font-bold text-[#00D2FF] mr-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-2xs font-semibold text-primary">
                         {qr.shortcut}
                       </span>
-                      <span className="font-semibold text-[#F8FAFC]">
+                      <span className="font-medium text-fg truncate">
                         {qr.title}
                       </span>
                     </div>
-                    <span className="text-[11px] text-[#94A3B8] truncate max-w-xs">
+                    <span className="text-2xs text-muted truncate max-w-xs">
                       {qr.content}
                     </span>
                   </button>
@@ -1022,10 +1018,10 @@ export default function OmnichannelInbox({
               </div>
             )}
 
-            {/* Barra de Digitação */}
+            {/* Barra de Envio (Composer) */}
             <form
               onSubmit={handleSendSubmit}
-              className="p-3.5 bg-[#121824] border-t border-[#1E293B] flex items-center gap-2"
+              className="p-3 bg-surface border-t border-line space-y-2"
             >
               <input
                 ref={fileInputRef}
@@ -1035,103 +1031,104 @@ export default function OmnichannelInbox({
                 className="hidden"
               />
 
-              <button
-                type="button"
-                disabled={isInputBlocked}
-                onClick={() => setShowQuickReplies(!showQuickReplies)}
-                className="px-2.5 py-2.5 rounded-xl border border-[#1E293B] bg-[#0A0D14] text-xs font-semibold text-[#F8FAFC] hover:bg-[#1B2333] hover:border-[#00D2FF]/40 disabled:opacity-40 shrink-0 transition"
-                title="Respostas Rápidas (/)"
-              >
-                <Zap size={15} className="inline mr-1 text-[#00D2FF]" />
-                Atalhos
-              </button>
-
-              <button
-                type="button"
-                disabled={isInputBlocked}
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2.5 rounded-xl border border-[#1E293B] bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#00D2FF] disabled:opacity-40 shrink-0 transition"
-                title="Anexar Imagem, Catálogo ou Documento PDF"
-              >
-                <Paperclip size={15} />
-              </button>
-
-              <button
-                type="button"
-                disabled={isInputBlocked}
-                onClick={handleToggleAudioRecording}
-                className={cn(
-                  'px-2.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition shrink-0 disabled:opacity-40',
-                  isRecordingAudio
-                    ? 'border-rose-500 bg-rose-600 text-white animate-pulse'
-                    : 'border-[#1E293B] bg-[#0A0D14] text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#00D2FF]'
-                )}
-                title={
-                  isRecordingAudio
-                    ? 'Clique para finalizar e enviar o áudio gravado'
-                    : 'Gravar Nota de Voz (Áudio PTT)'
-                }
-              >
-                {isRecordingAudio ? (
-                  <>
-                    <Square size={13} />
-                    <span>0:{String(recordingSeconds).padStart(2, '0')}</span>
-                  </>
-                ) : (
-                  <Mic size={15} className="text-[#00D2FF]" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={isInputBlocked}
-                onClick={() => setShowTemplateModal(true)}
-                className="px-2.5 py-2.5 rounded-xl border border-[#1E293B] bg-[#0A0D14] text-xs font-semibold text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#00D2FF] disabled:opacity-40 shrink-0 transition"
-                title="Disparar Template Oficial da Meta (HSM)"
-              >
-                <Sparkles size={14} className="inline mr-1 text-[#00D2FF]" />
-                Template HSM
-              </button>
-
-              {currentContact?.channel === 'instagram' && (
-                <button
-                  type="button"
+              <div className="relative">
+                <input
+                  type="text"
                   disabled={isInputBlocked}
-                  onClick={() => setShowIgCommentModal(true)}
-                  className="px-2.5 py-2.5 rounded-xl border border-pink-500/30 bg-[#0A0D14] text-xs font-semibold text-pink-400 hover:bg-[#1B2333] disabled:opacity-40 shrink-0 transition"
-                  title="Responder Comentário no Post/Reels do Instagram + Enviar Direct (Comment-to-DM)"
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder={
+                    isInputBlocked
+                      ? `Chat em modo leitura — operador responsável: ${currentContact.assignee}`
+                      : chatSubTab === 'notes'
+                      ? 'Adicionar nota interna para a equipe...'
+                      : chatSubTab === 'simulator'
+                      ? 'Simular mensagem enviada pelo cliente...'
+                      : impersonatedSeller
+                      ? `Respondendo como ${impersonatedSeller.name}...`
+                      : `Responder como ${activeSellerName}...`
+                  }
+                  className={cn(fieldClass, 'h-9 px-3 text-xs')}
+                />
+              </div>
+
+              {/* Barra de ferramentas do composer */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isInputBlocked}
+                    onClick={() => setShowQuickReplies(!showQuickReplies)}
+                    title="Respostas rápidas (/)"
+                  >
+                    <Zap size={13} className="text-primary" />
+                    <span>Atalhos</span>
+                  </Button>
+
+                  <IconButton
+                    label="Anexar arquivo"
+                    size="sm"
+                    disabled={isInputBlocked}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip size={14} />
+                  </IconButton>
+
+                  <IconButton
+                    label={
+                      isRecordingAudio
+                        ? 'Finalizar e enviar áudio'
+                        : 'Gravar áudio'
+                    }
+                    size="sm"
+                    disabled={isInputBlocked}
+                    onClick={handleToggleAudioRecording}
+                    active={isRecordingAudio}
+                  >
+                    {isRecordingAudio ? (
+                      <span className="flex items-center gap-1 text-2xs font-mono text-primary animate-pulse">
+                        <Square size={12} />
+                        0:{String(recordingSeconds).padStart(2, '0')}
+                      </span>
+                    ) : (
+                      <Mic size={14} />
+                    )}
+                  </IconButton>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isInputBlocked}
+                    onClick={() => setShowTemplateModal(true)}
+                  >
+                    <Sparkles size={13} className="text-primary" />
+                    <span className="hidden sm:inline">Template HSM</span>
+                  </Button>
+
+                  {currentContact?.channel === 'instagram' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isInputBlocked}
+                      onClick={() => setShowIgCommentModal(true)}
+                    >
+                      <Instagram size={13} />
+                      <span className="hidden sm:inline">Responder Post</span>
+                    </Button>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={!messageText.trim() || isInputBlocked}
                 >
-                  📸 Responder Post
-                </button>
-              )}
-
-              <input
-                type="text"
-                disabled={isInputBlocked}
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={
-                  isInputBlocked
-                    ? `🔒 Chat bloqueado — em atendimento por ${currentContact.assignee}`
-                    : chatSubTab === 'notes'
-                    ? 'Escrever nota interna visível apenas para a equipe...'
-                    : chatSubTab === 'simulator'
-                    ? 'Simular mensagem enviada pelo cliente no WhatsApp...'
-                    : impersonatedSeller
-                    ? `Respondendo na conta de ${impersonatedSeller.name} (Modo Supervisor)...`
-                    : `Responder como ${activeSellerName}...`
-                }
-                className="flex-1 min-w-0 rounded-xl border border-[#1E293B] bg-[#0A0D14] px-4 py-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF] disabled:opacity-50 transition"
-              />
-
-              <button
-                type="submit"
-                disabled={!messageText.trim() || isInputBlocked}
-                className="px-4 py-2.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 transition shrink-0"
-              >
-                <Send size={14} />
-                <span>Enviar</span>
-              </button>
+                  <Send size={13} />
+                  <span>Enviar</span>
+                </Button>
+              </div>
             </form>
           </>
         )}
@@ -1167,28 +1164,37 @@ export default function OmnichannelInbox({
         />
       )}
 
-      {/* Modal de Transferência de Vendedor */}
+      {/* =================================================================== */}
+      {/* MODAL: TRANSFERÊNCIA DE ATENDIMENTO                                 */}
+      {/* =================================================================== */}
       {showTransferModal && currentContact && (
-        <div className="fixed inset-0 bg-[#0A0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form
-            onSubmit={handleConfirmTransfer}
-            className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-card"
-          >
-            <h3 className="font-bold text-base text-[#F8FAFC]">
-              Transferir Atendimento
-            </h3>
-            <p className="text-xs text-[#94A3B8]">
-              Transferindo <strong className="text-[#F8FAFC]">{currentContact.name}</strong> para outro
-              vendedor da equipe:
-            </p>
-            <div>
-              <label className="block text-xs font-semibold text-[#94A3B8] mb-1">
-                Selecionar Vendedor Destino
-              </label>
+        <Modal
+          title="Transferir atendimento"
+          description={`Reatribuir a conversa de ${currentContact.name} para outro vendedor:`}
+          onClose={() => setShowTransferModal(false)}
+          as="form"
+          onSubmit={handleConfirmTransfer}
+          footer={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTransferModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" variant="primary" size="sm">
+                Confirmar transferência
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field label="Vendedor de destino">
               <select
                 value={transferTargetId}
                 onChange={(e) => setTransferTargetId(e.target.value)}
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#00D2FF]"
+                className={fieldClass}
               >
                 {sellers
                   .filter((s) => s.id !== activeSeller?.id)
@@ -1198,200 +1204,153 @@ export default function OmnichannelInbox({
                     </option>
                   ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#94A3B8] mb-1">
-                Motivo / Observação Interna (Opcional)
-              </label>
+            </Field>
+
+            <Field label="Observação interna (opcional)">
               <textarea
                 rows={2}
                 value={transferReason}
                 onChange={(e) => setTransferReason(e.target.value)}
-                placeholder="Ex: Cliente pediu orçamento de atacado..."
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
+                placeholder="Ex: Cliente solicitou negociação de atacado..."
+                className={textareaClass}
               />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowTransferModal(false)}
-                className="px-4 py-2 rounded-xl border border-[#1E293B] text-xs font-semibold text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC] transition"
+            </Field>
+          </div>
+        </Modal>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL: DISPARO DE TEMPLATES HSM (META)                             */}
+      {/* =================================================================== */}
+      {showTemplateModal && currentContact && (
+        <Modal
+          title="Templates oficiais Meta (HSM)"
+          description={
+            windowInfo?.reason ||
+            'Selecione um template aprovado para iniciar ou restabelecer a janela oficial de 24h.'
+          }
+          onClose={() => setShowTemplateModal(false)}
+          size="lg"
+        >
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {(windowInfo?.templates || []).map((tpl) => (
+              <div
+                key={tpl.name}
+                className="p-3 rounded-lg border border-line bg-canvas flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-fg">
+                    {tpl.title}{' '}
+                    <span className="font-mono text-2xs text-muted">
+                      ({tpl.name})
+                    </span>
+                  </div>
+                  <p className="text-2xs text-muted mt-0.5 leading-relaxed">
+                    {tpl.preview}
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={async () => {
+                    await onSendTemplate({
+                      contact_id: currentContact.id,
+                      template_name: tpl.name,
+                      language_code: tpl.language,
+                      sender_name: activeSellerName,
+                    });
+                    setShowTemplateModal(false);
+                  }}
+                >
+                  Disparar
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL: INSTAGRAM COMMENT-TO-DM                                      */}
+      {/* =================================================================== */}
+      {showIgCommentModal && currentContact && (
+        <Modal
+          title="Responder comentário no Instagram"
+          description={`Responda publicamente na publicação e envie simultaneamente uma mensagem privada no Direct para ${currentContact.name}.`}
+          onClose={() => setShowIgCommentModal(false)}
+          as="form"
+          size="lg"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!onReplyInstagramComment) return;
+            if (!igPublicReply.trim() && !igPrivateDm.trim()) return;
+            setIgSending(true);
+            try {
+              await onReplyInstagramComment({
+                contact_id: currentContact.id,
+                public_reply: igPublicReply.trim(),
+                private_dm: igPrivateDm.trim(),
+                sender_name: activeSellerName,
+                is_supervisor_override: Boolean(
+                  isSupervisorMode &&
+                    (supervisorIntervention || impersonatedSeller)
+                ),
+              });
+              setShowIgCommentModal(false);
+            } finally {
+              setIgSending(false);
+            }
+          }}
+          footer={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowIgCommentModal(false)}
               >
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold transition"
+                variant="primary"
+                size="sm"
+                disabled={
+                  igSending || (!igPublicReply.trim() && !igPrivateDm.trim())
+                }
               >
-                Confirmar Transferência
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Modal de Disparo de Templates HSM Oficiais da Meta */}
-      {showTemplateModal && currentContact && (
-        <div className="fixed inset-0 bg-[#0A0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-card">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-[#F8FAFC]">
-                Templates Oficiais Meta (HSM)
-              </h3>
-              <button
-                onClick={() => setShowTemplateModal(false)}
-                className="text-[#94A3B8] hover:text-[#F8FAFC]"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-xs text-[#94A3B8]">
-              {windowInfo?.reason ||
-                'Selecione um template aprovado para iniciar ou reabrir a janela de 24h.'}
-            </p>
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {(windowInfo?.templates || []).map((tpl) => (
-                <div
-                  key={tpl.name}
-                  className="p-3 rounded-xl border border-[#1E293B] bg-[#0A0D14] flex items-center justify-between gap-3"
-                >
-                  <div>
-                    <div className="font-bold text-xs text-[#F8FAFC]">
-                      {tpl.title}{' '}
-                      <span className="font-mono text-[10px] text-[#00D2FF]">
-                        ({tpl.name})
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#94A3B8] mt-0.5">
-                      {tpl.preview}
-                    </p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      await onSendTemplate({
-                        contact_id: currentContact.id,
-                        template_name: tpl.name,
-                        language_code: tpl.language,
-                        sender_name: activeSellerName,
-                      });
-                      setShowTemplateModal(false);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-[#0072FF] hover:bg-[#00D2FF] hover:text-[#0A0D14] text-[#F8FAFC] text-xs font-bold shrink-0 transition"
-                  >
-                    Disparar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Resposta em Comentário de Post/Reels do Instagram + Direct (Comment-to-DM) */}
-      {showIgCommentModal && currentContact && (
-        <div className="fixed inset-0 bg-[#0A0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!onReplyInstagramComment) return;
-              if (!igPublicReply.trim() && !igPrivateDm.trim()) return;
-              setIgSending(true);
-              try {
-                await onReplyInstagramComment({
-                  contact_id: currentContact.id,
-                  public_reply: igPublicReply.trim(),
-                  private_dm: igPrivateDm.trim(),
-                  sender_name: activeSellerName,
-                  is_supervisor_override: Boolean(
-                    isSupervisorMode &&
-                      (supervisorIntervention || impersonatedSeller)
-                  ),
-                });
-                setShowIgCommentModal(false);
-              } finally {
-                setIgSending(false);
-              }
-            }}
-            className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-card"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-950/60 text-pink-300 text-[10px] font-bold mb-1 border border-pink-500/30">
-                  📸 Instagram Graph API v21.0 • Comment-to-DM
-                </span>
-                <h3 className="font-bold text-base text-[#F8FAFC]">
-                  Responder Comentário no Post + Puxar para o Direct
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowIgCommentModal(false)}
-                className="text-[#94A3B8] hover:text-[#F8FAFC]"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-[#94A3B8]">
-              Responda publicamente abaixo do comentário de{' '}
-              <strong className="text-[#F8FAFC]">{currentContact.name}</strong> na publicação/Reels e
-              envie simultaneamente uma mensagem privada no Instagram Direct.
-            </p>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#F8FAFC] mb-1">
-                1. Resposta Pública no Comentário do Post (Opcional)
-              </label>
+                {igSending ? 'Enviando...' : 'Enviar resposta e Direct'}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field
+              label="Resposta pública no comentário do post"
+              hint="Ficará visível abaixo do comentário na publicação ou Reels."
+            >
               <textarea
                 rows={2}
                 value={igPublicReply}
                 onChange={(e) => setIgPublicReply(e.target.value)}
-                placeholder="Ex: Olá! Te enviamos todos os detalhes e valores no seu Direct agora mesmo! 🚀📩"
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
+                placeholder="Ex: Olá! Enviamos as informações no seu Direct agora mesmo."
+                className={textareaClass}
               />
-              <span className="text-[10px] text-[#94A3B8]">
-                Aparecerá publicamente abaixo do comentário do cliente no Post/Reels (`POST /{'{comment_id}'}/replies`).
-              </span>
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-xs font-semibold text-[#F8FAFC] mb-1">
-                2. Mensagem Privada no Direct — Comment-to-DM (Opcional)
-              </label>
+            <Field
+              label="Mensagem privada no Direct (Comment-to-DM)"
+              hint="Abre a conversa no Direct vinculada ao comentário do cliente."
+            >
               <textarea
                 rows={3}
                 value={igPrivateDm}
                 onChange={(e) => setIgPrivateDm(e.target.value)}
-                placeholder="Ex: Olá! Vi seu comentário no nosso post 😊 Aqui estão as condições especiais..."
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
+                placeholder="Ex: Olá! Vi seu comentário no post. Como podemos te ajudar?"
+                className={textareaClass}
               />
-              <span className="text-[10px] text-[#94A3B8]">
-                Abre a conversa no Direct vinculada ao comentário (`recipient.comment_id`).
-              </span>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowIgCommentModal(false)}
-                className="px-4 py-2 rounded-xl border border-[#1E293B] text-xs font-semibold text-[#94A3B8] hover:bg-[#1B2333] hover:text-[#F8FAFC] transition"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={
-                  igSending || (!igPublicReply.trim() && !igPrivateDm.trim())
-                }
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-[#6366F1] hover:opacity-90 text-white text-xs font-bold disabled:opacity-40 transition"
-              >
-                {igSending
-                  ? 'Enviando...'
-                  : '🚀 Responder no Post + Enviar Direct'}
-              </button>
-            </div>
-          </form>
-        </div>
+            </Field>
+          </div>
+        </Modal>
       )}
     </div>
   );
