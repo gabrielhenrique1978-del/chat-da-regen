@@ -1,6 +1,9 @@
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("regenflow.api")
 
 from fastapi import (
     APIRouter,
@@ -1938,11 +1941,11 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             msg_obj = data.get("message", {}) or data
             key = data.get("key", {}) or msg_obj.get("key", {})
             from_me = bool(key.get("fromMe", False))
+            is_self = bool(data.get("isSelf", False))
             remote_jid = str(key.get("remoteJid", ""))
             clean_phone = remote_jid.split("@")[0].replace("+", "").strip()
 
-            # Bloqueia números próprios (self-LID ou self-phone) para nunca cadastrar o usuário do WhatsApp como cliente
-            if (
+            if not is_self and (
                 not clean_phone
                 or clean_phone == "status"
                 or clean_phone.endswith("g.us")
@@ -1952,7 +1955,9 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 return {"status": "ignored_self_or_group"}
 
             push_name = data.get("pushName")
-            if not push_name or push_name == whatsapp_service._name:
+            if is_self:
+                push_name = "Meu WhatsApp (Conversa de Teste)"
+            elif not push_name or push_name == whatsapp_service._name:
                 push_name = f"WhatsApp (+{clean_phone})"
 
             text_content = (
@@ -1972,12 +1977,12 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         name=push_name,
                         phone=f"+{clean_phone}",
                         channel="whatsapp",
-                        tags=["whatsapp-real"],
+                        tags=["whatsapp-teste"] if is_self else ["whatsapp-real"],
                     ),
                     create_default_deal=True,
                 )
 
-            if not from_me:
+            if not from_me or is_self:
                 result = agent.process_incoming_message(
                     contact_id=contact.id,
                     content=text_content or "Áudio recebido via WhatsApp",
