@@ -538,7 +538,7 @@ export default function App() {
     authUser?.role === 'super_admin' || authUser?.is_super_admin;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0A0D14] text-[#F8FAFC] select-none">
+    <div className="flex h-screen w-screen overflow-hidden bg-canvas text-fg select-none">
       {/* Left Navigation Sidebar */}
       <Sidebar
         activeTab={activeTab}

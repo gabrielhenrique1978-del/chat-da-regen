@@ -8,9 +8,18 @@ import {
   Lock,
   Unlock,
   Copy,
+  RefreshCw,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  StatusDot,
+  fieldClass,
+} from './ui';
 
 export default function SettingsView({ authUser, onSwitchAuthRole }) {
   const [tenants, setTenants] = useState([]);
@@ -38,7 +47,6 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
     }
     if (isSuperAdmin) {
       try {
-        // Garante token de super_admin se ainda não houver no localStorage
         if (!localStorage.getItem('regenflow_auth_token')) {
           const sw = await api.quickSwitchProfile('super_admin');
           localStorage.setItem('regenflow_auth_token', sw.access_token);
@@ -84,320 +92,276 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 bg-[#0A0D14] text-[#F8FAFC] space-y-6">
-      {/* Topo: Identidade Super Admin vs Tenant */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-6 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start gap-3.5">
-          <div
-            className={cn(
-              'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border',
-              isSuperAdmin
-                ? 'bg-[#1B2333] text-[#00D2FF] border-[#00D2FF]/30'
-                : 'bg-[#1B2333] text-[#A5B4FC] border-[#6366F1]/30'
-            )}
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-canvas text-fg">
+      {/* Cabeçalho */}
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line px-6">
+        <div>
+          <h1 className="text-sm font-semibold text-fg">
+            {isSuperAdmin ? 'Administração Global' : 'Configurações da Empresa'}
+          </h1>
+          <p className="text-2xs text-muted">
+            {isSuperAdmin
+              ? 'Gestão de empresas clientes, segurança de dados e trilha de auditoria.'
+              : 'Ambiente operacional da empresa e políticas de dados.'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant={isSuperAdmin ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => onSwitchAuthRole('super_admin')}
           >
-            {isSuperAdmin ? <Crown size={22} /> : <Building2 size={22} />}
+            <Crown size={13} />
+            <span>Visão Super Admin</span>
+          </Button>
+          <Button
+            variant={!isSuperAdmin ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => onSwitchAuthRole('tenant')}
+          >
+            <Building2 size={13} />
+            <span>Visão Empresa Cliente</span>
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex-1 space-y-6 overflow-y-auto p-6">
+        {feedback && (
+          <div
+            role="status"
+            className="flex items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface px-4 py-2.5 text-xs text-fg"
+          >
+            <span>{feedback.text}</span>
+            <button
+              onClick={() => setFeedback(null)}
+              className="text-muted hover:text-fg"
+            >
+              ✕
+            </button>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-[#F8FAFC]">
-                {isSuperAdmin
-                  ? 'Painel Master — Super Admin (Proprietário)'
-                  : `Ambiente da Empresa: ${
-                      authUser?.tenant_name || 'Tenant Cliente'
-                    }`}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-[#1B2333] text-[#00D2FF] border border-[#00D2FF]/20">
-                role: {authUser?.role || 'super_admin'}
-              </span>
+        )}
+
+        {/* Painel do Super Admin: Provisionamento e Bloqueio de Clientes */}
+        {isSuperAdmin && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Formulário de Provisionamento */}
+            <form
+              onSubmit={handleCreateTenant}
+              className="rounded-lg border border-line bg-surface p-5 space-y-4"
+            >
+              <div className="flex items-center gap-2 border-b border-line pb-3">
+                <Plus size={15} className="text-primary" />
+                <h2 className="text-xs font-medium text-fg">
+                  Nova empresa cliente (Tenant)
+                </h2>
+              </div>
+
+              <Field label="Nome da empresa">
+                <input
+                  type="text"
+                  required
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ex: Clínica Sorriso"
+                  className={fieldClass}
+                />
+              </Field>
+
+              <Field label="Nome do gestor / administrador">
+                <input
+                  type="text"
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  placeholder="Ex: Dr. Marcos"
+                  className={fieldClass}
+                />
+              </Field>
+
+              <Field label="E-mail de acesso">
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="admin@empresa.com"
+                  className={fieldClass}
+                />
+              </Field>
+
+              <Button type="submit" variant="primary" className="w-full">
+                Provisionar empresa e gerar acesso
+              </Button>
+
+              {provisionResult && (
+                <div className="rounded-md border border-line bg-canvas p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-2xs font-medium text-fg">
+                    <span>Senha temporária: {provisionResult.temporary_password}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigator.clipboard.writeText(
+                          provisionResult.whatsapp_welcome_message
+                        )
+                      }
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      <Copy size={11} />
+                      <span>Copiar dados</span>
+                    </button>
+                  </div>
+                  <pre className="text-2xs font-mono p-2 rounded bg-surface border border-line whitespace-pre-wrap text-muted">
+                    {provisionResult.whatsapp_welcome_message}
+                  </pre>
+                </div>
+              )}
+            </form>
+
+            {/* Lista de Empresas Clientes */}
+            <div className="lg:col-span-2 rounded-lg border border-line bg-surface overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+                <span className="text-xs font-medium text-fg">
+                  Empresas clientes ({tenants.length})
+                </span>
+                <span className="text-2xs text-muted">
+                  Bloqueio em tempo real (HTTP 403)
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto divide-y divide-line">
+                {tenants.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-muted">
+                    Nenhuma empresa cadastrada.
+                  </div>
+                ) : (
+                  tenants.map((t) => (
+                    <div
+                      key={t.id}
+                      className="p-4 flex items-center justify-between gap-4 hover:bg-elevated/40 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-xs font-medium text-fg">
+                            {t.name}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-2xs text-muted">
+                            <StatusDot tone={t.is_active ? 'primary' : 'accent'} />
+                            <span>{t.is_active ? 'Ativo' : 'Suspenso'}</span>
+                          </span>
+                        </div>
+                        <p className="text-2xs text-muted mt-0.5">
+                          Admin: {t.admin_email || '—'} · {t.users_count || 1} operador(es)
+                        </p>
+                      </div>
+
+                      <Button
+                        variant={t.is_active ? 'outline' : 'primary'}
+                        size="sm"
+                        onClick={() => handleToggleTenant(t)}
+                      >
+                        {t.is_active ? (
+                          <>
+                            <Lock size={12} />
+                            <span>Suspender</span>
+                          </>
+                        ) : (
+                          <>
+                            <Unlock size={12} />
+                            <span>Reativar</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            <p className="text-xs text-[#94A3B8] mt-1">
-              {isSuperAdmin
-                ? 'Você está autenticado como Super Admin Master com permissão global para provisionar e bloquear empresas clientes.'
-                : 'Você está autenticado como uma Empresa Cliente (Tenant). O painel de gestão B2B de outras empresas fica oculto.'}
+          </div>
+        )}
+
+        {/* Segurança Criptográfica & Autoria */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="rounded-lg border border-line bg-surface p-5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-fg">
+              <ShieldCheck size={16} className="text-primary" />
+              <span>Criptografia de ponta a ponta em repouso</span>
+            </div>
+            <p className="text-xs text-fg">
+              Algoritmo ativo:{' '}
+              <span className="font-mono text-primary font-medium">
+                {securityInfo?.cipher_algorithm || 'AES-256-CBC + HMAC-SHA256'}
+              </span>
+            </p>
+            <p className="text-2xs text-muted leading-relaxed">
+              Contatos protegidos: {securityInfo?.metrics?.encrypted_contacts_count || 0} · 
+              Mensagens cifradas: {securityInfo?.metrics?.encrypted_messages_count || 0}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-line bg-surface p-5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-fg">
+              <Award size={16} className="text-primary" />
+              <span>Autoria e licença oficial</span>
+            </div>
+            <p className="text-xs font-medium text-fg">
+              Desenvolvido por Gabriel Henrique e Otavio Santana
+            </p>
+            <p className="text-2xs text-muted leading-relaxed">
+              Copyright © 2026 Gabriel Henrique & Otavio Santana. Todos os direitos reservados sob Licença MIT.
+              Arquitetura em React, Vite, Tailwind CSS, FastAPI e Neon PostgreSQL.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => onSwitchAuthRole('super_admin')}
-            className={cn(
-              'px-3.5 py-2 rounded-xl text-xs font-semibold border transition',
-              isSuperAdmin
-                ? 'bg-[#00D2FF] text-[#0A0D14] border-[#00D2FF] font-bold'
-                : 'bg-[#0A0D14] text-[#94A3B8] border-[#1E293B] hover:text-[#F8FAFC] hover:bg-[#1B2333]'
-            )}
-          >
-            👑 Visão Super Admin
-          </button>
-          <button
-            onClick={() => onSwitchAuthRole('tenant')}
-            className={cn(
-              'px-3.5 py-2 rounded-xl text-xs font-semibold border transition',
-              !isSuperAdmin
-                ? 'bg-[#6366F1] text-white border-[#6366F1] font-bold'
-                : 'bg-[#0A0D14] text-[#94A3B8] border-[#1E293B] hover:text-[#F8FAFC] hover:bg-[#1B2333]'
-            )}
-          >
-            🏢 Visão Tenant Cliente
-          </button>
-        </div>
-      </div>
-
-      {feedback && (
-        <div className="p-3 rounded-lg bg-surface border border-line-strong text-fg text-xs font-medium flex justify-between items-center">
-          <span>{feedback.text}</span>
-          <button onClick={() => setFeedback(null)} className="text-muted hover:text-fg">✕</button>
-        </div>
-      )}
-
-      {/* Seção Exclusiva Super Admin: Gestão de Empresas Clientes (Tenants) e Inadimplência */}
-      {isSuperAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Cadastrar Nova Empresa Cliente */}
-          <form
-            onSubmit={handleCreateTenant}
-            className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4 shadow-card"
-          >
-            <h2 className="text-xs font-bold uppercase tracking-wider text-[#00D2FF] flex items-center gap-1.5">
-              <Plus size={15} />
-              Cadastrar Nova Empresa Cliente (Tenant)
-            </h2>
-
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#94A3B8] mb-1">
-                Nome da Empresa *
-              </label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Ex: Clínica Sorriso Perfeito"
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
-              />
+        {/* Trilha de Auditoria (LGPD Art. 37) */}
+        <div className="rounded-lg border border-line bg-surface overflow-hidden">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={15} className="text-muted" />
+              <span className="text-xs font-medium text-fg">
+                Trilha de auditoria imutável (LGPD Art. 37)
+              </span>
             </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#94A3B8] mb-1">
-                Nome do Gestor / Admin
-              </label>
-              <input
-                type="text"
-                value={adminName}
-                onChange={(e) => setAdminName(e.target.value)}
-                placeholder="Ex: Dr. Marcos"
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#94A3B8] mb-1">
-                E-mail de Login *
-              </label>
-              <input
-                type="email"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="contato@clinica.com.br"
-                className="w-full rounded-xl border border-[#1E293B] bg-[#0A0D14] p-2.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#00D2FF]"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-[#00D2FF] hover:bg-[#38BDF8] text-[#0A0D14] text-xs font-bold transition shadow-xs"
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadTenantsAndSecurity}
             >
-              Provisionar Empresa + Senha Provisória
-            </button>
+              <RefreshCw size={12} />
+              <span>Atualizar logs</span>
+            </Button>
+          </div>
 
-            {provisionResult && (
-              <div className="p-3 rounded-xl bg-[#0A0D14] border border-[#1E293B] text-xs space-y-2">
-                <div className="font-semibold text-[#00D2FF] flex items-center justify-between">
-                  <span>Senha: {provisionResult.temporary_password}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigator.clipboard.writeText(
-                        provisionResult.whatsapp_welcome_message
-                      )
-                    }
-                    className="inline-flex items-center gap-1 text-[10px] underline hover:text-[#38BDF8]"
-                  >
-                    <Copy size={11} /> Copiar Msg
-                  </button>
-                </div>
-                <pre className="text-[10px] whitespace-pre-wrap font-mono bg-[#121824] p-2 rounded border border-[#1E293B] text-[#F8FAFC]">
-                  {provisionResult.whatsapp_welcome_message}
-                </pre>
+          <div className="max-h-72 overflow-y-auto divide-y divide-line">
+            {auditLogs.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted">
+                Nenhum evento registrado.
               </div>
-            )}
-          </form>
-
-          {/* Lista de Empresas & Trava de Inadimplência */}
-          <div className="lg:col-span-2 bg-[#121824] border border-[#1E293B] rounded-2xl overflow-hidden shadow-card">
-            <div className="px-5 py-4 border-b border-[#1E293B] bg-[#0A0D14]/40 flex items-center justify-between">
-              <span className="font-semibold text-xs text-[#F8FAFC]">
-                Empresas Clientes Cadastradas ({tenants.length})
-              </span>
-              <span className="text-[11px] text-[#94A3B8]">
-                Bloqueio em Tempo Real (HTTP 403 Forbidden)
-              </span>
-            </div>
-
-            <div className="divide-y divide-[#1E293B]/60">
-              {tenants.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[#94A3B8]">
-                  Nenhuma empresa cliente cadastrada ainda.
-                </div>
-              ) : (
-                tenants.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-4 flex items-center justify-between gap-4 hover:bg-[#1B2333]/40 transition"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-[#F8FAFC]">
-                          {t.name}
-                        </span>
-                        <span
-                          className={cn(
-                            'px-2 py-0.5 rounded-full text-[10px] font-semibold border',
-                            t.is_active
-                              ? 'bg-elevated text-primary border-primary/30'
-                              : 'bg-accent/15 text-accent border-accent/30'
-                          )}
-                        >
-                          {t.is_active
-                            ? 'Ativo'
-                            : 'Suspenso (403)'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#94A3B8] mt-0.5">
-                        Admin: {t.admin_email || '—'} • {t.users_count || 1}{' '}
-                        usuário(s)
-                      </p>
+            ) : (
+              auditLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-elevated/40 transition-colors"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-2xs font-medium text-primary">
+                        {log.action}
+                      </span>
+                      <span className="font-medium text-fg">{log.actor}</span>
+                      <span className="text-2xs text-muted">
+                        ({log.actor_role})
+                      </span>
                     </div>
-
-                    <button
-                      onClick={() => handleToggleTenant(t)}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition border',
-                        t.is_active
-                          ? 'border-accent/30 bg-accent-deep/20 text-fg hover:bg-accent-deep/40'
-                          : 'border-primary/30 bg-elevated text-primary hover:bg-elevated/80'
-                      )}
-                    >
-                      {t.is_active ? (
-                        <>
-                          <Lock size={13} />
-                          <span>Suspender</span>
-                        </>
-                      ) : (
-                        <>
-                          <Unlock size={13} />
-                          <span>Reativar Acesso</span>
-                        </>
-                      )}
-                    </button>
+                    <p className="text-2xs text-muted">{log.details}</p>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Segurança AES-256 & Licença Oficial de Autoria */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-2 shadow-card">
-          <div className="flex items-center gap-2 text-[#00D2FF] font-bold text-xs uppercase">
-            <ShieldCheck size={16} />
-            Segurança Criptográfica & Banco em Nuvem (Neon PostgreSQL)
-          </div>
-          <p className="text-xs text-[#F8FAFC]">
-            Algoritmo ativo:{' '}
-            <strong className="text-[#00D2FF]">
-              {securityInfo?.cipher_algorithm || 'AES-256-CBC + HMAC-SHA256'}
-            </strong>
-          </p>
-          <p className="text-[11px] text-[#94A3B8]">
-            Contatos criptografados:{' '}
-            {securityInfo?.metrics?.encrypted_contacts_count || 0} • Mensagens
-            cifradas: {securityInfo?.metrics?.encrypted_messages_count || 0}
-          </p>
-        </div>
-
-        {/* Card Oficial de Licença & Autoria */}
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-2 shadow-card">
-          <div className="flex items-center gap-2 text-[#00D2FF] font-bold text-xs uppercase tracking-wider">
-            <Award size={18} />
-            Licença Oficial & Propriedade Intelectual
-          </div>
-          <h3 className="text-sm font-bold text-[#F8FAFC]">
-            Desenvolvido por Gabriel Henrique e Otavio Santana
-          </h3>
-          <p className="text-xs text-[#94A3B8] leading-relaxed">
-            Copyright © 2026 <strong className="text-[#F8FAFC]">Gabriel Henrique</strong> &{' '}
-            <strong className="text-[#F8FAFC]">Otavio Santana</strong>. Todos os direitos reservados sob
-            Licença MIT. Arquitetura Full Stack em React, Vite, Tailwind CSS,
-            FastAPI e Neon PostgreSQL Cloud.
-          </p>
-        </div>
-      </div>
-
-      {/* Trilha de Auditoria Imutável (LGPD Art. 37 & Governança de Equipe) */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl overflow-hidden shadow-card">
-        <div className="px-5 py-4 border-b border-[#1E293B] bg-[#0A0D14]/40 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={16} className="text-[#00D2FF]" />
-            <span className="font-semibold text-xs uppercase tracking-wider text-[#F8FAFC]">
-              Trilha de Auditoria Imutável & Operações LGPD (Art. 37)
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={loadTenantsAndSecurity}
-            className="text-[11px] font-semibold text-[#00D2FF] hover:underline"
-          >
-            ↻ Atualizar Logs
-          </button>
-        </div>
-
-        <div className="max-h-72 overflow-y-auto divide-y divide-[#1E293B]/60">
-          {auditLogs.length === 0 ? (
-            <div className="p-6 text-center text-xs text-[#94A3B8]">
-              Nenhum evento de auditoria registrado ainda.
-            </div>
-          ) : (
-            auditLogs.map((log) => (
-              <div
-                key={log.id}
-                className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-[#1B2333]/40 transition"
-              >
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-[#0A0D14] border border-[#1E293B] font-mono text-[10px] font-semibold text-[#00D2FF]">
-                      {log.action}
-                    </span>
-                    <span className="font-semibold text-[#F8FAFC]">
-                      {log.actor}
-                    </span>
-                    <span className="text-[10px] text-[#94A3B8] uppercase">
-                      ({log.actor_role})
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#94A3B8]">
-                    {log.details}
-                  </p>
+                  <span className="text-2xs tabular-nums font-mono text-muted shrink-0">
+                    {new Date(log.timestamp).toLocaleString('pt-BR')}
+                  </span>
                 </div>
-                <span className="text-[10px] font-mono text-[#94A3B8] shrink-0">
-                  {new Date(log.timestamp).toLocaleString('pt-BR')}
-                </span>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
