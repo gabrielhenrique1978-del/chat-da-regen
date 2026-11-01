@@ -115,14 +115,18 @@ class WhatsAppService:
                     data = res.json()
                     state = data.get("instance", {}).get("state", "disconnected")
                     self._connected = state == "open"
+                    phone_val = data.get("instance", {}).get("phone")
+                    if phone_val:
+                        self._phone_number = phone_val
                     return {
                         "online": True,
                         "instance": self.instance_name,
                         "state": state,
                         "connected": self._connected,
                         "phone": self._phone_number,
+                        "phone_number": self._phone_number,
                         "qrcode": self._last_qrcode if not self._connected else None,
-                        "provider": "Evolution API v2",
+                        "provider": "WhatsApp Native Bridge (Baileys)",
                     }
         except Exception:
             pass
@@ -133,9 +137,10 @@ class WhatsAppService:
             "state": "offline" if not self._connected else "open",
             "connected": self._connected,
             "phone": self._phone_number,
+            "phone_number": self._phone_number,
             "qrcode": self._last_qrcode,
-            "provider": "Evolution API (Local/Docker)",
-            "message": "Servidor Evolution API não detectado na porta 8080. Inicie com 'docker-compose up -d' ou configure a URL da nuvem.",
+            "provider": "WhatsApp Native Bridge (Baileys)",
+            "message": "Servidor WhatsApp Bridge não detectado na porta 8080.",
         }
 
     async def create_or_connect(self) -> Dict[str, Any]:

@@ -11,12 +11,14 @@ bridge_proc = None
 
 def start_whatsapp_bridge():
     global bridge_proc
-    bridge_script = os.path.join(os.path.dirname(__file__), "whatsapp_bridge", "server.js")
+    bridge_dir = os.path.join(os.path.dirname(__file__), "whatsapp_bridge")
+    bridge_script = os.path.join(bridge_dir, "server.js")
     if os.path.exists(bridge_script):
         try:
             print("🚀 Iniciando WhatsApp Native Bridge (Baileys) na porta 8080...")
             bridge_proc = subprocess.Popen(
-                ["node", bridge_script],
+                ["node", "server.js"],
+                cwd=bridge_dir,
             )
             def cleanup():
                 if bridge_proc and bridge_proc.poll() is None:
