@@ -1493,6 +1493,15 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         await ws_manager.broadcast_event("new_message", {"type": "contact_details_updated"})
         return updated.model_dump()
 
+    @router.post("/contacts/{contact_id}/request-phone")
+    async def request_contact_phone(contact_id: str):
+        contact = db.get_contact(contact_id)
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contato não encontrado")
+        target = (contact.custom_fields or {}).get("whatsapp_jid") or contact.phone
+        res = await whatsapp_service.request_phone_number(target)
+        return res
+
     # -----------------------------------------------------------------
     # Mensagens, Notas Internas, Áudio/Mídia & Anti-Fragmentação
     # -----------------------------------------------------------------
@@ -1998,8 +2007,22 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 return {"status": "ignored_empty"}
 
             canonical_jid = f"{clean_phone}@lid" if (len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))) else (remote_jid or f"{clean_phone}@s.whatsapp.net")
+            is_lid = len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))
 
-            contact = db.find_contact_by_phone(clean_phone)
+            contact = None
+            if is_lid:
+                for c in db.list_contacts():
+                    fields = c.custom_fields or {}
+                    if (
+                        fields.get("whatsapp_lid") == clean_phone
+                        or (fields.get("whatsapp_jid") and clean_phone in str(fields.get("whatsapp_jid")))
+                        or c.phone == f"+{clean_phone}"
+                    ):
+                        contact = c
+                        break
+            else:
+                contact = db.find_contact_by_phone(clean_phone)
+
             if not contact:
                 contact = db.create_contact(
                     Contact(
@@ -2007,16 +2030,22 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         phone=f"+{clean_phone}",
                         channel="whatsapp",
                         tags=["whatsapp-teste"] if is_self else ["whatsapp-real"],
-                        custom_fields={"whatsapp_jid": canonical_jid},
+                        custom_fields={
+                            "whatsapp_jid": canonical_jid,
+                            "whatsapp_lid": clean_phone if is_lid else None,
+                            "is_lid": is_lid,
+                        },
                     ),
                     create_default_deal=True,
                 )
             else:
                 fields = contact.custom_fields or {}
-                if fields.get("whatsapp_jid") != canonical_jid:
-                    fields["whatsapp_jid"] = canonical_jid
-                    contact.custom_fields = fields
-                    db.update_contact(contact)
+                fields["whatsapp_jid"] = canonical_jid
+                if is_lid:
+                    fields["is_lid"] = True
+                    fields["whatsapp_lid"] = clean_phone
+                contact.custom_fields = fields
+                db.update_contact(contact)
 
             if not from_me or is_self:
                 result = agent.process_incoming_message(
@@ -2042,6 +2071,28 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 await ws_manager.broadcast_event("message_sent", payload)
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
                 return {"status": "mirrored", "contact_id": contact.id}
+
+        elif "PHONE_IDENTIFIED" in event or "PHONE" in event and "IDENTIFIED" in event:
+            lid_val = str(data.get("lid", "")).strip()
+            phone_val = str(data.get("phone", "")).strip().replace("+", "")
+            if lid_val and phone_val:
+                for c in db.list_contacts():
+                    fields = c.custom_fields or {}
+                    if (
+                        fields.get("whatsapp_lid") == lid_val
+                        or (fields.get("whatsapp_jid") and lid_val in str(fields.get("whatsapp_jid")))
+                        or c.phone == f"+{lid_val}"
+                    ):
+                        c.phone = f"+{phone_val}"
+                        fields["whatsapp_lid"] = lid_val
+                        fields["real_phone"] = phone_val
+                        fields["is_lid"] = False
+                        c.custom_fields = fields
+                        db.update_contact(c)
+                        await ws_manager.broadcast_event("new_message", {"type": "contact_details_updated"})
+                        logger.info(f"Telefone identificado com sucesso: {lid_val} -> +{phone_val}")
+                        return {"status": "phone_updated", "contact_id": c.id}
+            return {"status": "phone_identified_processed"}
 
         elif "CONTACTS" in event and "SYNC" in event:
             contacts_list = data.get("contacts") or []

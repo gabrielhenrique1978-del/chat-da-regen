@@ -570,7 +570,14 @@ export default function OmnichannelInbox({
                     </div>
 
                     <div className="text-2xs text-muted truncate mt-0.5">
-                      {c.phone || c.email || 'Canal digital'}
+                      {c.phone && c.phone.replace(/\D/g, '').length <= 13 ? (
+                        c.phone
+                      ) : (
+                        <span className="flex items-center gap-1 text-muted text-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0"></span>
+                          <span className="truncate">WhatsApp Business (Meta ID)</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Metadados de posse e canal */}
@@ -637,6 +644,15 @@ export default function OmnichannelInbox({
                       <ChannelIcon size={11} />
                       <span className="capitalize">{currentContact.channel}</span>
                     </Badge>
+                    {currentContact.phone && currentContact.phone.replace(/\D/g, '').length <= 13 ? (
+                      <span className="text-2xs text-muted font-mono">
+                        {currentContact.phone}
+                      </span>
+                    ) : (
+                      <span className="text-3xs text-muted/80 bg-surface-elevated px-1.5 py-0.5 rounded border border-line" title="Conta com ID de privacidade Meta">
+                        Meta ID Protegido
+                      </span>
+                    )}
                   </div>
                   <p className="text-2xs text-muted truncate">
                     {isMine

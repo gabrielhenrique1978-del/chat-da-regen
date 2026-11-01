@@ -281,6 +281,19 @@ class WhatsAppService:
             "message": "Áudio salvo no CRM como nota de voz.",
         }
 
+    async def request_phone_number(self, phone_or_jid: str) -> Dict[str, Any]:
+        """Solicita ao cliente via protocolo oficial do WhatsApp o compartilhamento do número real."""
+        url = f"{self.base_url}/message/requestPhoneNumber/{self.instance_name}"
+        payload = {"number": phone_or_jid}
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.post(url, headers=self.headers, json=payload)
+                if res.status_code in (200, 201):
+                    return {"success": True, "result": res.json()}
+        except Exception as exc:
+            logger.warning(f"Falha ao solicitar telefone via WhatsApp: {exc}")
+        return {"success": False, "error": "WhatsApp offline ou indisponível"}
+
     def set_connection_state_from_webhook(
         self,
         state: str,

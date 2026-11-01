@@ -86,6 +86,8 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  requestContactPhone: (contactId) =>
+    apiRequest(`/contacts/${contactId}/request-phone`, { method: 'POST' }),
   clearDemoContacts: () => apiRequest('/contacts/clear-demo', { method: 'POST' }),
 
   // Mensagens, Áudio PTT, Templates HSM e Simulador

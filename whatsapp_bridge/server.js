@@ -127,12 +127,19 @@ async function processAndForwardMessage(msg) {
   jidMap.set(rawId, remoteJid);
   jidMap.set(remoteJid, remoteJid);
 
-  // Tenta resolver o telefone real a partir do mapa ou de participant
+  // Tenta resolver o telefone real a partir do mapa, senderPn ou participant
   let realPhone = isLid ? (lidToPhoneMap.get(rawId) || rawId) : rawId;
-  const altJid = msg.key?.participant || msg.participant;
-  if (altJid && altJid.includes('@s.whatsapp.net')) {
-    realPhone = altJid.split('@')[0];
-    recordMapping(altJid, remoteJid, msg.pushName);
+  const senderPn = msg.key?.senderPn || msg.key?.participantPn || msg.senderPn || msg.participantPn;
+  if (senderPn && senderPn.includes('@s.whatsapp.net')) {
+    realPhone = senderPn.split('@')[0];
+    recordMapping(senderPn, remoteJid, msg.pushName);
+    console.log(`📞 [Baileys] Telefone real identificado via senderPn: ${realPhone}`);
+  } else {
+    const altJid = msg.key?.participant || msg.participant;
+    if (altJid && altJid.includes('@s.whatsapp.net')) {
+      realPhone = altJid.split('@')[0];
+      recordMapping(altJid, remoteJid, msg.pushName);
+    }
   }
 
   const text =
@@ -338,6 +345,26 @@ async function startWhatsAppSocket() {
       }
     });
 
+    // Evento oficial do WhatsApp quando o usuário compartilha o telefone real
+    sock.ev.on('chats.phoneNumberShare', async ({ lid, jid }) => {
+      console.log(`📞 [Baileys] chats.phoneNumberShare recebido: LID ${lid} -> Telefone ${jid}`);
+      if (lid && jid) {
+        recordMapping(jid, lid);
+        const cleanPhone = jid.split('@')[0];
+        const cleanLid = lid.split('@')[0];
+        await notifyWebhook({
+          event: 'contacts.phone_identified',
+          instance: 'regenflow',
+          data: {
+            lid: cleanLid,
+            phone: cleanPhone,
+            jid: jid,
+            lidJid: lid,
+          },
+        });
+      }
+    });
+
     // Sincronização de histórico recente
     sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
       console.log(`📥 [Baileys] Sincronização inicial: ${chats?.length || 0} chats, ${contacts?.length || 0} contatos.`);
@@ -469,6 +496,23 @@ app.post('/message/sendWhatsAppAudio/:instance', async (req, res) => {
     res.json({ success: true, messageId: sent.key.id, jid: targetJid });
   } catch (err) {
     console.error('Erro ao enviar áudio:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/message/requestPhoneNumber/:instance', async (req, res) => {
+  try {
+    const { number } = req.body;
+    if (!sock || connectionState !== 'open') {
+      return res.status(400).json({ error: 'WhatsApp não está conectado.' });
+    }
+
+    const targetJid = getTargetJid(number);
+    console.log(`📲 [Baileys] Solicitando compartilhamento nativo de telefone para ${targetJid}`);
+    const sent = await sock.sendMessage(targetJid, { requestPhoneNumber: {} });
+    res.json({ success: true, messageId: sent?.key?.id, jid: targetJid });
+  } catch (err) {
+    console.error('Erro ao solicitar telefone:', err);
     res.status(500).json({ error: err.message });
   }
 });

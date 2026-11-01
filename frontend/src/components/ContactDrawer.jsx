@@ -65,13 +65,32 @@ export default function ContactDrawer({
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState(contact?.phone || '');
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [requestingPhone, setRequestingPhone] = useState(false);
+  const [phoneRequested, setPhoneRequested] = useState(false);
+
+  const handleRequestPhone = async () => {
+    setRequestingPhone(true);
+    try {
+      await api.requestContactPhone(contact.id);
+      setPhoneRequested(true);
+      setTimeout(() => setPhoneRequested(false), 5000);
+    } catch (err) {
+      console.error('Erro ao solicitar telefone:', err);
+    } finally {
+      setRequestingPhone(false);
+    }
+  };
 
   const handleSavePhone = async () => {
     if (!phoneInput.trim()) return;
     setPhoneSaving(true);
     try {
-      await api.updateContactDetails(contact.id, { phone: phoneInput.trim() });
-      contact.phone = phoneInput.trim();
+      const clean = phoneInput.trim();
+      await api.updateContactDetails(contact.id, {
+        phone: clean,
+        custom_fields: { real_phone: clean, is_lid: false },
+      });
+      contact.phone = clean;
       setIsEditingPhone(false);
     } catch (err) {
       console.error('Erro ao atualizar telefone:', err);
@@ -157,17 +176,32 @@ export default function ContactDrawer({
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-fg font-mono">
-                  {contact.phone || <span className="text-muted">—</span>}
+                  {contact.phone && contact.phone.replace(/\D/g, '').length <= 13 ? (
+                    contact.phone
+                  ) : (
+                    <span className="text-muted text-2xs italic">Protegido por Meta ID</span>
+                  )}
                 </span>
                 {contact.phone && contact.phone.replace(/\D/g, '').length > 13 && (
-                  <span className="rounded bg-primary/10 px-1 py-0.5 text-3xs text-primary font-medium" title="Identificador Meta LID">
-                    Meta LID
-                  </span>
+                  <>
+                    <span className="rounded bg-primary/10 px-1 py-0.5 text-3xs text-primary font-medium" title={`Meta LID: ${contact.phone}`}>
+                      Meta LID
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRequestPhone}
+                      disabled={requestingPhone}
+                      className="rounded bg-secondary/15 hover:bg-secondary/25 text-secondary text-3xs px-1.5 py-0.5 transition-colors font-medium flex items-center gap-1"
+                      title="Solicitar compartilhamento oficial de telefone no WhatsApp"
+                    >
+                      {phoneRequested ? 'Solicitado ✓' : 'Solicitar'}
+                    </button>
+                  </>
                 )}
                 <button
                   type="button"
                   onClick={() => {
-                    setPhoneInput(contact.phone || '');
+                    setPhoneInput(contact.phone && contact.phone.replace(/\D/g, '').length <= 13 ? contact.phone : '');
                     setIsEditingPhone(true);
                   }}
                   className="text-muted hover:text-fg p-0.5 rounded transition-colors"
