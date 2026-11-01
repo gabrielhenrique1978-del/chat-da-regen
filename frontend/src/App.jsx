@@ -207,6 +207,8 @@ export default function App() {
       }
       if (
         ev === 'new_message' ||
+        ev === 'message_processed' ||
+        ev === 'message_sent' ||
         ev === 'seller_assigned' ||
         ev === 'contact_assigned' ||
         ev === 'handoff_updated' ||
@@ -226,6 +228,12 @@ export default function App() {
       ) {
         loadSellers();
         loadContacts();
+      }
+      if (ev === 'whatsapp_status_updated') {
+        if (payload.data?.state === 'open') {
+          showToast(`WhatsApp Conectado (${payload.data.phone || 'Sessão ativa'})`, 'success');
+          loadContacts();
+        }
       }
     });
     return () => {

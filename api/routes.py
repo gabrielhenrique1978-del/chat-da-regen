@@ -1937,41 +1937,59 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         if "MESSAGES" in event and "UPSERT" in event:
             msg_obj = data.get("message", {}) or data
             key = data.get("key", {}) or msg_obj.get("key", {})
-            from_me = key.get("fromMe", False)
+            from_me = bool(key.get("fromMe", False))
+            remote_jid = str(key.get("remoteJid", ""))
+            clean_phone = remote_jid.split("@")[0].replace("+", "").strip()
 
-            if not from_me:
-                remote_jid = str(key.get("remoteJid", ""))
-                clean_phone = remote_jid.split("@")[0]
-                if clean_phone and clean_phone != "status":
-                    push_name = data.get("pushName") or msg_obj.get("pushName") or f"WhatsApp ({clean_phone[-4:]})"
-                    text_content = (
-                        msg_obj.get("conversation")
-                        or msg_obj.get("extendedTextMessage", {}).get("text")
-                        or msg_obj.get("audioMessage", {}).get("caption")
-                        or "Mensagem via WhatsApp"
+            if clean_phone and clean_phone != "status" and not clean_phone.endswith("g.us"):
+                push_name = data.get("pushName") or msg_obj.get("pushName") or f"WhatsApp ({clean_phone[-4:]})"
+                text_content = (
+                    msg_obj.get("conversation")
+                    or msg_obj.get("extendedTextMessage", {}).get("text")
+                    or msg_obj.get("audioMessage", {}).get("caption")
+                    or ""
+                )
+                media_type = "audio" if "audioMessage" in msg_obj else "text"
+                if not text_content and media_type != "audio":
+                    return {"status": "ignored_empty"}
+
+                contact = db.find_contact_by_phone(clean_phone)
+                if not contact:
+                    contact = db.create_contact(
+                        Contact(
+                            name=push_name,
+                            phone=f"+{clean_phone}",
+                            channel="whatsapp",
+                            tags=["whatsapp-real"],
+                        ),
+                        create_default_deal=True,
                     )
-                    media_type = "audio" if "audioMessage" in msg_obj else "text"
 
-                    contact = db.find_contact_by_phone(clean_phone)
-                    if not contact:
-                        contact = db.create_contact(
-                            Contact(
-                                name=push_name,
-                                phone=f"+{clean_phone}",
-                                channel="whatsapp",
-                                tags=["whatsapp-real"],
-                            ),
-                            create_default_deal=True,
-                        )
-
+                if not from_me:
                     result = agent.process_incoming_message(
                         contact_id=contact.id,
-                        content=text_content,
+                        content=text_content or "Áudio recebido via WhatsApp",
                         channel="whatsapp",
                         media_type=media_type,
                     )
                     await ws_manager.broadcast_event("message_processed", result)
+                    await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
                     return {"status": "processed", "contact_id": contact.id}
+                else:
+                    # Espelhar mensagem enviada pelo próprio usuário no celular para a interface
+                    sent_msg = db.add_message(
+                        Message(
+                            contact_id=contact.id,
+                            sender="agent",
+                            content=text_content or "Áudio enviado via WhatsApp",
+                            channel="whatsapp",
+                            media_type=media_type,
+                        )
+                    )
+                    payload = {"message": sent_msg.model_dump()}
+                    await ws_manager.broadcast_event("message_sent", payload)
+                    await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
+                    return {"status": "mirrored", "contact_id": contact.id}
 
         elif "CONNECTION" in event and "UPDATE" in event:
             state = data.get("state", "disconnected")

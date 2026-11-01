@@ -28,6 +28,7 @@ let sock = null;
 let currentQR = null;
 let connectionState = 'close'; // 'open' | 'connecting' | 'close'
 let myPhoneNumber = null;
+let isStarting = false;
 
 async function notifyWebhook(payload) {
   try {
@@ -37,123 +38,181 @@ async function notifyWebhook(payload) {
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    // FastAPI might be starting or busy
+    // FastAPI pode estar ocupado ou inicializando
   }
 }
 
-async function startWhatsAppSocket() {
-  if (sock && (connectionState === 'open' || connectionState === 'connecting')) {
-    return;
+async function processAndForwardMessage(msg) {
+  if (!msg || !msg.message) return;
+
+  const remoteJid = msg.key?.remoteJid;
+  if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
+    return; // Ignora grupos e status stories
   }
 
-  connectionState = 'connecting';
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version } = await fetchLatestBaileysVersion();
+  const text =
+    msg.message.conversation ||
+    msg.message.extendedTextMessage?.text ||
+    msg.message.imageMessage?.caption ||
+    msg.message.videoMessage?.caption ||
+    msg.message.documentMessage?.title ||
+    '';
 
-  sock = makeWASocket({
-    version,
-    auth: state,
-    logger,
-    printQRInTerminal: true,
-    browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
-    generateHighQualityLinkPreview: true,
+  const isAudio = Boolean(msg.message.audioMessage);
+  if (!text && !isAudio) return;
+
+  const pushName = msg.pushName || 'Contato WhatsApp';
+  const fromMe = Boolean(msg.key?.fromMe);
+
+  console.log(`📩 [WhatsApp ${fromMe ? 'Enviada (App)' : 'Recebida'} (${remoteJid})]: ${text || '[Áudio]'}`);
+
+  await notifyWebhook({
+    event: 'messages.upsert',
+    instance: 'regenflow',
+    data: {
+      key: {
+        remoteJid: remoteJid,
+        fromMe: fromMe,
+        id: msg.key?.id,
+      },
+      pushName: pushName,
+      message: {
+        conversation: text,
+        ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
+      },
+    },
   });
+}
 
-  sock.ev.on('creds.update', saveCreds);
+async function startWhatsAppSocket() {
+  if (sock && connectionState === 'open') {
+    return;
+  }
+  if (isStarting) {
+    return;
+  }
+  isStarting = true;
 
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      console.log('⚡ [Baileys] Novo QR Code real recebido do WhatsApp!');
+  try {
+    // Limpeza defensiva de conexões anteriores
+    if (sock) {
       try {
-        currentQR = await QRCode.toDataURL(qr, {
-          margin: 2,
-          scale: 8,
-          errorCorrectionLevel: 'M',
-        });
-        await notifyWebhook({
-          event: 'qrcode.updated',
-          instance: 'regenflow',
-          data: { qrcode: { base64: currentQR } },
-        });
-      } catch (e) {
-        console.error('Erro ao gerar PNG do QR Code:', e);
-      }
+        sock.ev.removeAllListeners();
+        sock.end(undefined);
+      } catch (e) {}
+      sock = null;
     }
 
-    if (connection === 'open') {
-      connectionState = 'open';
-      currentQR = null;
-      myPhoneNumber = sock.user?.id ? sock.user.id.split(':')[0] : null;
-      console.log(`✅ [Baileys] WhatsApp Conectado com sucesso! Número: ${myPhoneNumber}`);
-      await notifyWebhook({
-        event: 'connection.update',
-        instance: 'regenflow',
-        data: { state: 'open', phone: myPhoneNumber },
-      });
-    } else if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`⚠️ [Baileys] Conexão fechada (código ${statusCode}). Reconectar: ${shouldReconnect}`);
+    connectionState = 'connecting';
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { version } = await fetchLatestBaileysVersion();
 
-      if (statusCode === DisconnectReason.loggedOut) {
-        connectionState = 'close';
-        currentQR = null;
-        myPhoneNumber = null;
-        sock = null;
-        // Limpa credenciais salvas em caso de logout
-        if (fs.existsSync(AUTH_DIR)) {
-          fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    sock = makeWASocket({
+      version,
+      auth: state,
+      logger,
+      browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
+      syncFullHistory: false, // CRUCIAL: impede que o WhatsApp no celular fique pausado tentando sincronizar gigabytes
+      markOnlineOnConnect: true,
+      generateHighQualityLinkPreview: true,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      defaultQueryTimeoutMs: 60000,
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        console.log('⚡ [Baileys] Novo QR Code real recebido do WhatsApp!');
+        try {
+          currentQR = await QRCode.toDataURL(qr, {
+            margin: 2,
+            scale: 8,
+            errorCorrectionLevel: 'M',
+          });
+          await notifyWebhook({
+            event: 'qrcode.updated',
+            instance: 'regenflow',
+            data: { qrcode: { base64: currentQR } },
+          });
+        } catch (e) {
+          console.error('Erro ao gerar PNG do QR Code:', e);
         }
+      }
+
+      if (connection === 'open') {
+        connectionState = 'open';
+        currentQR = null;
+        myPhoneNumber = sock.user?.id ? sock.user.id.split(':')[0] : null;
+        console.log(`✅ [Baileys] WhatsApp Conectado com sucesso! Número: ${myPhoneNumber}`);
         await notifyWebhook({
           event: 'connection.update',
           instance: 'regenflow',
-          data: { state: 'close' },
+          data: { state: 'open', phone: myPhoneNumber },
         });
-      } else {
-        connectionState = 'connecting';
-        setTimeout(() => startWhatsAppSocket(), 3000);
+      } else if (connection === 'close') {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        console.log(`⚠️ [Baileys] Conexão encerrada (código ${statusCode}). Reconectar: ${shouldReconnect}`);
+
+        connectionState = 'close';
+        try {
+          sock?.ev?.removeAllListeners();
+        } catch (e) {}
+        sock = null;
+
+        if (statusCode === DisconnectReason.loggedOut) {
+          currentQR = null;
+          myPhoneNumber = null;
+          if (fs.existsSync(AUTH_DIR)) {
+            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+          }
+          await notifyWebhook({
+            event: 'connection.update',
+            instance: 'regenflow',
+            data: { state: 'close' },
+          });
+        } else {
+          // Código 515 (restartRequired) ocorre logo após a leitura do QR Code
+          const delay = statusCode === DisconnectReason.restartRequired ? 500 : 2500;
+          console.log(`🔄 [Baileys] Restabelecendo socket em ${delay}ms...`);
+          setTimeout(() => {
+            startWhatsAppSocket().catch(console.error);
+          }, delay);
+        }
       }
-    }
-  });
+    });
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    for (const msg of messages) {
-      if (!msg.message || msg.key.fromMe) continue;
-
-      const remoteJid = msg.key.remoteJid;
-      if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
-        continue; // Ignora grupos e status por padrão
+    // Recebimento de mensagens em tempo real
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+      if (!messages || !Array.isArray(messages)) return;
+      for (const msg of messages) {
+        await processAndForwardMessage(msg);
       }
+    });
 
-      const text =
-        msg.message.conversation ||
-        msg.message.extendedTextMessage?.text ||
-        msg.message.imageMessage?.caption ||
-        msg.message.videoMessage?.caption ||
-        '';
-
-      const pushName = msg.pushName || 'Cliente WhatsApp';
-
-      console.log(`📩 [Mensagem WhatsApp recebida de ${pushName} (${remoteJid})]: ${text}`);
-
-      await notifyWebhook({
-        event: 'messages.upsert',
-        instance: 'regenflow',
-        data: {
-          key: {
-            remoteJid: remoteJid,
-            fromMe: false,
-          },
-          pushName: pushName,
-          message: {
-            conversation: text,
-          },
-        },
-      });
-    }
-  });
+    // Sincronização inicial de histórico das conversas recentes
+    sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
+      console.log(`📥 [Baileys] Histórico sincronizado: ${chats?.length || 0} conversas, ${messages?.length || 0} mensagens.`);
+      if (messages && Array.isArray(messages)) {
+        // Envia as mensagens mais recentes para o CRM
+        const recents = messages.slice(-100);
+        for (const msg of recents) {
+          try {
+            await processAndForwardMessage(msg);
+          } catch (e) {}
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Erro ao inicializar WhatsApp Socket:', err);
+    connectionState = 'close';
+  } finally {
+    isStarting = false;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -181,11 +240,10 @@ app.post('/instance/create', async (req, res) => {
 });
 
 app.get('/instance/connect/:instance', async (req, res) => {
-  if (!sock) {
-    await startWhatsAppSocket().catch(console.error);
+  if (!sock || connectionState === 'close') {
+    startWhatsAppSocket().catch(console.error);
   }
 
-  // Espera até 3 segundos se o QR ainda estiver sendo gerado
   let attempts = 0;
   while (!currentQR && connectionState !== 'open' && attempts < 15) {
     await new Promise((r) => setTimeout(r, 200));
@@ -205,13 +263,16 @@ app.delete('/instance/logout/:instance', async (req, res) => {
     if (sock) {
       await sock.logout();
     }
-  } catch (err) {
-    // ignore
-  }
+  } catch (err) {}
   connectionState = 'close';
   currentQR = null;
   myPhoneNumber = null;
-  sock = null;
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners();
+    } catch (e) {}
+    sock = null;
+  }
   if (fs.existsSync(AUTH_DIR)) {
     fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   }
@@ -250,7 +311,7 @@ app.post('/message/sendWhatsAppAudio/:instance', async (req, res) => {
     const sent = await sock.sendMessage(jid, {
       audio: audioBuffer,
       mimetype: 'audio/mp4',
-      ptt: true, // Push-to-Talk (nota de voz humana)
+      ptt: true,
     });
 
     res.json({ success: true, messageId: sent.key.id });
@@ -261,5 +322,5 @@ app.post('/message/sendWhatsAppAudio/:instance', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 [Regen Flow] WhatsApp Native Bridge rodando em http://localhost:${PORT}`);
+  console.log(`[Regen Flow] WhatsApp Native Bridge rodando em http://localhost:${PORT}`);
 });
