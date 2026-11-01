@@ -7,6 +7,13 @@ from api.routes import create_app
 
 app = create_app()
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 bridge_proc = None
 
 def start_whatsapp_bridge():
@@ -15,7 +22,7 @@ def start_whatsapp_bridge():
     bridge_script = os.path.join(bridge_dir, "server.js")
     if os.path.exists(bridge_script):
         try:
-            print("🚀 Iniciando WhatsApp Native Bridge (Baileys) na porta 8080...")
+            print("[Baileys Bridge] Iniciando servico de conexao na porta 8080...")
             bridge_proc = subprocess.Popen(
                 ["node", "server.js"],
                 cwd=bridge_dir,
@@ -28,7 +35,7 @@ def start_whatsapp_bridge():
                         pass
             atexit.register(cleanup)
         except Exception as e:
-            print(f"⚠️ Aviso: Não foi possível iniciar WhatsApp Bridge automaticamente: {e}")
+            print(f"[Aviso] Nao foi possivel iniciar WhatsApp Bridge: {e}")
 
 if __name__ == "__main__":
     start_whatsapp_bridge()
