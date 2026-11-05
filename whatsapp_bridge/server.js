@@ -539,4 +539,8 @@ app.post('/message/requestPhoneNumber/:instance', async (req, res) => {
 
 app.listen(PORT, BRIDGE_HOST, () => {
   console.log(`[Regen Flow] WhatsApp Native Bridge rodando de forma isolada em http://${BRIDGE_HOST}:${PORT}`);
+  if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) {
+    console.log('🔄 [Baileys] Sessão salva detectada em disco. Reconectando automaticamente...');
+    startWhatsAppSocket().catch(console.error);
+  }
 });
