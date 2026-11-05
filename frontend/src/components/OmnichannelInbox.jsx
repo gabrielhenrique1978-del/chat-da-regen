@@ -178,6 +178,23 @@ export default function OmnichannelInbox({
   const filteredContacts = contacts.filter((c) => {
     if (channelFilter && c.channel !== channelFilter) return false;
 
+    const cIsMine =
+      (c.attendance_status === 'human' || c.ai_enabled === false) &&
+      (c.seller_id === effectiveSeller?.id ||
+        (c.assignee || '').toLowerCase() === activeSellerName.toLowerCase());
+    const cIsWaiting =
+      c.attendance_status === 'waiting' ||
+      c.assignee === 'Fila de Espera Humana' ||
+      c.assignee === 'Fila de Espera';
+    const cIsOthers =
+      (c.attendance_status === 'human' || c.ai_enabled === false) &&
+      Boolean(c.assignee) &&
+      !cIsMine &&
+      c.assignee !== 'Agente IA' &&
+      c.assignee !== 'Fila de Espera Humana' &&
+      c.assignee !== 'Fila de Espera';
+    const cIsBot = !cIsMine && !cIsWaiting && !cIsOthers;
+
     // BLOQUEIO ESTRITO: Vendedor comum JAMAIS vê chats de colegas ou IA
     if (!isSupervisorMode) {
       if (statusFilter === 'waiting') {
@@ -393,15 +410,17 @@ export default function OmnichannelInbox({
               {contacts.length} contatos ativos
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onOpenSellersModal}
-            title="Gerenciar equipe de vendedores"
-          >
-            <Users size={14} />
-            <span>Equipe</span>
-          </Button>
+          {isSupervisorMode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenSellersModal}
+              title="Gerenciar equipe de vendedores"
+            >
+              <Users size={14} />
+              <span>Equipe</span>
+            </Button>
+          )}
         </div>
 
         {/* Busca e Filtros */}

@@ -193,6 +193,10 @@ export default function ConnectionsView({ onWebhookSimulated }) {
   };
 
   const webhookUrl = `${window.location.origin}/api/webhooks/meta`;
+  const isWaConnected =
+    waStatus?.state === 'open' ||
+    waStatus?.state === 'connected' ||
+    Boolean(waStatus?.connected);
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden bg-canvas text-fg">
@@ -219,9 +223,11 @@ export default function ConnectionsView({ onWebhookSimulated }) {
               </div>
               <span className="inline-flex items-center gap-1.5 text-2xs text-muted">
                 <StatusDot
-                  tone={waStatus?.state === 'connected' ? 'primary' : 'muted'}
+                  tone={isWaConnected ? 'primary' : 'muted'}
                 />
-                <span className="capitalize">{waStatus?.state || 'Desconectado'}</span>
+                <span className="capitalize">
+                  {isWaConnected ? 'Conectado' : waStatus?.state || 'Desconectado'}
+                </span>
               </span>
             </div>
 
@@ -233,14 +239,14 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                     Conectando aos servidores do WhatsApp...
                   </p>
                 </div>
-              ) : waStatus?.state === 'connected' ? (
+              ) : isWaConnected ? (
                 <div className="space-y-2">
                   <CheckCircle2 size={36} className="mx-auto text-primary" />
                   <p className="text-xs font-medium text-fg">
                     WhatsApp conectado e sincronizado
                   </p>
                   <p className="text-2xs font-mono text-muted">
-                    {waStatus?.phone_number || 'Sessão ativa'}
+                    {waStatus?.phone_number || waStatus?.phone || 'Sessão ativa'}
                   </p>
                 </div>
               ) : waStatus?.qrcode ? (
@@ -308,7 +314,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 <span>Limpar contatos demo</span>
               </Button>
 
-              {waStatus?.state === 'connected' && (
+              {isWaConnected && (
                 <Button
                   variant="outline"
                   size="sm"

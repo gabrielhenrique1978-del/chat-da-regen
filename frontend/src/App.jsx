@@ -550,6 +550,7 @@ export default function App() {
     }
   };
 
+  const effectiveSeller = impersonatedSeller || activeSeller;
   const isSuperAdmin =
     authUser?.role === 'super_admin' || authUser?.is_super_admin;
 

@@ -288,6 +288,8 @@ class Database:
         self.is_postgres = resolved_target.startswith(("postgresql://", "postgres://"))
         self._pg_conn = None
         self._pg_lock = threading.RLock()
+        self._pg_last_check = 0.0
+        self._pg_depth = 0
         self._memory_conn: Optional[sqlite3.Connection] = None
 
         if self.is_postgres:
@@ -315,12 +317,17 @@ class Database:
         return url
 
     def _get_pg_connection(self):
+        import time
         import psycopg
         from psycopg.rows import dict_row
 
+        now_mono = time.monotonic()
         if self._pg_conn is not None and not self._pg_conn.closed and not self._pg_conn.broken:
+            if (now_mono - self._pg_last_check) < 20.0:
+                return self._pg_conn
             try:
                 self._pg_conn.execute("SELECT 1")
+                self._pg_last_check = now_mono
                 return self._pg_conn
             except Exception:
                 try:
@@ -338,23 +345,32 @@ class Database:
             keepalives_interval=10,
             keepalives_count=3,
         )
+        self._pg_last_check = now_mono
         return self._pg_conn
 
     @contextmanager
     def connection(self):
+        import time
+
         if self.is_postgres:
             with self._pg_lock:
                 conn = self._get_pg_connection()
                 adapter = _PostgresConnectionAdapter(conn)
+                self._pg_depth += 1
                 try:
                     yield adapter
-                    conn.commit()
+                    if self._pg_depth == 1:
+                        conn.commit()
+                    self._pg_last_check = time.monotonic()
                 except Exception:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        self._pg_conn = None
+                    if self._pg_depth == 1:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            self._pg_conn = None
                     raise
+                finally:
+                    self._pg_depth = max(0, self._pg_depth - 1)
         elif self._memory_conn is not None:
             try:
                 yield self._memory_conn

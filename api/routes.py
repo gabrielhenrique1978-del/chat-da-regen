@@ -863,6 +863,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             },
             "temporary_password": temp_pwd,
             "whatsapp_message": whatsapp_text,
+            "whatsapp_welcome_message": whatsapp_text,
         }
 
     @router.patch("/admin/tenants/{tenant_id}/toggle-status")
@@ -974,6 +975,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             },
             "temporary_password": temp_pwd,
             "whatsapp_message": whatsapp_text,
+            "whatsapp_welcome_message": whatsapp_text,
         }
 
     @router.post("/admin/clients/block")
