@@ -68,11 +68,12 @@ export default function SellersView({
     }
     try {
       if (editingId) {
+        const cleanPin = pin.trim();
         await api.updateSeller(editingId, {
           name: name.trim(),
           email: email.trim() || null,
           phone: phone.trim() || null,
-          pin: pin.trim() || '1234',
+          ...(cleanPin && cleanPin !== '••••' ? { pin: cleanPin } : {}),
           role,
         });
         setFeedback({ type: 'success', text: `Dados de ${name.trim()} atualizados.` });
@@ -114,7 +115,7 @@ export default function SellersView({
     setName(seller.name);
     setEmail(seller.email || '');
     setPhone(seller.phone || '');
-    setPin(seller.pin || '1234');
+    setPin('');
     setRole(seller.role || 'seller');
   };
 

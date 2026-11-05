@@ -15,12 +15,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.disable('x-powered-by');
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 const PORT = process.env.PORT || 8080;
+const BRIDGE_HOST = process.env.BRIDGE_HOST || '127.0.0.1';
+const INTERNAL_API_KEY = process.env.EVOLUTION_API_KEY || 'REGENFLOW_SECRET_KEY_2026';
 const FASTAPI_WEBHOOK = process.env.WEBHOOK_URL || 'http://localhost:8000/api/webhooks/evolution';
 const AUTH_DIR = path.join(__dirname, 'auth_info_baileys');
+
+// Middleware defensivo: aceita tráfego de loopback ou com apikey válida
+app.use((req, res, next) => {
+  const remoteIp = req.ip || req.socket?.remoteAddress || '';
+  const isLoopback =
+    remoteIp === '127.0.0.1' ||
+    remoteIp === '::1' ||
+    remoteIp === '::ffff:127.0.0.1';
+  const apiKey = req.headers['apikey'] || req.headers['x-webhook-secret'];
+  if (isLoopback || apiKey === INTERNAL_API_KEY) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Acesso não autorizado ao motor WhatsApp Bridge.' });
+});
 
 const logger = pino({ level: 'silent' });
 
@@ -92,7 +109,10 @@ async function notifyWebhook(payload) {
   try {
     await fetch(FASTAPI_WEBHOOK, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-secret': INTERNAL_API_KEY,
+      },
       body: JSON.stringify(payload),
     });
   } catch (err) {
@@ -517,6 +537,6 @@ app.post('/message/requestPhoneNumber/:instance', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Regen Flow] WhatsApp Native Bridge rodando em http://localhost:${PORT}`);
+app.listen(PORT, BRIDGE_HOST, () => {
+  console.log(`[Regen Flow] WhatsApp Native Bridge rodando de forma isolada em http://${BRIDGE_HOST}:${PORT}`);
 });

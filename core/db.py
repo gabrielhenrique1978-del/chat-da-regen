@@ -15,6 +15,7 @@ load_dotenv()
 from core.security import (
     CIPHER_PREFIX,
     blind_index,
+    constant_time_compare,
     decrypt_dict,
     decrypt_field,
     encrypt_dict,
@@ -1178,31 +1179,6 @@ class Database:
             )
         return contact
 
-    def delete_contact(self, contact_id: str) -> bool:
-        """Exclui um contato e todos os seus relacionamentos associados."""
-        with self.connection() as conn:
-            conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
-            conn.execute("DELETE FROM deals WHERE contact_id = ?", (contact_id,))
-            conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
-            cur = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
-            return cur.rowcount > 0
-
-    def clear_demo_contacts(self) -> int:
-        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos)."""
-        demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
-        deleted_count = 0
-        contacts = self.list_contacts()
-        for c in contacts:
-            is_demo = (
-                (c.email and c.email.lower() in demo_emails)
-                or (c.phone and "70102875644093" in c.phone)
-                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name))
-            )
-            if is_demo:
-                if self.delete_contact(c.id):
-                    deleted_count += 1
-        return deleted_count
-
     def set_contact_handoff(
         self,
         contact_id: str,
@@ -1247,31 +1223,6 @@ class Database:
                 contact.lead_score = min(100, contact.lead_score + 20)
             self.update_contact(contact)
         return contact
-
-    def delete_contact(self, contact_id: str) -> bool:
-        """Exclui um contato e todos os seus relacionamentos associados."""
-        with self.connection() as conn:
-            conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
-            conn.execute("DELETE FROM deals WHERE contact_id = ?", (contact_id,))
-            conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
-            cur = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
-            return cur.rowcount > 0
-
-    def clear_demo_contacts(self) -> int:
-        """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos)."""
-        demo_emails = {"marina@technova.com.br", "roberto@grupovertice.com", "carlos@agenciafluxo.io"}
-        deleted_count = 0
-        contacts = self.list_contacts()
-        for c in contacts:
-            is_demo = (
-                (c.email and c.email.lower() in demo_emails)
-                or (c.phone and "70102875644093" in c.phone)
-                or (c.name and ("TechNova" in c.name or "Grupo Vértice" in c.name))
-            )
-            if is_demo:
-                if self.delete_contact(c.id):
-                    deleted_count += 1
-        return deleted_count
 
     def update_contact_custom_fields(self, contact_id: str, fields: Dict[str, Any]) -> Optional[Contact]:
         contact = self.get_contact(contact_id)
@@ -2428,7 +2379,7 @@ class Database:
                     name=row["name"],
                     email=row["email"],
                     phone=row["phone"],
-                    pin=row["pin"] if "pin" in row.keys() and row["pin"] else "1234",
+                    pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
                     role=row["role"] if "role" in row.keys() and row["role"] else ("supervisor" if "gabriel" in (row["name"] or "").lower() or "otavio" in (row["name"] or "").lower() else "seller"),
                     active=bool(row["active"]),
                     created_at=row["created_at"],
@@ -2447,7 +2398,7 @@ class Database:
                 name=row["name"],
                 email=row["email"],
                 phone=row["phone"],
-                pin=row["pin"] if "pin" in row.keys() and row["pin"] else "1234",
+                pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
                 role=row["role"] if "role" in row.keys() and row["role"] else "seller",
                 active=bool(row["active"]),
                 created_at=row["created_at"],
@@ -2464,7 +2415,7 @@ class Database:
                 name=row["name"],
                 email=row["email"],
                 phone=row["phone"],
-                pin=row["pin"] if "pin" in row.keys() and row["pin"] else "1234",
+                pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
                 role=row["role"] if "role" in row.keys() and row["role"] else "seller",
                 active=bool(row["active"]),
                 created_at=row["created_at"],
@@ -2486,7 +2437,9 @@ class Database:
         if existing:
             raise ValueError(f"Já existe um vendedor cadastrado com o nome '{clean_name}'.")
 
-        clean_pin = (pin or "1234").strip() or "1234"
+        clean_pin = (pin or "1234").strip()
+        if not clean_pin or clean_pin in ("••••", "****"):
+            clean_pin = "1234"
         clean_role = role if role in ("seller", "supervisor") else "seller"
 
         seller = Seller(
@@ -2503,7 +2456,15 @@ class Database:
                 INSERT INTO sellers (id, name, email, phone, pin, role, active, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, 1, ?)
                 """,
-                (seller.id, seller.name, seller.email, seller.phone, seller.pin, seller.role, seller.created_at),
+                (
+                    seller.id,
+                    seller.name,
+                    seller.email,
+                    seller.phone,
+                    encrypt_field(seller.pin),
+                    seller.role,
+                    seller.created_at,
+                ),
             )
         return seller
 
@@ -2535,7 +2496,11 @@ class Database:
 
         new_email = email.strip() if email is not None and email.strip() else (seller.email if email is None else None)
         new_phone = phone.strip() if phone is not None and phone.strip() else (seller.phone if phone is None else None)
-        new_pin = pin.strip() if pin is not None and pin.strip() else seller.pin
+        new_pin = (
+            pin.strip()
+            if pin is not None and pin.strip() and pin.strip() not in ("••••", "****")
+            else seller.pin
+        )
         new_role = role if role in ("seller", "supervisor") else seller.role
         new_active = active if active is not None else seller.active
 
@@ -2546,16 +2511,24 @@ class Database:
                 SET name = ?, email = ?, phone = ?, pin = ?, role = ?, active = ?
                 WHERE id = ?
                 """,
-                (new_name, new_email, new_phone, new_pin, new_role, 1 if new_active else 0, seller_id),
+                (
+                    new_name,
+                    new_email,
+                    new_phone,
+                    encrypt_field(new_pin),
+                    new_role,
+                    1 if new_active else 0,
+                    seller_id,
+                ),
             )
         return self.get_seller(seller_id)
 
     def verify_seller_pin(self, seller_id: str, pin: str) -> Optional[Seller]:
-        """Valida o PIN individual do vendedor/supervisor para travar a sessão no nome dele."""
+        """Valida o PIN individual do vendedor/supervisor em tempo constante (anti-timing attack)."""
         seller = self.get_seller(seller_id)
         if not seller or not seller.active:
             return None
-        if str(seller.pin).strip() == str(pin).strip():
+        if constant_time_compare(str(seller.pin), str(pin)):
             return seller
         return None
 

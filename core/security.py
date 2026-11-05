@@ -50,6 +50,10 @@ def get_or_create_master_key() -> bytes:
     new_key = Fernet.generate_key()
     try:
         KEY_FILE.write_text(new_key.decode("utf-8"), encoding="utf-8")
+        try:
+            os.chmod(KEY_FILE, 0o600)
+        except Exception:
+            pass
     except Exception as e:
         logger.warning("Não foi possível salvar .encryption.key no disco: %s", e)
 
@@ -255,11 +259,16 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decodifica e valida a assinatura e expiração de um token JWT."""
+    """Decodifica e valida a assinatura, claims obrigatórias e expiração de um token JWT."""
     if not token:
         return None
     try:
-        payload = jwt.decode(token, _JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(
+            token,
+            _JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]},
+        )
         return payload
     except jwt.ExpiredSignatureError:
         logger.warning("Token JWT expirado.")
@@ -267,4 +276,56 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     except jwt.InvalidTokenError as exc:
         logger.warning("Token JWT inválido: %s", exc)
         return None
+
+
+def constant_time_compare(val_a: Optional[str], val_b: Optional[str]) -> bool:
+    """
+    Compara duas strings (ex: PINs, tokens, segredos de webhook) em tempo constante
+    utilizando hmac.compare_digest para mitigar Timing Side-Channel Attacks (CWE-208).
+    """
+    if val_a is None or val_b is None:
+        return False
+    a_bytes = str(val_a).strip().encode("utf-8")
+    b_bytes = str(val_b).strip().encode("utf-8")
+    return hmac.compare_digest(a_bytes, b_bytes)
+
+
+class AuthRateLimiter:
+    """
+    Proteção em memória (Sliding Window) contra ataques de Força Bruta (CWE-307)
+    nos endpoints de Login e Autenticação de PIN de Vendedores.
+    """
+
+    def __init__(self, max_attempts: int = 8, window_seconds: int = 60) -> None:
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self._attempts: Dict[str, list[float]] = {}
+
+    def _prune(self, key: str, now_ts: float) -> list[float]:
+        history = self._attempts.get(key, [])
+        cutoff = now_ts - self.window_seconds
+        valid = [t for t in history if t > cutoff]
+        if valid:
+            self._attempts[key] = valid
+        else:
+            self._attempts.pop(key, None)
+        return valid
+
+    def is_blocked(self, key: str) -> bool:
+        now_ts = datetime.now(timezone.utc).timestamp()
+        valid = self._prune(key, now_ts)
+        return len(valid) >= self.max_attempts
+
+    def record_failure(self, key: str) -> None:
+        now_ts = datetime.now(timezone.utc).timestamp()
+        valid = self._prune(key, now_ts)
+        valid.append(now_ts)
+        self._attempts[key] = valid
+
+    def reset(self, key: str) -> None:
+        self._attempts.pop(key, None)
+
+
+auth_rate_limiter = AuthRateLimiter(max_attempts=8, window_seconds=60)
+
 

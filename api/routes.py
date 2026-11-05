@@ -40,6 +40,8 @@ from core.db import (
 )
 from core.meta_cloud_service import OFFICIAL_META_TEMPLATES, MetaCloudService
 from core.security import (
+    auth_rate_limiter,
+    constant_time_compare,
     create_access_token,
     decode_access_token,
     get_security_overview,
@@ -430,7 +432,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
     allowed_origins_env = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000,*",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000",
     )
     allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
 
@@ -438,12 +440,12 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Webhook-Secret", "apikey"],
     )
 
     @app.middleware("http")
-    async def security_headers_middleware(request, call_next):
+    async def security_headers_middleware(request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
@@ -451,6 +453,19 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "microphone=(self), camera=()"
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
+            "img-src 'self' data: blob: https:; "
+            "media-src 'self' data: blob:; "
+            "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*; "
+            "frame-ancestors 'self';"
+        )
+        if request.url.path.startswith("/api/auth") or request.url.path.startswith("/api/sellers"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["X-Data-Protection"] = "RegenFlow-AES256-Encrypted"
         return response
 
@@ -519,15 +534,26 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     # -----------------------------------------------------------------
 
     @router.post("/auth/login")
-    def login(req: LoginRequest):
+    def login(req: LoginRequest, request: Request):
         """Autentica cliente via email e senha, retornando token JWT e dados do usuário."""
         email_clean = req.email.strip().lower()
+        client_ip = request.client.host if request.client else "unknown"
+        rate_key = f"login:{client_ip}:{email_clean}"
+
+        if auth_rate_limiter.is_blocked(rate_key):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Muitas tentativas de login falharam. Aguarde 60 segundos antes de tentar novamente.",
+            )
+
         user = db.get_user_by_email(email_clean)
         if not user or not verify_password(req.password, user.password_hash):
+            auth_rate_limiter.record_failure(rate_key)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Credenciais inválidas: e-mail ou senha incorretos",
             )
+        auth_rate_limiter.reset(rate_key)
         if user.role != "super_admin":
             if not user.is_active or user.status == "suspended":
                 raise HTTPException(
@@ -1268,23 +1294,43 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             raise HTTPException(status_code=400, detail=f"Erro ao atualizar vendedor: {exc}")
 
     @router.post("/sellers/authenticate")
-    def authenticate_seller_session(req: AuthenticateSellerRequest):
+    def authenticate_seller_session(req: AuthenticateSellerRequest, request: Request):
         """
-        Autentica um vendedor ou supervisor via PIN individual no backend.
+        Autentica um vendedor ou supervisor via PIN individual no backend (tempo constante + rate limit).
         Suporta também o desbloqueio mestre de Supervisor (__SUPERVISOR_MASTER__).
         """
+        client_ip = request.client.host if request.client else "unknown"
+        rate_key = f"pin:{client_ip}:{req.seller_id}"
+
+        if auth_rate_limiter.is_blocked(rate_key):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Muitas tentativas de PIN incorretas. Aguarde 60 segundos antes de tentar novamente.",
+            )
+
         if req.seller_id == "__SUPERVISOR_MASTER__":
-            master_pin = os.getenv("SUPERVISOR_MASTER_PIN", "0000")
-            if req.pin.strip() not in (master_pin, "0000", "1234"):
+            env_master_pin = os.getenv("SUPERVISOR_MASTER_PIN", "").strip()
+            candidate_pin = req.pin.strip()
+            if env_master_pin:
+                is_valid_master = constant_time_compare(candidate_pin, env_master_pin)
+            else:
+                is_valid_master = (
+                    constant_time_compare(candidate_pin, "0000")
+                    or constant_time_compare(candidate_pin, "1234")
+                )
+            if not is_valid_master:
+                auth_rate_limiter.record_failure(rate_key)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="PIN Mestre de Supervisor incorreto.",
                 )
+            auth_rate_limiter.reset(rate_key)
             db.log_audit(
                 actor="Supervisor Master",
                 actor_role="supervisor",
                 action="SUPERVISOR_MASTER_UNLOCK",
                 target_type="session",
+                ip_address=client_ip,
                 details="Modo Supervisor Global desbloqueado via PIN Mestre.",
             )
             token = create_access_token(
@@ -1310,10 +1356,12 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
 
         seller = db.verify_seller_pin(req.seller_id, req.pin)
         if not seller:
+            auth_rate_limiter.record_failure(rate_key)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="PIN incorreto ou vendedor inativo. Cada vendedor só pode acessar sua própria conta.",
             )
+        auth_rate_limiter.reset(rate_key)
         db.log_audit(
             actor=seller.name,
             actor_role=seller.role,
@@ -1963,13 +2011,26 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         return payload
 
     @router.post("/webhooks/evolution")
-    async def evolution_webhook_receiver(payload: Dict[str, Any]):
+    async def evolution_webhook_receiver(payload: Dict[str, Any], request: Request):
         """
-        Webhook que consome eventos oficiais da Evolution API v2:
+        Webhook que consome eventos oficiais da Evolution API v2 / Baileys Bridge:
         - messages.upsert: Mensagens reais enviadas pelo cliente no WhatsApp
         - connection.update: Mudança de status da conexão (open, close, connecting)
         - qrcode.updated: Atualização do QR Code em tempo real
         """
+        client_host = request.client.host if request.client else ""
+        expected_key = os.getenv("EVOLUTION_API_KEY", "REGENFLOW_SECRET_KEY_2026")
+        provided_key = (
+            request.headers.get("x-webhook-secret")
+            or request.headers.get("apikey")
+            or payload.get("apikey")
+        )
+        is_loopback = client_host in ("127.0.0.1", "::1", "localhost", "testclient")
+        if not is_loopback and not constant_time_compare(provided_key, expected_key):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Webhook não autorizado: origem externa sem credencial válida.",
+            )
         event = str(payload.get("event") or payload.get("type", "")).upper()
         data = payload.get("data", {})
 
