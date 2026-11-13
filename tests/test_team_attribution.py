@@ -24,10 +24,7 @@ def test_sellers_crud(client):
     resp = c.get("/api/sellers")
     assert resp.status_code == 200
     sellers = resp.json()["sellers"]
-    assert len(sellers) >= 5
-    seller_names = [s["name"] for s in sellers]
-    assert "Lucas Silva" in seller_names
-    assert "Camila Santos" in seller_names
+    assert len(sellers) == 0
 
     # 2. Cadastra novo vendedor
     resp_new = c.post(

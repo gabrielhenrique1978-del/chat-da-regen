@@ -765,7 +765,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         e usuários vinculados. Acessível exclusivamente pelo Super Admin Master.
         """
         tenants = db.list_tenants()
-        if not tenants:
+        if not tenants and seed_demo:
             default_t = db.create_tenant(
                 Tenant(name="Loja Exemplo (Cliente SaaS)", status="active", is_active=True)
             )
