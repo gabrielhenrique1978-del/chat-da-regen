@@ -4,7 +4,8 @@
   "description": "Native WhatsApp Web Baileys Bridge for Regen Flow CRM",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "node patch-baileys.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",

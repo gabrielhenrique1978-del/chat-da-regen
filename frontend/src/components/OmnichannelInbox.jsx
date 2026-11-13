@@ -904,11 +904,13 @@ export default function OmnichannelInbox({
                           {!isCustomer && (
                             <>
                               {m.delivery_status === 'read' ? (
-                                <CheckCheck size={13} className="text-primary" />
+                                <CheckCheck size={13} className="text-primary" title="Lida pelo cliente" />
+                              ) : m.delivery_status === 'delivered' ? (
+                                <CheckCheck size={13} className="text-muted" title="Entregue no WhatsApp do cliente" />
                               ) : m.delivery_status === 'failed' ? (
-                                <AlertCircle size={13} className="text-accent" />
+                                <AlertCircle size={13} className="text-accent" title="Falha no envio" />
                               ) : (
-                                <Check size={13} className="text-muted" />
+                                <Check size={13} className="text-muted" title="Enviada ao servidor" />
                               )}
                             </>
                           )}

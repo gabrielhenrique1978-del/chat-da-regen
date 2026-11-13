@@ -1730,19 +1730,49 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             target_number = (contact.custom_fields or {}).get("whatsapp_jid") or contact.phone
             if target_number:
                 import asyncio
-                if req.media_type == "audio" and req.media_url:
-                    asyncio.create_task(whatsapp_service.send_audio_message(target_number, req.media_url))
-                elif req.media_type in ("image", "video", "document") and req.media_url:
-                    asyncio.create_task(
-                        whatsapp_service.send_media_message(
-                            target_number,
-                            req.media_url,
-                            req.media_type,
-                            rendered_content,
-                        )
+
+                async def _dispatch_whatsapp_and_record(
+                    msg_id_local: str,
+                    dest: str,
+                    m_type: str,
+                    m_url: Optional[str],
+                    body_text: str,
+                ):
+                    try:
+                        if m_type == "audio" and m_url:
+                            res = await whatsapp_service.send_audio_message(dest, m_url)
+                        elif m_type in ("image", "video", "document") and m_url:
+                            res = await whatsapp_service.send_media_message(dest, m_url, m_type, body_text)
+                        else:
+                            res = await whatsapp_service.send_text_message(dest, body_text)
+
+                        ext_id = (res or {}).get("messageId")
+                        if ext_id:
+                            updated = db.set_message_external_id(msg_id_local, str(ext_id))
+                            if updated:
+                                await ws_manager.broadcast_event(
+                                    "meta_message_status",
+                                    {"external_id": str(ext_id), "status": updated.delivery_status, "message": updated.model_dump()},
+                                )
+                        elif (res or {}).get("status") == "error":
+                            failed_msg = db.update_message_delivery_status(msg_id_local, "failed")
+                            if failed_msg:
+                                await ws_manager.broadcast_event(
+                                    "meta_message_status",
+                                    {"external_id": msg_id_local, "status": "failed", "message": failed_msg.model_dump()},
+                                )
+                    except Exception as exc:
+                        logger.warning(f"Erro no envio assíncrono WhatsApp ({msg_id_local}): {exc}")
+
+                asyncio.create_task(
+                    _dispatch_whatsapp_and_record(
+                        msg.id,
+                        target_number,
+                        req.media_type or "text",
+                        req.media_url,
+                        rendered_content,
                     )
-                else:
-                    asyncio.create_task(whatsapp_service.send_text_message(target_number, rendered_content))
+                )
 
         payload = {"message": msg.model_dump()}
         await ws_manager.broadcast_event("message_sent", payload)
@@ -2288,10 +2318,12 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 for rm in reversed(recent_msgs[-3:] if len(recent_msgs) >= 3 else recent_msgs):
                     if (
                         rm.sender in ("human", "agent")
-                        and not rm.external_id
+                        and (not rm.external_id or rm.external_id == msg_id)
                         and rm.content.strip() == (text_content or "").strip()
                     ):
                         is_echo_duplicate = True
+                        if msg_id and not rm.external_id:
+                            db.set_message_external_id(rm.id, msg_id)
                         break
 
                 if is_echo_duplicate:
@@ -2317,6 +2349,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         media_type=media_type,
                         media_url=media_url,
                         external_id=msg_id or None,
+                        delivery_status="delivered",
                     )
                 )
                 payload = {"message": sent_msg.model_dump()}
@@ -2324,6 +2357,23 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
                 logger.info(f"Mensagem enviada pelo celular da loja espelhada no CRM: {contact.id}")
                 return {"status": "mirrored_from_phone", "contact_id": contact.id}
+
+        elif "STATUS_UPDATE" in event or ("MESSAGES" in event and "STATUS" in event):
+            ext_id = str(data.get("externalId") or "").strip()
+            st = str(data.get("status") or "sent").strip().lower()
+            if ext_id and st in ("sent", "delivered", "read", "failed"):
+                updated_msg = db.update_message_delivery_status(ext_id, st)
+                if updated_msg:
+                    await ws_manager.broadcast_event(
+                        "meta_message_status",
+                        {
+                            "external_id": ext_id,
+                            "status": updated_msg.delivery_status,
+                            "message": updated_msg.model_dump(),
+                        },
+                    )
+                    return {"status": "delivery_status_updated", "external_id": ext_id, "delivery_status": updated_msg.delivery_status}
+            return {"status": "status_update_ignored"}
 
         elif "PHONE_IDENTIFIED" in event or "PHONE" in event and "IDENTIFIED" in event:
             lid_val = str(data.get("lid", "")).strip()

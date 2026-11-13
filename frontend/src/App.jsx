@@ -258,7 +258,9 @@ export default function App() {
           setContactDetail((prev) => {
             if (!prev || prev.contact?.id !== incomingMsg.contact_id) return prev;
             const exists = (prev.messages || []).some((m) => m.id === incomingMsg.id);
-            const nextMsgs = exists ? prev.messages : [...(prev.messages || []), incomingMsg];
+            const nextMsgs = exists
+              ? (prev.messages || []).map((m) => (m.id === incomingMsg.id ? { ...m, ...incomingMsg } : m))
+              : [...(prev.messages || []), incomingMsg];
             if (replyMsg && !nextMsgs.some((m) => m.id === replyMsg.id)) {
               nextMsgs.push(replyMsg);
             }

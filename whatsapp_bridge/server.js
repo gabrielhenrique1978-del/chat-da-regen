@@ -1,3 +1,4 @@
+import './patch-baileys.js';
 import express from 'express';
 import pino from 'pino';
 import QRCode from 'qrcode';
@@ -9,6 +10,7 @@ import {
   fetchLatestBaileysVersion,
   downloadMediaMessage,
   normalizeMessageContent,
+  generateMessageIDV2,
 } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -135,11 +137,10 @@ function isSelfJid(jid) {
 // Cache em memória de mensagens enviadas para permitir retry de criptografia Signal (evita Bad MAC)
 const sentMessagesCache = new Map();
 
-// Cache rápido de retry Signal: inicia contagem em 1 para forçar envio imediato de PreKey (<keys>) na 1ª tentativa
-// e pular o delay bloqueante de 5000ms do requestPlaceholderResend no Baileys
+// Cache de contagem de retry Signal em memória
 const rawRetryMap = new Map();
 const fastRetryCounterCache = {
-  get: (k) => rawRetryMap.get(k) ?? 1,
+  get: (k) => rawRetryMap.get(k) ?? 0,
   set: (k, v) => rawRetryMap.set(k, v),
   del: (k) => rawRetryMap.delete(k),
   flushAll: () => rawRetryMap.clear(),
@@ -522,11 +523,16 @@ async function startWhatsAppSocket() {
       maxMsgRetryCount: 6,
       msgRetryCounterCache: fastRetryCounterCache,
       placeholderResendCache: noOpPlaceholderCache,
+      cacheSentMessage: (id, msg) => {
+        if (id && msg) {
+          sentMessagesCache.set(id, msg);
+        }
+      },
       getMessage: async (key) => {
         if (key?.id && sentMessagesCache.has(key.id)) {
           return sentMessagesCache.get(key.id);
         }
-        return { conversation: '' };
+        return undefined;
       },
       connectTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
@@ -644,7 +650,7 @@ async function startWhatsAppSocket() {
       }
     });
 
-    // Mensagens que foram descriptografadas após retry de chave Signal (messages.update)
+    // Mensagens que foram descriptografadas após retry de chave Signal ou atualizações de recibo (messages.update)
     sock.ev.on('messages.update', async (updates) => {
       if (!updates || !Array.isArray(updates)) return;
       for (const u of updates) {
@@ -659,6 +665,23 @@ async function startWhatsAppSocket() {
             sentMessagesCache.set(u.key.id, u.update.message);
           }
           await processAndForwardMessage(reconstructed, false);
+        }
+        if (typeof u?.update?.status === 'number' && u?.key?.id) {
+          const st = u.update.status;
+          const mappedStatus = st >= 4 ? 'read' : st === 3 ? 'delivered' : 'sent';
+          if (st >= 3) {
+            console.log(`✅ [Baileys] Recibo de entrega (${mappedStatus.toUpperCase()}) para msg ${u.key.id} (${u.key.remoteJid || ''})`);
+          }
+          await notifyWebhook({
+            event: 'messages.status_update',
+            instance: 'regenflow',
+            data: {
+              externalId: u.key.id,
+              status: mappedStatus,
+              rawStatus: st,
+              remoteJid: u.key.remoteJid,
+            },
+          });
         }
       }
     });
@@ -811,12 +834,14 @@ app.post('/message/sendText/:instance', async (req, res) => {
     }
 
     const targetJid = getTargetJid(number);
-    console.log(`🚀 [Baileys] Enviando mensagem de texto para ${targetJid}: "${text}"`);
-    const sent = await sock.sendMessage(targetJid, { text });
+    const msgId = generateMessageIDV2(sock.user?.id);
+    sentMessagesCache.set(msgId, { conversation: text });
+    console.log(`🚀 [Baileys] Enviando mensagem de texto (${msgId}) para ${targetJid}: "${text}"`);
+    const sent = await sock.sendMessage(targetJid, { text }, { messageId: msgId });
     if (sent?.key?.id && sent?.message) {
       sentMessagesCache.set(sent.key.id, sent.message);
     }
-    res.json({ success: true, messageId: sent.key.id, jid: targetJid });
+    res.json({ success: true, messageId: sent?.key?.id || msgId, jid: targetJid });
   } catch (err) {
     console.error('Erro ao enviar mensagem:', err);
     res.status(500).json({ error: err.message });

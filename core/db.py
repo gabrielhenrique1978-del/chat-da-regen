@@ -2011,12 +2011,57 @@ class Database:
             "touched_contacts": len(contact_last_ts),
         }
 
+    def set_message_external_id(
+        self, message_id: str, external_id: str, delivery_status: Optional[str] = None
+    ) -> Optional[Message]:
+        """Vincula o external_id (wamid/Baileys ID) a uma mensagem recém-enviada pelo CRM."""
+        if not message_id or not external_id:
+            return None
+        with self.connection() as conn:
+            if delivery_status:
+                conn.execute(
+                    "UPDATE messages SET external_id = ?, delivery_status = ? WHERE id = ?",
+                    (external_id, delivery_status, message_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE messages SET external_id = ? WHERE id = ?",
+                    (external_id, message_id),
+                )
+            updated = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+            if not updated:
+                return None
+            msg = Message(
+                id=updated["id"],
+                contact_id=updated["contact_id"],
+                sender=updated["sender"],
+                channel=updated["channel"],
+                content=decrypt_field(updated["content"]) or "",
+                is_internal=bool(updated["is_internal"]),
+                media_type=updated["media_type"] or "text",
+                media_url=updated["media_url"],
+                external_id=updated["external_id"],
+                delivery_status=updated["delivery_status"] or "sent",
+                timestamp=updated["timestamp"],
+            )
+        with self._cache_lock:
+            cached_list = self._messages_cache.get(msg.contact_id)
+            if cached_list is not None:
+                for m in cached_list:
+                    if m.id == msg.id:
+                        m.external_id = msg.external_id
+                        if delivery_status:
+                            m.delivery_status = msg.delivery_status
+                        break
+        return msg
+
     def update_message_delivery_status(
         self, external_id: str, delivery_status: str
     ) -> Optional[Message]:
         """Atualiza o status de entrega/leitura de uma mensagem via external_id (wamid/mid da Meta) ou id."""
         if not external_id:
             return None
+        status_rank = {"failed": 0, "sent": 1, "delivered": 2, "read": 3}
         with self.connection() as conn:
             row = conn.execute(
                 "SELECT * FROM messages WHERE external_id = ? OR id = ? LIMIT 1",
@@ -2024,6 +2069,12 @@ class Database:
             ).fetchone()
             if not row:
                 return None
+            current_st = row["delivery_status"] or "sent"
+            if (
+                delivery_status != "failed"
+                and status_rank.get(delivery_status, 1) < status_rank.get(current_st, 1)
+            ):
+                delivery_status = current_st
             conn.execute(
                 "UPDATE messages SET delivery_status = ? WHERE id = ?",
                 (delivery_status, row["id"]),
