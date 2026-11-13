@@ -244,7 +244,7 @@ export default function App() {
       ) {
         // Atualização otimista imediata na conversa aberta se o payload já trouxer a mensagem
         const incomingMsg = payload.data?.message || payload.data?.user_message;
-        const replyMsg = payload.data?.agent_reply;
+        const replyMsg = payload.data?.agent_reply || payload.data?.agent_message;
         if (incomingMsg && incomingMsg.contact_id === selectedContactIdRef.current) {
           setContactDetail((prev) => {
             if (!prev || prev.contact?.id !== incomingMsg.contact_id) return prev;

@@ -353,6 +353,23 @@ class ConversationalAgent:
             self.db.add_contact_tag(contact.id, "handoff-humano")
             handoff_triggered = True
 
+        # Se o contato já estava com IA pausada (em atendimento humano) e não foi um pedido de handoff agora:
+        # Caminho ultra-rápido (1 única query de INSERT): evita buscar KB, workflows e deals desnecessariamente
+        if not contact.ai_enabled and not handoff_triggered:
+            return {
+                "contact": contact.model_dump(),
+                "user_message": user_msg.model_dump() if user_msg else None,
+                "agent_message": None,
+                "ai_paused": True,
+                "kb_matches": [],
+                "extracted_fields": extracted_fields,
+                "intent_detected": None,
+                "stage_transition": None,
+                "workflow_actions": [],
+                "scheduled_appointment": scheduled_appointment,
+                "deal": None,
+            }
+
         # 5. Consulta à Base de Conhecimento
         kb_hits = self.search_knowledge_base(content, top_k=2)
 
@@ -387,27 +404,6 @@ class ConversationalAgent:
                             channel=active_channel,
                         )
                         workflow_actions.extend(stage_wf)
-
-        # Se o contato já estava com IA pausada (em atendimento humano) e não foi um pedido de handoff agora:
-        if not contact.ai_enabled and not handoff_triggered:
-            updated_contact = self.db.get_contact(contact.id)
-            updated_deal = self.db.get_contact_active_deal(contact.id)
-            return {
-                "contact": updated_contact.model_dump() if updated_contact else None,
-                "user_message": user_msg.model_dump() if user_msg else None,
-                "agent_message": None,
-                "ai_paused": True,
-                "kb_matches": [
-                    {"id": h["id"], "question": h["question"], "score": h["score"], "category": h["category"]}
-                    for h in kb_hits
-                ],
-                "extracted_fields": extracted_fields,
-                "intent_detected": intent,
-                "stage_transition": stage_transition,
-                "workflow_actions": workflow_actions,
-                "scheduled_appointment": scheduled_appointment,
-                "deal": updated_deal.model_dump() if updated_deal else None,
-            }
 
         # 7. Construção da resposta
         reply_parts: List[str] = []

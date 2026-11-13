@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import {
   makeWASocket,
   useMultiFileAuthState,
+  makeCacheableSignalKeyStore,
   DisconnectReason,
   fetchLatestBaileysVersion,
 } from '@whiskeysockets/baileys';
@@ -129,6 +130,34 @@ function isSelfJid(jid) {
   return false;
 }
 
+// Cache em memória de mensagens enviadas para permitir retry de criptografia Signal (evita Bad MAC)
+const sentMessagesCache = new Map();
+
+function unwrapMessageContent(m) {
+  if (!m) return null;
+  let curr = m;
+  for (let i = 0; i < 6; i++) {
+    if (curr.ephemeralMessage?.message) {
+      curr = curr.ephemeralMessage.message;
+    } else if (curr.viewOnceMessage?.message) {
+      curr = curr.viewOnceMessage.message;
+    } else if (curr.viewOnceMessageV2?.message) {
+      curr = curr.viewOnceMessageV2.message;
+    } else if (curr.viewOnceMessageV2Extension?.message) {
+      curr = curr.viewOnceMessageV2Extension.message;
+    } else if (curr.documentWithCaptionMessage?.message) {
+      curr = curr.documentWithCaptionMessage.message;
+    } else if (curr.editedMessage?.message?.protocolMessage?.editedMessage) {
+      curr = curr.editedMessage.message.protocolMessage.editedMessage;
+    } else if (curr.editedMessage?.message) {
+      curr = curr.editedMessage.message;
+    } else {
+      break;
+    }
+  }
+  return curr;
+}
+
 function extractMessageItem(msg, isHistory = false) {
   if (!msg || !msg.message) return null;
 
@@ -140,7 +169,19 @@ function extractMessageItem(msg, isHistory = false) {
     return null;
   }
 
-  const rawId = remoteJid.split('@')[0];
+  const inner = unwrapMessageContent(msg.message);
+  if (!inner) return null;
+
+  // Ignora mensagens internas de protocolo puro (exceto se for edição de texto)
+  if (inner.protocolMessage && !inner.protocolMessage.editedMessage) {
+    return null;
+  }
+  const contentObj = inner.protocolMessage?.editedMessage
+    ? unwrapMessageContent(inner.protocolMessage.editedMessage)
+    : inner;
+  if (!contentObj) return null;
+
+  const rawId = remoteJid.split('@')[0].split(':')[0];
   const isLid = remoteJid.endsWith('@lid') || rawId.length > 13;
 
   // Registra mapeamento do JID ativo
@@ -149,28 +190,48 @@ function extractMessageItem(msg, isHistory = false) {
 
   // Tenta resolver o telefone real a partir do mapa, senderPn ou participant
   let realPhone = isLid ? (lidToPhoneMap.get(rawId) || rawId) : rawId;
-  const senderPn = msg.key?.senderPn || msg.key?.participantPn || msg.senderPn || msg.participantPn;
+  const senderPn =
+    msg.key?.senderPn ||
+    msg.key?.participantPn ||
+    msg.senderPn ||
+    msg.participantPn ||
+    msg.key?.remoteJidAlt;
   if (senderPn && senderPn.includes('@s.whatsapp.net')) {
-    realPhone = senderPn.split('@')[0];
+    realPhone = senderPn.split('@')[0].split(':')[0];
     recordMapping(senderPn, remoteJid, msg.pushName);
   } else {
     const altJid = msg.key?.participant || msg.participant;
     if (altJid && altJid.includes('@s.whatsapp.net')) {
-      realPhone = altJid.split('@')[0];
+      realPhone = altJid.split('@')[0].split(':')[0];
       recordMapping(altJid, remoteJid, msg.pushName);
     }
   }
 
-  const text =
-    msg.message.conversation ||
-    msg.message.extendedTextMessage?.text ||
-    msg.message.imageMessage?.caption ||
-    msg.message.videoMessage?.caption ||
-    msg.message.documentMessage?.title ||
+  let text =
+    contentObj.conversation ||
+    contentObj.extendedTextMessage?.text ||
+    contentObj.imageMessage?.caption ||
+    contentObj.videoMessage?.caption ||
+    contentObj.documentMessage?.caption ||
+    contentObj.documentMessage?.title ||
+    contentObj.documentMessage?.fileName ||
+    contentObj.buttonsResponseMessage?.selectedDisplayText ||
+    contentObj.listResponseMessage?.title ||
+    contentObj.templateButtonReplyMessage?.selectedDisplayText ||
+    contentObj.interactiveResponseMessage?.body?.text ||
+    contentObj.contactMessage?.displayName ||
     '';
 
-  const isAudio = Boolean(msg.message.audioMessage);
-  if (!text && !isAudio) return null;
+  const isAudio = Boolean(contentObj.audioMessage || contentObj.pttMessage);
+  if (!text && !isAudio) {
+    if (contentObj.imageMessage) text = '📷 [Imagem enviada pelo cliente]';
+    else if (contentObj.videoMessage) text = '🎥 [Vídeo enviado pelo cliente]';
+    else if (contentObj.stickerMessage) text = '🏷️ [Figurinha]';
+    else if (contentObj.documentMessage) text = '📄 [Documento anexado]';
+    else if (contentObj.locationMessage || contentObj.liveLocationMessage) text = '📍 [Localização compartilhada]';
+    else if (contentObj.contactMessage || contentObj.contactsArrayMessage) text = '👤 [Contato compartilhado]';
+    else return null;
+  }
 
   const fromMe = Boolean(msg.key?.fromMe);
   const isSelf = isSelfJid(remoteJid);
@@ -294,13 +355,24 @@ async function startWhatsAppSocket() {
 
     sock = makeWASocket({
       version,
-      auth: state,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger),
+      },
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
       syncFullHistory: true,
       shouldSyncHistoryMessage: () => true, // Sincroniza todo o histórico disponível enviado pelo aparelho
       markOnlineOnConnect: true,
-      generateHighQualityLinkPreview: true,
+      generateHighQualityLinkPreview: false,
+      retryRequestDelayMs: 250,
+      maxMsgRetryCount: 5,
+      getMessage: async (key) => {
+        if (key?.id && sentMessagesCache.has(key.id)) {
+          return sentMessagesCache.get(key.id);
+        }
+        return { conversation: '' };
+      },
       connectTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
       defaultQueryTimeoutMs: 60000,
@@ -386,13 +458,50 @@ async function startWhatsAppSocket() {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       console.log(`⚡ [messages.upsert] Evento (${type}): ${messages?.length || 0} mensagens.`);
       if (!messages || !Array.isArray(messages)) return;
-      const isHistoryBatch = type !== 'notify';
+      for (const m of messages) {
+        if (m?.key?.id && m?.message) {
+          sentMessagesCache.set(m.key.id, m.message);
+        } else if (m?.messageStubType === 2 && m?.key?.id && !m?.key?.fromMe) {
+          // StubType 2 = CIPHERTEXT (Bad MAC na sessão Signal): solicita reenvio imediato da mensagem ao aparelho principal (PDO)
+          try {
+            if (typeof sock?.requestPlaceholderResend === 'function') {
+              sock.requestPlaceholderResend(m.key).catch(() => {});
+            }
+          } catch (e) {}
+        }
+      }
+      // Se for uma mensagem recente (últimos 90 segundos), trata como tempo real mesmo se vier como 'append'
+      const nowSec = Math.floor(Date.now() / 1000);
+      const isRecentSingle =
+        messages.length === 1 &&
+        Math.abs(nowSec - Number(messages[0]?.messageTimestamp?.low || messages[0]?.messageTimestamp || nowSec)) <= 90;
+
+      const isHistoryBatch = type !== 'notify' && !isRecentSingle;
       if (isHistoryBatch && messages.length > 1) {
         await processAndForwardHistoryBatch(messages);
         return;
       }
       for (const msg of messages) {
         await processAndForwardMessage(msg, isHistoryBatch);
+      }
+    });
+
+    // Mensagens que foram descriptografadas após retry de chave Signal (messages.update)
+    sock.ev.on('messages.update', async (updates) => {
+      if (!updates || !Array.isArray(updates)) return;
+      for (const u of updates) {
+        if (u?.update?.message && u?.key) {
+          const reconstructed = {
+            key: u.key,
+            message: u.update.message,
+            messageTimestamp: u.update.messageTimestamp || Math.floor(Date.now() / 1000),
+            pushName: u.update.pushName,
+          };
+          if (u.key.id) {
+            sentMessagesCache.set(u.key.id, u.update.message);
+          }
+          await processAndForwardMessage(reconstructed, false);
+        }
       }
     });
 
@@ -545,6 +654,9 @@ app.post('/message/sendText/:instance', async (req, res) => {
     const targetJid = getTargetJid(number);
     console.log(`🚀 [Baileys] Enviando mensagem de texto para ${targetJid}: "${text}"`);
     const sent = await sock.sendMessage(targetJid, { text });
+    if (sent?.key?.id && sent?.message) {
+      sentMessagesCache.set(sent.key.id, sent.message);
+    }
     res.json({ success: true, messageId: sent.key.id, jid: targetJid });
   } catch (err) {
     console.error('Erro ao enviar mensagem:', err);

@@ -22,6 +22,18 @@ def start_whatsapp_bridge():
     bridge_script = os.path.join(bridge_dir, "server.js")
     if os.path.exists(bridge_script):
         try:
+            # Encerra qualquer processo Node antigo preso na porta 8080 antes de subir a versão atual
+            if sys.platform == "win32":
+                subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-Command",
+                        "Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             print("[Baileys Bridge] Iniciando servico de conexao na porta 8080...")
             bridge_proc = subprocess.Popen(
                 ["node", "server.js"],

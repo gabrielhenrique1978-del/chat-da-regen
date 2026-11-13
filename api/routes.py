@@ -2177,8 +2177,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             canonical_jid = f"{clean_phone}@lid" if (len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))) else (remote_jid or f"{clean_phone}@s.whatsapp.net")
             is_lid = len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))
 
-            contact = None
-            if is_lid:
+            contact = db.find_contact_by_phone(clean_phone)
+            if not contact and is_lid:
                 for c in db.list_contacts():
                     fields = c.custom_fields or {}
                     if (
@@ -2188,8 +2188,6 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                     ):
                         contact = c
                         break
-            else:
-                contact = db.find_contact_by_phone(clean_phone)
 
             if not contact:
                 contact = db.create_contact(
@@ -2208,12 +2206,20 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 )
             else:
                 fields = contact.custom_fields or {}
-                fields["whatsapp_jid"] = canonical_jid
-                if is_lid:
+                needs_update = False
+                if fields.get("whatsapp_jid") != canonical_jid:
+                    fields["whatsapp_jid"] = canonical_jid
+                    needs_update = True
+                if is_lid and fields.get("whatsapp_lid") != clean_phone:
                     fields["is_lid"] = True
                     fields["whatsapp_lid"] = clean_phone
-                contact.custom_fields = fields
-                db.update_contact(contact)
+                    needs_update = True
+                if contact.name.startswith("WhatsApp (") and push_name and not push_name.startswith("WhatsApp ("):
+                    contact.name = push_name
+                    needs_update = True
+                if needs_update:
+                    contact.custom_fields = fields
+                    db.update_contact(contact)
 
             msg_id = str(key.get("id") or "").strip()
             is_history = bool(data.get("isHistory", False))
