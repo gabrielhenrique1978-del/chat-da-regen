@@ -598,6 +598,9 @@ class Database:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_contacts_phone_hash ON contacts(phone_hash);")
                 conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS external_id TEXT;")
                 conn.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'sent';")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_contact_ts ON messages(contact_id, timestamp);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_external_id ON messages(external_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_deals_contact ON deals(contact_id);")
             else:
                 # Migração de colunas para suportar SaaS Multi-Tenant na tabela users
                 user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -637,6 +640,9 @@ class Database:
                     conn.execute("ALTER TABLE messages ADD COLUMN external_id TEXT;")
                 if "delivery_status" not in msg_cols:
                     conn.execute("ALTER TABLE messages ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'sent';")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_contact_ts ON messages(contact_id, timestamp);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_external_id ON messages(external_id);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_deals_contact ON deals(contact_id);")
 
     def encrypt_existing_unencrypted_records(self) -> int:
         """
@@ -1504,6 +1510,17 @@ class Database:
         with self.connection() as conn:
             row = conn.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
             return int(row["cnt"]) if row else 0
+
+    def message_exists_by_external_id(self, external_id: Optional[str]) -> bool:
+        """Verifica em O(1) via índice B-Tree se uma mensagem do WhatsApp (external_id) já foi importada."""
+        if not external_id:
+            return False
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT id FROM messages WHERE external_id = ? LIMIT 1",
+                (external_id,),
+            ).fetchone()
+            return row is not None
 
     # -----------------------------------------------------------------
     # Operações de Mensagens & Notas Internas

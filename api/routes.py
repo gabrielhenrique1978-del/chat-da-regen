@@ -2147,9 +2147,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             is_history = bool(data.get("isHistory", False))
             msg_timestamp = str(data.get("timestamp") or "").strip() or None
 
-            # Deduplicação por external_id (evita duplicar mensagens ao sincronizar histórico)
-            existing_msgs = db.list_messages(contact.id)
-            if msg_id and any(m.external_id == msg_id for m in existing_msgs):
+            # Deduplicação O(1) via índice B-Tree em messages(external_id) no Neon PostgreSQL
+            if msg_id and db.message_exists_by_external_id(msg_id):
                 return {"status": "duplicate_skipped", "contact_id": contact.id}
 
             # Se for sincronização de histórico do aparelho, importa silenciosamente na ordem original sem acionar a IA
@@ -2162,7 +2161,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         channel="whatsapp",
                         media_type=media_type,
                         external_id=msg_id or None,
-                         **( {"timestamp": msg_timestamp} if msg_timestamp else {} ),
+                        **({"timestamp": msg_timestamp} if msg_timestamp else {}),
                     )
                 )
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id, "history": True})
@@ -2181,7 +2180,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             else:
                 # Mensagem enviada a partir de um aparelho do WhatsApp (fromMe = True)
                 # 1. Verifica se não é eco duplicado de uma mensagem recém enviada pelo próprio CRM
-                recent_msgs = existing_msgs
+                recent_msgs = db.list_messages(contact.id)
                 is_echo_duplicate = False
                 for rm in reversed(recent_msgs[-3:] if len(recent_msgs) >= 3 else recent_msgs):
                     if (
