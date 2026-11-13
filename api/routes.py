@@ -1328,6 +1328,15 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Erro ao atualizar vendedor: {exc}")
 
+    @router.delete("/sellers/{seller_id}")
+    async def delete_store_seller(seller_id: str):
+        """Remove permanentemente um vendedor da equipe da loja."""
+        deleted = db.delete_seller(seller_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Vendedor não encontrado")
+        await ws_manager.broadcast_event("sellers_updated", {"deleted_id": seller_id})
+        return {"deleted": True, "id": seller_id}
+
     @router.post("/sellers/authenticate")
     def authenticate_seller_session(req: AuthenticateSellerRequest, request: Request):
         """

@@ -120,7 +120,7 @@ export default function OmnichannelInbox({
   const stage = contactDetail?.stage || null;
 
   const effectiveSeller = impersonatedSeller || activeSeller;
-  const activeSellerName = effectiveSeller?.name || 'Lucas Silva';
+  const activeSellerName = effectiveSeller?.name || 'Supervisor';
 
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });

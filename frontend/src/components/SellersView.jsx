@@ -10,6 +10,7 @@ import {
   Crown,
   X,
   Users,
+  Trash2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
@@ -102,6 +103,20 @@ export default function SellersView({
       setFeedback({
         type: 'success',
         text: `${seller.name} ${newActive ? 'reativado' : 'desativado'}.`,
+      });
+      await fetchAllSellers();
+      onSellersUpdated?.();
+    } catch (err) {
+      setFeedback({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleDeleteSeller = async (seller) => {
+    try {
+      await api.deleteSeller(seller.id);
+      setFeedback({
+        type: 'success',
+        text: `${seller.name} removido permanentemente da equipe.`,
       });
       await fetchAllSellers();
       onSellersUpdated?.();
@@ -370,6 +385,13 @@ export default function SellersView({
                                   onClick={() => handleToggleActive(s)}
                                 >
                                   {s.active ? <UserX size={13} /> : <UserCheck size={13} />}
+                                </IconButton>
+                                <IconButton
+                                  label={`Excluir ${s.name}`}
+                                  size="sm"
+                                  onClick={() => handleDeleteSeller(s)}
+                                >
+                                  <Trash2 size={13} />
                                 </IconButton>
                               </>
                             )}

@@ -126,6 +126,10 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  deleteSeller: (sellerId) =>
+    apiRequest(`/sellers/${sellerId}`, {
+      method: 'DELETE',
+    }),
   authenticateSeller: (sellerId, pin) =>
     apiRequest('/sellers/authenticate', {
       method: 'POST',

@@ -121,7 +121,12 @@ export default function App() {
           );
           if (found) return found;
         }
-        return list[0] || null;
+        const fallback = list[0] || null;
+        if (!fallback) {
+          localStorage.removeItem('ocf_active_seller');
+          setIsSupervisorMode(true);
+        }
+        return fallback;
       });
       setImpersonatedSeller((prev) => {
         if (!prev) return null;

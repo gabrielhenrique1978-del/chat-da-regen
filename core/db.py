@@ -2382,25 +2382,8 @@ class Database:
         Retorna os vendedores da loja para distribuição e posse de conversas.
         Por padrão retorna apenas vendedores ativos (active = True).
         Se include_inactive = True, inclui também os vendedores desativados (soft delete).
-        Popula a equipe inicial caso a tabela esteja vazia.
         """
         with self.connection() as conn:
-            total_count = conn.execute("SELECT COUNT(*) as cnt FROM sellers").fetchone()["cnt"]
-            if total_count == 0:
-                default_team = [
-                    "Lucas Silva",
-                    "Camila Santos",
-                    "Matheus Oliveira",
-                    "Juliana Costa",
-                    "Gabriel Henrique",
-                ]
-                now = utc_now_iso()
-                for name in default_team:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO sellers (id, name, active, created_at) VALUES (?, ?, 1, ?)",
-                        (new_uuid(), name, now),
-                    )
-
             if include_inactive:
                 rows = conn.execute("SELECT * FROM sellers ORDER BY name ASC").fetchall()
             else:
@@ -2419,6 +2402,19 @@ class Database:
                 )
                 for row in rows
             ]
+
+    def delete_seller(self, seller_id: str) -> bool:
+        """Exclui permanentemente um vendedor e desvincula conversas atribuídas a ele."""
+        seller = self.get_seller(seller_id)
+        if not seller:
+            return False
+        with self.connection() as conn:
+            conn.execute(
+                "UPDATE contacts SET seller_id = NULL, assignee = 'Agente IA', attendance_status = 'bot', ai_enabled = 1 WHERE seller_id = ? OR lower(assignee) = lower(?)",
+                (seller_id, seller.name),
+            )
+            cur = conn.execute("DELETE FROM sellers WHERE id = ?", (seller_id,))
+            return cur.rowcount > 0
 
     def get_seller(self, seller_id: str) -> Optional[Seller]:
         """Busca vendedor por ID."""
