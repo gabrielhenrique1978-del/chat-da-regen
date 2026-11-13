@@ -761,26 +761,59 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         current_admin: User = Depends(require_super_admin),
     ):
         """
-        Lista todas as empresas clientes (Tenants), status de adimplência e contagem de usuários.
-        Acessível exclusivamente pelo Super Admin Master.
+        Lista todas as empresas clientes (Tenants), status de adimplência (Em dia vs Inadimplente)
+        e usuários vinculados. Acessível exclusivamente pelo Super Admin Master.
         """
         tenants = db.list_tenants()
+        if not tenants:
+            default_t = db.create_tenant(
+                Tenant(name="Loja Exemplo (Cliente SaaS)", status="active", is_active=True)
+            )
+            demo_email = "admin@lojaexemplo.com.br"
+            if not db.get_user_by_email(demo_email):
+                db.create_user(
+                    User(
+                        tenant_id=default_t.id,
+                        email=demo_email,
+                        password_hash=hash_password("Cliente@2026"),
+                        client_name="Gestor - Loja Exemplo",
+                        company_name=default_t.name,
+                        role="admin",
+                        is_active=True,
+                        status="active",
+                        must_change_password=False,
+                    )
+                )
+            tenants = db.list_tenants()
+
         result = []
         for t in tenants:
             users_count = db.count_tenant_users(t.id)
             tenant_users = db.list_users_by_tenant(t.id)
-            admin_user = next((u for u in tenant_users if u.role == "admin"), None)
+            admin_user = next((u for u in tenant_users if u.role == "admin"), tenant_users[0] if tenant_users else None)
             result.append(
                 {
                     "id": t.id,
                     "name": t.name,
                     "status": t.status,
                     "is_active": t.is_active,
+                    "payment_status": "em_dia" if t.is_active and t.status == "active" else "inadimplente",
                     "created_at": t.created_at,
                     "updated_at": t.updated_at,
                     "users_count": users_count,
                     "admin_email": admin_user.email if admin_user else None,
                     "admin_name": admin_user.client_name if admin_user else None,
+                    "users": [
+                        {
+                            "id": u.id,
+                            "name": u.client_name,
+                            "email": u.email,
+                            "role": u.role,
+                            "is_active": u.is_active,
+                            "status": u.status,
+                        }
+                        for u in tenant_users
+                    ],
                 }
             )
         return {"tenants": result}
@@ -2110,6 +2143,31 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 contact.custom_fields = fields
                 db.update_contact(contact)
 
+            msg_id = str(key.get("id") or "").strip()
+            is_history = bool(data.get("isHistory", False))
+            msg_timestamp = str(data.get("timestamp") or "").strip() or None
+
+            # Deduplicação por external_id (evita duplicar mensagens ao sincronizar histórico)
+            existing_msgs = db.list_messages(contact.id)
+            if msg_id and any(m.external_id == msg_id for m in existing_msgs):
+                return {"status": "duplicate_skipped", "contact_id": contact.id}
+
+            # Se for sincronização de histórico do aparelho, importa silenciosamente na ordem original sem acionar a IA
+            if is_history:
+                hist_msg = db.create_message(
+                    Message(
+                        contact_id=contact.id,
+                        sender="human" if from_me else "contact",
+                        content=text_content or "🎙️ [Áudio do Histórico WhatsApp]",
+                        channel="whatsapp",
+                        media_type=media_type,
+                        external_id=msg_id or None,
+                         **( {"timestamp": msg_timestamp} if msg_timestamp else {} ),
+                    )
+                )
+                await ws_manager.broadcast_event("new_message", {"contact_id": contact.id, "history": True})
+                return {"status": "history_imported", "contact_id": contact.id, "message_id": hist_msg.id}
+
             if not from_me or is_self:
                 result = agent.process_incoming_message(
                     contact_id=contact.id,
@@ -2123,7 +2181,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             else:
                 # Mensagem enviada a partir de um aparelho do WhatsApp (fromMe = True)
                 # 1. Verifica se não é eco duplicado de uma mensagem recém enviada pelo próprio CRM
-                recent_msgs = db.list_messages(contact.id)
+                recent_msgs = existing_msgs
                 is_echo_duplicate = False
                 for rm in reversed(recent_msgs[-3:] if len(recent_msgs) >= 3 else recent_msgs):
                     if (
@@ -2146,6 +2204,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         content=text_content or "Áudio enviado via WhatsApp pelo celular",
                         channel="whatsapp",
                         media_type=media_type,
+                        external_id=msg_id or None,
                     )
                 )
                 payload = {"message": sent_msg.model_dump()}

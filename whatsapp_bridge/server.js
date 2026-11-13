@@ -129,7 +129,7 @@ function isSelfJid(jid) {
   return false;
 }
 
-async function processAndForwardMessage(msg) {
+async function processAndForwardMessage(msg, isHistory = false) {
   if (!msg || !msg.message) return;
 
   const remoteJid = msg.key?.remoteJid;
@@ -193,7 +193,16 @@ async function processAndForwardMessage(msg) {
     }
   }
 
-  console.log(`📩 [WhatsApp ${fromMe ? 'Enviada' : 'Recebida'} (${realPhone})]: ${text || '[Áudio]'}`);
+  // Preserva o timestamp original da mensagem no WhatsApp (quando disponível)
+  const rawTs = msg.messageTimestamp?.low || msg.messageTimestamp;
+  const isoTimestamp =
+    rawTs && !isNaN(Number(rawTs))
+      ? new Date(Number(rawTs) * 1000).toISOString()
+      : new Date().toISOString();
+
+  if (!isHistory) {
+    console.log(`📩 [WhatsApp ${fromMe ? 'Enviada' : 'Recebida'} (${realPhone})]: ${text || '[Áudio]'}`);
+  }
 
   await notifyWebhook({
     event: 'messages.upsert',
@@ -208,6 +217,8 @@ async function processAndForwardMessage(msg) {
       whatsappJid: remoteJid,
       pushName: clientName,
       isSelf: isSelf,
+      isHistory: Boolean(isHistory),
+      timestamp: isoTimestamp,
       message: {
         conversation: text,
         ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
@@ -243,8 +254,8 @@ async function startWhatsAppSocket() {
       auth: state,
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
-      syncFullHistory: false,
-      shouldSyncHistoryMessage: (msg) => msg.syncType !== 2, // Permite RECENT e BOOTSTRAP, descarta FULL pesado
+      syncFullHistory: true,
+      shouldSyncHistoryMessage: () => true, // Sincroniza todo o histórico disponível enviado pelo aparelho
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: true,
       connectTimeoutMs: 60000,
@@ -328,12 +339,13 @@ async function startWhatsAppSocket() {
       }
     });
 
-    // Mensagens em tempo real
+    // Mensagens em tempo real ou lotes de histórico (type === 'append')
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       console.log(`⚡ [messages.upsert] Evento (${type}): ${messages?.length || 0} mensagens.`);
       if (!messages || !Array.isArray(messages)) return;
+      const isHistoryBatch = type !== 'notify';
       for (const msg of messages) {
-        await processAndForwardMessage(msg);
+        await processAndForwardMessage(msg, isHistoryBatch);
       }
     });
 
@@ -385,9 +397,9 @@ async function startWhatsAppSocket() {
       }
     });
 
-    // Sincronização de histórico recente
+    // Sincronização completa de histórico do WhatsApp (messaging-history.set)
     sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
-      console.log(`📥 [Baileys] Sincronização inicial: ${chats?.length || 0} chats, ${contacts?.length || 0} contatos.`);
+      console.log(`📥 [Baileys] Sincronização de histórico: ${chats?.length || 0} chats, ${contacts?.length || 0} contatos, ${messages?.length || 0} mensagens.`);
       for (const ch of chats || []) {
         recordMapping(ch.id, ch.lidJid, ch.name);
       }
@@ -395,9 +407,14 @@ async function startWhatsAppSocket() {
         recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
       }
       if (messages && Array.isArray(messages)) {
-        for (const msg of messages.slice(-50)) {
+        const sorted = [...messages].sort((a, b) => {
+          const ta = Number(a.messageTimestamp?.low || a.messageTimestamp || 0);
+          const tb = Number(b.messageTimestamp?.low || b.messageTimestamp || 0);
+          return ta - tb;
+        });
+        for (const msg of sorted.slice(-500)) {
           try {
-            await processAndForwardMessage(msg);
+            await processAndForwardMessage(msg, true);
           } catch (e) {}
         }
       }

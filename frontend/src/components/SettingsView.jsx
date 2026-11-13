@@ -51,7 +51,14 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
           const sw = await api.quickSwitchProfile('super_admin');
           localStorage.setItem('regenflow_auth_token', sw.access_token);
         }
-        const data = await api.getTenants();
+        let data;
+        try {
+          data = await api.getTenants();
+        } catch {
+          const sw = await api.quickSwitchProfile('super_admin');
+          localStorage.setItem('regenflow_auth_token', sw.access_token);
+          data = await api.getTenants();
+        }
         setTenants(data.tenants || []);
       } catch (err) {
         console.error(err);
@@ -220,11 +227,19 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
             {/* Lista de Empresas Clientes */}
             <div className="lg:col-span-2 rounded-lg border border-line bg-surface overflow-hidden flex flex-col">
               <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-                <span className="text-xs font-medium text-fg">
-                  Empresas clientes ({tenants.length})
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-fg">
+                    Usuários & Empresas Clientes ({tenants.length})
+                  </span>
+                  <span className="text-2xs text-primary font-medium">
+                    {tenants.filter((t) => t.is_active).length} em dia
+                  </span>
+                  <span className="text-2xs text-accent font-medium">
+                    {tenants.filter((t) => !t.is_active).length} inadimplente(s)
+                  </span>
+                </div>
                 <span className="text-2xs text-muted">
-                  Bloqueio em tempo real (HTTP 403)
+                  Trava de inadimplência em tempo real (HTTP 403)
                 </span>
               </div>
 
@@ -244,13 +259,16 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
                           <span className="truncate text-xs font-medium text-fg">
                             {t.name}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-2xs text-muted">
+                          <Badge variant={t.is_active ? 'primary' : 'accent'}>
                             <StatusDot tone={t.is_active ? 'primary' : 'accent'} />
-                            <span>{t.is_active ? 'Ativo' : 'Suspenso'}</span>
-                          </span>
+                            <span>
+                              {t.is_active ? 'Em dia (Ativo)' : 'Inadimplente (Bloqueado)'}
+                            </span>
+                          </Badge>
                         </div>
-                        <p className="text-2xs text-muted mt-0.5">
-                          Admin: {t.admin_email || '—'} · {t.users_count || 1} operador(es)
+                        <p className="text-2xs text-muted mt-1">
+                          Responsável: <span className="text-fg">{t.admin_name || 'Gestor'}</span> · Login:{' '}
+                          <span className="font-mono text-fg">{t.admin_email || '—'}</span> · {t.users_count || 1} usuário(s)
                         </p>
                       </div>
 
@@ -262,12 +280,12 @@ export default function SettingsView({ authUser, onSwitchAuthRole }) {
                         {t.is_active ? (
                           <>
                             <Lock size={12} />
-                            <span>Suspender</span>
+                            <span>Bloquear (Inadimplente)</span>
                           </>
                         ) : (
                           <>
                             <Unlock size={12} />
-                            <span>Reativar</span>
+                            <span>Liberar (Em dia)</span>
                           </>
                         )}
                       </Button>
