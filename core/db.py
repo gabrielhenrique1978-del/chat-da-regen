@@ -258,6 +258,12 @@ class _PostgresConnectionAdapter:
         translated = self._translate_sql(sql)
         return self._conn.execute(translated, params)
 
+    def executemany(self, sql: str, params_seq):
+        translated = self._translate_sql(sql)
+        with self._conn.cursor() as cur:
+            cur.executemany(translated, params_seq)
+            return cur
+
     def executescript(self, script: str):
         statements = [stmt.strip() for stmt in script.split(";") if stmt.strip()]
         for stmt in statements:
@@ -1569,21 +1575,44 @@ class Database:
 
     add_message = create_message
 
-    def list_messages(self, contact_id: Optional[str] = None, include_internal: bool = True) -> List[Message]:
+    def list_messages(
+        self,
+        contact_id: Optional[str] = None,
+        include_internal: bool = True,
+        limit: Optional[int] = None,
+    ) -> List[Message]:
         with self.connection() as conn:
             if contact_id:
-                if include_internal:
+                if limit and limit > 0:
+                    if include_internal:
+                        rows = conn.execute(
+                            "SELECT * FROM (SELECT * FROM messages WHERE contact_id = ? ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
+                            (contact_id, int(limit)),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute(
+                            "SELECT * FROM (SELECT * FROM messages WHERE contact_id = ? AND is_internal = 0 ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
+                            (contact_id, int(limit)),
+                        ).fetchall()
+                else:
+                    if include_internal:
+                        rows = conn.execute(
+                            "SELECT * FROM messages WHERE contact_id = ? ORDER BY timestamp ASC",
+                            (contact_id,),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute(
+                            "SELECT * FROM messages WHERE contact_id = ? AND is_internal = 0 ORDER BY timestamp ASC",
+                            (contact_id,),
+                        ).fetchall()
+            else:
+                if limit and limit > 0:
                     rows = conn.execute(
-                        "SELECT * FROM messages WHERE contact_id = ? ORDER BY timestamp ASC",
-                        (contact_id,),
+                        "SELECT * FROM (SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
+                        (int(limit),),
                     ).fetchall()
                 else:
-                    rows = conn.execute(
-                        "SELECT * FROM messages WHERE contact_id = ? AND is_internal = 0 ORDER BY timestamp ASC",
-                        (contact_id,),
-                    ).fetchall()
-            else:
-                rows = conn.execute("SELECT * FROM messages ORDER BY timestamp ASC").fetchall()
+                    rows = conn.execute("SELECT * FROM messages ORDER BY timestamp ASC").fetchall()
 
             return [
                 Message(
@@ -1601,6 +1630,284 @@ class Database:
                 )
                 for r in rows
             ]
+
+    def get_existing_external_ids(self, external_ids: List[str]) -> set:
+        """Retorna em uma única consulta SQL todos os external_id já existentes no banco."""
+        clean_ids = [str(eid).strip() for eid in external_ids if eid and str(eid).strip()]
+        if not clean_ids:
+            return set()
+        existing = set()
+        with self.connection() as conn:
+            chunk_size = 400
+            for i in range(0, len(clean_ids), chunk_size):
+                chunk = clean_ids[i : i + chunk_size]
+                placeholders = ",".join(["?"] * len(chunk))
+                rows = conn.execute(
+                    f"SELECT external_id FROM messages WHERE external_id IN ({placeholders})",
+                    tuple(chunk),
+                ).fetchall()
+                for r in rows:
+                    if r["external_id"]:
+                        existing.add(str(r["external_id"]))
+        return existing
+
+    def bulk_import_whatsapp_history(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Importa um lote completo de mensagens e conversas do WhatsApp em uma única transação atômica
+        ultra-rápida (estilo WhatsApp Web), evitando dezenas de idas e vindas ao Neon PostgreSQL.
+        """
+        if not items:
+            return {"imported_messages": 0, "touched_contacts": 0}
+
+        # 1. Deduplicação em lote por external_id (1 única consulta indexada)
+        candidate_ext_ids = [str(it.get("external_id") or "").strip() for it in items if it.get("external_id")]
+        existing_ext_ids = self.get_existing_external_ids(candidate_ext_ids)
+
+        filtered_items = []
+        seen_in_batch = set()
+        for it in items:
+            ext_id = str(it.get("external_id") or "").strip()
+            if ext_id:
+                if ext_id in existing_ext_ids or ext_id in seen_in_batch:
+                    continue
+                seen_in_batch.add(ext_id)
+            filtered_items.append(it)
+
+        if not filtered_items:
+            return {"imported_messages": 0, "touched_contacts": 0}
+
+        # 2. Carrega mapa de contatos e pipeline inicial uma única vez em memória
+        existing_contacts = self.list_contacts()
+        by_phone_hash: Dict[str, Contact] = {}
+        by_clean_digits: Dict[str, Contact] = {}
+        by_lid: Dict[str, Contact] = {}
+
+        for c in existing_contacts:
+            if c.phone_hash:
+                by_phone_hash[c.phone_hash] = c
+            c_digits = "".join(ch for ch in (c.phone or "") if ch.isdigit())
+            if c_digits:
+                by_clean_digits[c_digits] = c
+                if len(c_digits) >= 8:
+                    by_clean_digits[c_digits[-8:]] = c
+            cf = c.custom_fields or {}
+            if cf.get("whatsapp_lid"):
+                by_lid[str(cf["whatsapp_lid"])] = c
+
+        pipelines = self.list_pipelines()
+        default_pipeline_id = pipelines[0].id if pipelines else None
+        default_stage_id = None
+        if default_pipeline_id:
+            stages = self.list_stages(default_pipeline_id)
+            if stages:
+                default_stage_id = stages[0].id
+
+        now = utc_now_iso()
+        new_contacts_params = []
+        new_deals_params = []
+        updated_contacts_map: Dict[str, Contact] = {}
+        new_contact_ids = set()
+        messages_params = []
+        contact_last_ts: Dict[str, str] = {}
+
+        for it in filtered_items:
+            clean_phone = str(it.get("clean_phone") or "").strip().replace("+", "")
+            if not clean_phone:
+                continue
+            is_lid = bool(it.get("is_lid", False))
+            canonical_jid = str(it.get("canonical_jid") or f"{clean_phone}@s.whatsapp.net")
+            push_name = str(it.get("push_name") or f"WhatsApp (+{clean_phone})")
+            is_self = bool(it.get("is_self", False))
+            from_me = bool(it.get("from_me", False))
+            text_content = str(it.get("text_content") or "🎙️ [Áudio do Histórico WhatsApp]")
+            media_type = str(it.get("media_type") or "text")
+            ext_id = str(it.get("external_id") or "").strip() or None
+            msg_ts = str(it.get("timestamp") or now).strip() or now
+
+            # Resolve contato em memória O(1)
+            contact = None
+            if is_lid and clean_phone in by_lid:
+                contact = by_lid[clean_phone]
+            if not contact:
+                ph = self._compute_phone_hash(f"+{clean_phone}")
+                if ph and ph in by_phone_hash:
+                    contact = by_phone_hash[ph]
+            if not contact:
+                c_digits = "".join(ch for ch in clean_phone if ch.isdigit())
+                if c_digits:
+                    contact = by_clean_digits.get(c_digits) or (
+                        by_clean_digits.get(c_digits[-8:]) if len(c_digits) >= 8 else None
+                    )
+
+            if not contact:
+                contact = Contact(
+                    name=push_name,
+                    phone=f"+{clean_phone}",
+                    phone_hash=self._compute_phone_hash(f"+{clean_phone}"),
+                    channel="whatsapp",
+                    tags=["whatsapp-teste"] if is_self else ["whatsapp-real"],
+                    custom_fields={
+                        "whatsapp_jid": canonical_jid,
+                        "whatsapp_lid": clean_phone if is_lid else None,
+                        "is_lid": is_lid,
+                    },
+                    created_at=msg_ts,
+                    updated_at=msg_ts,
+                )
+                new_contact_ids.add(contact.id)
+                if contact.phone_hash:
+                    by_phone_hash[contact.phone_hash] = contact
+                c_digits = "".join(ch for ch in clean_phone if ch.isdigit())
+                if c_digits:
+                    by_clean_digits[c_digits] = contact
+                if is_lid:
+                    by_lid[clean_phone] = contact
+
+                new_contacts_params.append(
+                    (
+                        contact.id,
+                        contact.tenant_id or "master",
+                        contact.name,
+                        encrypt_field(contact.phone),
+                        contact.phone_hash,
+                        encrypt_field(contact.email),
+                        contact.channel,
+                        contact.seller_id,
+                        contact.assignee,
+                        1 if contact.ai_enabled else 0,
+                        contact.attendance_status,
+                        contact.temperature,
+                        contact.lead_score,
+                        contact.consent_status or "opted_in",
+                        0,
+                        json.dumps(contact.tags, ensure_ascii=False),
+                        encrypt_dict(contact.custom_fields),
+                        contact.created_at,
+                        contact.updated_at,
+                    )
+                )
+                if default_pipeline_id and default_stage_id:
+                    deal = Deal(
+                        contact_id=contact.id,
+                        pipeline_id=default_pipeline_id,
+                        stage_id=default_stage_id,
+                        title=f"Negócio - {contact.name}",
+                        value=497.0,
+                        status="open",
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    new_deals_params.append(
+                        (
+                            deal.id,
+                            deal.contact_id,
+                            deal.pipeline_id,
+                            deal.stage_id,
+                            deal.title,
+                            deal.value,
+                            deal.status,
+                            deal.created_at,
+                            deal.updated_at,
+                        )
+                    )
+            else:
+                fields = contact.custom_fields or {}
+                needs_cf_update = False
+                if fields.get("whatsapp_jid") != canonical_jid:
+                    fields["whatsapp_jid"] = canonical_jid
+                    needs_cf_update = True
+                if is_lid and fields.get("whatsapp_lid") != clean_phone:
+                    fields["is_lid"] = True
+                    fields["whatsapp_lid"] = clean_phone
+                    needs_cf_update = True
+                if contact.name.startswith("WhatsApp (") and push_name and not push_name.startswith("WhatsApp ("):
+                    contact.name = push_name
+                    needs_cf_update = True
+                if needs_cf_update and contact.id not in new_contact_ids:
+                    contact.custom_fields = fields
+                    updated_contacts_map[contact.id] = contact
+
+            msg_obj = Message(
+                contact_id=contact.id,
+                sender="human" if from_me else "contact",
+                channel="whatsapp",
+                content=text_content,
+                is_internal=False,
+                media_type=media_type,
+                external_id=ext_id,
+                delivery_status="sent",
+                timestamp=msg_ts,
+            )
+            messages_params.append(
+                (
+                    msg_obj.id,
+                    msg_obj.contact_id,
+                    msg_obj.sender,
+                    msg_obj.channel,
+                    encrypt_field(msg_obj.content),
+                    0,
+                    msg_obj.media_type,
+                    None,
+                    msg_obj.external_id,
+                    "sent",
+                    msg_obj.timestamp,
+                )
+            )
+            prev_ts = contact_last_ts.get(contact.id)
+            if not prev_ts or msg_ts > prev_ts:
+                contact_last_ts[contact.id] = msg_ts
+
+        # 3. Persiste tudo em uma única transação no banco (1 commit total)
+        with self.connection() as conn:
+            if new_contacts_params:
+                conn.executemany(
+                    """
+                    INSERT INTO contacts (
+                        id, tenant_id, name, phone, phone_hash, email, channel, seller_id, assignee, ai_enabled,
+                        attendance_status, temperature, lead_score, consent_status, unread_count, tags, custom_fields,
+                        created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    new_contacts_params,
+                )
+            if new_deals_params:
+                conn.executemany(
+                    """
+                    INSERT INTO deals (id, contact_id, pipeline_id, stage_id, title, value, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    new_deals_params,
+                )
+            if messages_params:
+                conn.executemany(
+                    """
+                    INSERT INTO messages (
+                        id, contact_id, sender, channel, content,
+                        is_internal, media_type, media_url, external_id, delivery_status, timestamp
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    messages_params,
+                )
+            for cid, c_obj in updated_contacts_map.items():
+                last_ts = contact_last_ts.get(cid, c_obj.updated_at)
+                conn.execute(
+                    "UPDATE contacts SET name = ?, custom_fields = ?, updated_at = ? WHERE id = ?",
+                    (c_obj.name, encrypt_dict(c_obj.custom_fields), last_ts, cid),
+                )
+            for cid, last_ts in contact_last_ts.items():
+                if cid not in updated_contacts_map and cid not in new_contact_ids:
+                    conn.execute(
+                        "UPDATE contacts SET updated_at = ? WHERE id = ? AND updated_at < ?",
+                        (last_ts, cid, last_ts),
+                    )
+
+        return {
+            "imported_messages": len(messages_params),
+            "new_contacts": len(new_contacts_params),
+            "touched_contacts": len(contact_last_ts),
+        }
 
     def update_message_delivery_status(
         self, external_id: str, delivery_status: str

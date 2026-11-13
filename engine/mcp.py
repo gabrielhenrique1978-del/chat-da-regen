@@ -183,7 +183,7 @@ class MCPServer:
             contacts = self.db.list_contacts()
             tag_filter = (args.get("tag") or "").strip().lower()
             channel_filter = (args.get("channel") or "").strip().lower()
-            limit = int(args.get("limit", 50))
+            limit = int(args.get("limit", 150))
 
             if tag_filter:
                 contacts = [c for c in contacts if tag_filter in [t.lower() for t in c.tags]]
@@ -191,9 +191,21 @@ class MCPServer:
                 contacts = [c for c in contacts if c.channel.lower() == channel_filter]
 
             stages_map = {s.id: s.name for s in self.db.list_stages()}
+            pipelines = self.db.list_pipelines()
+            first_pid = pipelines[0].id if pipelines else None
+            all_deals = self.db.list_deals()
+
+            # Mapa em O(1) para evitar N consultas ao banco (1 por contato)
+            deals_by_contact: Dict[str, Any] = {}
+            for d in all_deals:
+                if d.contact_id not in deals_by_contact:
+                    deals_by_contact[d.contact_id] = d
+                elif first_pid and d.pipeline_id == first_pid and deals_by_contact[d.contact_id].pipeline_id != first_pid:
+                    deals_by_contact[d.contact_id] = d
+
             enriched = []
             for c in contacts[:limit]:
-                deal = self.db.get_contact_active_deal(c.id)
+                deal = deals_by_contact.get(c.id)
                 data = c.model_dump()
                 data["deal"] = deal.model_dump() if deal else None
                 data["stage_name"] = stages_map.get(deal.stage_id) if deal else None

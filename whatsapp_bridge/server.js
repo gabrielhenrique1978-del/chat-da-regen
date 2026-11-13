@@ -129,15 +129,15 @@ function isSelfJid(jid) {
   return false;
 }
 
-async function processAndForwardMessage(msg, isHistory = false) {
-  if (!msg || !msg.message) return;
+function extractMessageItem(msg, isHistory = false) {
+  if (!msg || !msg.message) return null;
 
   const remoteJid = msg.key?.remoteJid;
-  if (!remoteJid) return;
+  if (!remoteJid) return null;
 
   // Ignora grupos e stories
   if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
-    return;
+    return null;
   }
 
   const rawId = remoteJid.split('@')[0];
@@ -153,7 +153,6 @@ async function processAndForwardMessage(msg, isHistory = false) {
   if (senderPn && senderPn.includes('@s.whatsapp.net')) {
     realPhone = senderPn.split('@')[0];
     recordMapping(senderPn, remoteJid, msg.pushName);
-    console.log(`📞 [Baileys] Telefone real identificado via senderPn: ${realPhone}`);
   } else {
     const altJid = msg.key?.participant || msg.participant;
     if (altJid && altJid.includes('@s.whatsapp.net')) {
@@ -171,7 +170,7 @@ async function processAndForwardMessage(msg, isHistory = false) {
     '';
 
   const isAudio = Boolean(msg.message.audioMessage);
-  if (!text && !isAudio) return;
+  if (!text && !isAudio) return null;
 
   const fromMe = Boolean(msg.key?.fromMe);
   const isSelf = isSelfJid(remoteJid);
@@ -200,31 +199,75 @@ async function processAndForwardMessage(msg, isHistory = false) {
       ? new Date(Number(rawTs) * 1000).toISOString()
       : new Date().toISOString();
 
+  return {
+    key: {
+      remoteJid: remoteJid,
+      fromMe: fromMe,
+      id: msg.key?.id,
+    },
+    phone: realPhone,
+    whatsappJid: remoteJid,
+    pushName: clientName,
+    isSelf: isSelf,
+    isHistory: Boolean(isHistory),
+    timestamp: isoTimestamp,
+    message: {
+      conversation: text,
+      ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
+    },
+  };
+}
+
+async function processAndForwardMessage(msg, isHistory = false) {
+  const item = extractMessageItem(msg, isHistory);
+  if (!item) return;
+
   if (!isHistory) {
-    console.log(`📩 [WhatsApp ${fromMe ? 'Enviada' : 'Recebida'} (${realPhone})]: ${text || '[Áudio]'}`);
+    console.log(
+      `📩 [WhatsApp ${item.key.fromMe ? 'Enviada' : 'Recebida'} (${item.phone})]: ${
+        item.message.conversation || '[Áudio]'
+      }`
+    );
   }
 
   await notifyWebhook({
     event: 'messages.upsert',
     instance: 'regenflow',
-    data: {
-      key: {
-        remoteJid: remoteJid,
-        fromMe: fromMe,
-        id: msg.key?.id,
-      },
-      phone: realPhone,
-      whatsappJid: remoteJid,
-      pushName: clientName,
-      isSelf: isSelf,
-      isHistory: Boolean(isHistory),
-      timestamp: isoTimestamp,
-      message: {
-        conversation: text,
-        ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
-      },
-    },
+    data: item,
   });
+}
+
+async function processAndForwardHistoryBatch(rawMessages) {
+  if (!rawMessages || !Array.isArray(rawMessages) || rawMessages.length === 0) return;
+
+  const sorted = [...rawMessages].sort((a, b) => {
+    const ta = Number(a.messageTimestamp?.low || a.messageTimestamp || 0);
+    const tb = Number(b.messageTimestamp?.low || b.messageTimestamp || 0);
+    return ta - tb;
+  });
+
+  const items = [];
+  for (const msg of sorted) {
+    const extracted = extractMessageItem(msg, true);
+    if (extracted) {
+      items.push(extracted);
+    }
+  }
+
+  if (items.length === 0) return;
+
+  // Envia em blocos grandes de até 250 mensagens de uma só vez (instantâneo igual WhatsApp Web)
+  const CHUNK_SIZE = 250;
+  for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+    const chunk = items.slice(i, i + CHUNK_SIZE);
+    await notifyWebhook({
+      event: 'messages.history_batch',
+      instance: 'regenflow',
+      data: {
+        messages: chunk,
+      },
+    });
+  }
 }
 
 async function startWhatsAppSocket() {
@@ -344,6 +387,10 @@ async function startWhatsAppSocket() {
       console.log(`⚡ [messages.upsert] Evento (${type}): ${messages?.length || 0} mensagens.`);
       if (!messages || !Array.isArray(messages)) return;
       const isHistoryBatch = type !== 'notify';
+      if (isHistoryBatch && messages.length > 1) {
+        await processAndForwardHistoryBatch(messages);
+        return;
+      }
       for (const msg of messages) {
         await processAndForwardMessage(msg, isHistoryBatch);
       }
@@ -406,17 +453,8 @@ async function startWhatsAppSocket() {
       for (const c of contacts || []) {
         recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
       }
-      if (messages && Array.isArray(messages)) {
-        const sorted = [...messages].sort((a, b) => {
-          const ta = Number(a.messageTimestamp?.low || a.messageTimestamp || 0);
-          const tb = Number(b.messageTimestamp?.low || b.messageTimestamp || 0);
-          return ta - tb;
-        });
-        for (const msg of sorted.slice(-500)) {
-          try {
-            await processAndForwardMessage(msg, true);
-          } catch (e) {}
-        }
+      if (messages && Array.isArray(messages) && messages.length > 0) {
+        await processAndForwardHistoryBatch(messages.slice(-800));
       }
     });
   } catch (err) {

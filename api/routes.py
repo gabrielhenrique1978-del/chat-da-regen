@@ -1122,7 +1122,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         return res["result"]
 
     @router.get("/contacts/{contact_id}")
-    def get_contact_detail(contact_id: str, mark_read: bool = True):
+    def get_contact_detail(contact_id: str, mark_read: bool = True, limit: int = 120):
         contact = db.get_contact(contact_id)
         if not contact:
             raise HTTPException(status_code=404, detail="Contato não encontrado")
@@ -1131,7 +1131,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             contact.unread_count = 0
         deal = db.get_contact_active_deal(contact_id)
         stage = db.get_stage(deal.stage_id) if deal else None
-        messages = db.list_messages(contact_id, include_internal=True)
+        messages = db.list_messages(contact_id, include_internal=True, limit=limit)
         appointments = db.list_appointments(contact_id)
         return {
             "contact": contact.model_dump(),
@@ -2078,6 +2078,69 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         event = str(payload.get("event") or payload.get("type", "")).upper()
         data = payload.get("data", {})
 
+        if "HISTORY_BATCH" in event or ("MESSAGES" in event and "BATCH" in event):
+            raw_list = data.get("messages") or []
+            batch_items = []
+            for item in raw_list:
+                msg_obj = item.get("message", {}) or item
+                key = item.get("key", {}) or msg_obj.get("key", {})
+                from_me = bool(key.get("fromMe", False))
+                is_self = bool(item.get("isSelf", False))
+                remote_jid = str(key.get("remoteJid", ""))
+                clean_phone = (str(item.get("phone") or "") or remote_jid.split("@")[0]).replace("+", "").strip()
+
+                if not is_self and (
+                    not clean_phone
+                    or clean_phone == "status"
+                    or clean_phone.endswith("g.us")
+                    or clean_phone.startswith("7010")
+                    or whatsapp_service.is_self(clean_phone)
+                ):
+                    continue
+
+                push_name = item.get("pushName")
+                if is_self:
+                    push_name = "Meu WhatsApp (Conversa de Teste)"
+                elif not push_name or push_name == whatsapp_service._name:
+                    push_name = f"WhatsApp (+{clean_phone})"
+
+                text_content = (
+                    msg_obj.get("conversation")
+                    or msg_obj.get("extendedTextMessage", {}).get("text")
+                    or msg_obj.get("audioMessage", {}).get("caption")
+                    or ""
+                )
+                media_type = "audio" if "audioMessage" in msg_obj else "text"
+                if not text_content and media_type != "audio":
+                    continue
+
+                is_lid = len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))
+                canonical_jid = (
+                    f"{clean_phone}@lid"
+                    if is_lid
+                    else (remote_jid or f"{clean_phone}@s.whatsapp.net")
+                )
+
+                batch_items.append(
+                    {
+                        "clean_phone": clean_phone,
+                        "is_lid": is_lid,
+                        "canonical_jid": canonical_jid,
+                        "push_name": push_name,
+                        "is_self": is_self,
+                        "from_me": from_me,
+                        "text_content": text_content or "🎙️ [Áudio do Histórico WhatsApp]",
+                        "media_type": media_type,
+                        "external_id": str(key.get("id") or "").strip() or None,
+                        "timestamp": str(item.get("timestamp") or "").strip() or None,
+                    }
+                )
+
+            stats_batch = db.bulk_import_whatsapp_history(batch_items)
+            if stats_batch.get("imported_messages", 0) > 0:
+                await ws_manager.broadcast_event("new_message", {"history_batch": True, **stats_batch})
+            return {"status": "history_batch_imported", **stats_batch}
+
         if "MESSAGES" in event and "UPSERT" in event:
             msg_obj = data.get("message", {}) or data
             key = data.get("key", {}) or msg_obj.get("key", {})
@@ -2189,7 +2252,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             else:
                 # Mensagem enviada a partir de um aparelho do WhatsApp (fromMe = True)
                 # 1. Verifica se não é eco duplicado de uma mensagem recém enviada pelo próprio CRM
-                recent_msgs = db.list_messages(contact.id)
+                recent_msgs = db.list_messages(contact.id, limit=5)
                 is_echo_duplicate = False
                 for rm in reversed(recent_msgs[-3:] if len(recent_msgs) >= 3 else recent_msgs):
                     if (

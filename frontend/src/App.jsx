@@ -165,20 +165,33 @@ export default function App() {
     }
   }, []);
 
-  // Load Selected Contact Detail + 24h Meta Window
-  const loadContactDetail = useCallback(async (contactId) => {
+  const contactDetailCacheRef = useRef({});
+  const wsRefreshTimerRef = useRef(null);
+
+  // Load Selected Contact Detail + 24h Meta Window (com cache instantâneo estilo WhatsApp Web)
+  const loadContactDetail = useCallback(async (contactId, background = false) => {
     if (!contactId) {
       setContactDetail(null);
       setWindowInfo(null);
       return;
     }
+    if (!background && contactDetailCacheRef.current[contactId]) {
+      setContactDetail(contactDetailCacheRef.current[contactId]);
+    }
     try {
       const detail = await api.getContactDetail(contactId);
-      setContactDetail(detail);
+      contactDetailCacheRef.current[contactId] = detail;
+      if (selectedContactIdRef.current === contactId) {
+        setContactDetail(detail);
+      }
       api
         .getContact24hWindow(contactId)
-        .then((win) => setWindowInfo(win))
-        .catch(() => setWindowInfo(null));
+        .then((win) => {
+          if (selectedContactIdRef.current === contactId) {
+            setWindowInfo(win);
+          }
+        })
+        .catch(() => {});
     } catch (err) {
       if (err.status === 403) setSuspendedDetail(err.detail);
       console.error('Erro ao carregar detalhes do contato:', err);
@@ -229,10 +242,33 @@ export default function App() {
         ev === 'stage_changed' ||
         ev === 'meta_message_status'
       ) {
-        loadContacts();
-        if (selectedContactIdRef.current) {
-          loadContactDetail(selectedContactIdRef.current);
+        // Atualização otimista imediata na conversa aberta se o payload já trouxer a mensagem
+        const incomingMsg = payload.data?.message || payload.data?.user_message;
+        const replyMsg = payload.data?.agent_reply;
+        if (incomingMsg && incomingMsg.contact_id === selectedContactIdRef.current) {
+          setContactDetail((prev) => {
+            if (!prev || prev.contact?.id !== incomingMsg.contact_id) return prev;
+            const exists = (prev.messages || []).some((m) => m.id === incomingMsg.id);
+            const nextMsgs = exists ? prev.messages : [...(prev.messages || []), incomingMsg];
+            if (replyMsg && !nextMsgs.some((m) => m.id === replyMsg.id)) {
+              nextMsgs.push(replyMsg);
+            }
+            const nextDetail = { ...prev, messages: nextMsgs };
+            contactDetailCacheRef.current[incomingMsg.contact_id] = nextDetail;
+            return nextDetail;
+          });
         }
+
+        // Coalesce/debounce de recarregamento para evitar tempestade de requisições durante sincronização de histórico
+        if (wsRefreshTimerRef.current) {
+          clearTimeout(wsRefreshTimerRef.current);
+        }
+        wsRefreshTimerRef.current = setTimeout(() => {
+          loadContacts();
+          if (selectedContactIdRef.current) {
+            loadContactDetail(selectedContactIdRef.current, true);
+          }
+        }, 120);
       }
       if (
         ev === 'sellers_updated' ||
@@ -344,17 +380,49 @@ export default function App() {
     }
   };
 
-  // Action Handlers for OmnichannelInbox & ContactDrawer
+  // Action Handlers for OmnichannelInbox & ContactDrawer (com renderização otimista instantânea)
   const handleSendMessage = async (payload) => {
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      contact_id: payload.contact_id,
+      sender: payload.is_internal ? 'internal' : payload.sender || 'human',
+      channel: 'whatsapp',
+      content: payload.content,
+      is_internal: Boolean(payload.is_internal),
+      media_type: payload.media_type || 'text',
+      delivery_status: 'sent',
+      timestamp: new Date().toISOString(),
+    };
+
+    setContactDetail((prev) => {
+      if (!prev || prev.contact?.id !== payload.contact_id) return prev;
+      const updated = {
+        ...prev,
+        messages: [...(prev.messages || []), optimisticMsg],
+      };
+      contactDetailCacheRef.current[payload.contact_id] = updated;
+      return updated;
+    });
+
     try {
-      await api.sendMessage(payload);
-      await Promise.all([
-        loadContactDetail(payload.contact_id),
-        loadContacts(),
-      ]);
+      const res = await api.sendMessage(payload);
+      if (res?.message) {
+        setContactDetail((prev) => {
+          if (!prev || prev.contact?.id !== payload.contact_id) return prev;
+          const msgs = (prev.messages || []).map((m) =>
+            m.id === tempId ? res.message : m
+          );
+          const updated = { ...prev, messages: msgs };
+          contactDetailCacheRef.current[payload.contact_id] = updated;
+          return updated;
+        });
+      }
+      loadContacts();
     } catch (err) {
       if (err.status === 403) setSuspendedDetail(err.detail);
       showToast(err.message || 'Erro ao enviar mensagem', 'error');
+      loadContactDetail(payload.contact_id, true);
     }
   };
 
