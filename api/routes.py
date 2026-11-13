@@ -1133,6 +1133,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
         stage = db.get_stage(deal.stage_id) if deal else None
         messages = db.list_messages(contact_id, include_internal=True, limit=limit)
         appointments = db.list_appointments(contact_id)
+        window_info = meta_service.check_24h_window([m for m in messages if not m.is_internal])
+        window_info["templates"] = OFFICIAL_META_TEMPLATES
         return {
             "contact": contact.model_dump(),
             "deal": deal.model_dump() if deal else None,
@@ -1140,6 +1142,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             "messages": [m.model_dump() for m in messages],
             "appointments": appointments,
             "pending_fragments": debouncer.pending_fragments(contact_id),
+            "window_info": window_info,
         }
 
     @router.get("/contacts/{contact_id}/lgpd-export")
@@ -1729,6 +1732,15 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 import asyncio
                 if req.media_type == "audio" and req.media_url:
                     asyncio.create_task(whatsapp_service.send_audio_message(target_number, req.media_url))
+                elif req.media_type in ("image", "video", "document") and req.media_url:
+                    asyncio.create_task(
+                        whatsapp_service.send_media_message(
+                            target_number,
+                            req.media_url,
+                            req.media_type,
+                            rendered_content,
+                        )
+                    )
                 else:
                     asyncio.create_task(whatsapp_service.send_text_message(target_number, rendered_content))
 
@@ -2110,8 +2122,9 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                     or msg_obj.get("audioMessage", {}).get("caption")
                     or ""
                 )
-                media_type = "audio" if "audioMessage" in msg_obj else "text"
-                if not text_content and media_type != "audio":
+                media_type = str(item.get("mediaType") or ("audio" if "audioMessage" in msg_obj else "text"))
+                media_url = item.get("mediaUrl")
+                if not text_content and media_type == "text":
                     continue
 
                 is_lid = len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))
@@ -2131,6 +2144,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         "from_me": from_me,
                         "text_content": text_content or "🎙️ [Áudio do Histórico WhatsApp]",
                         "media_type": media_type,
+                        "media_url": media_url,
                         "external_id": str(key.get("id") or "").strip() or None,
                         "timestamp": str(item.get("timestamp") or "").strip() or None,
                     }
@@ -2147,7 +2161,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             from_me = bool(key.get("fromMe", False))
             is_self = bool(data.get("isSelf", False))
             remote_jid = str(key.get("remoteJid", ""))
-            clean_phone = remote_jid.split("@")[0].replace("+", "").strip()
+            raw_lid = remote_jid.split("@")[0].replace("+", "").strip()
+            clean_phone = (str(data.get("phone") or "") or raw_lid).replace("+", "").strip()
 
             if not is_self and (
                 not clean_phone
@@ -2170,21 +2185,22 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 or msg_obj.get("audioMessage", {}).get("caption")
                 or ""
             )
-            media_type = "audio" if "audioMessage" in msg_obj else "text"
-            if not text_content and media_type != "audio":
+            media_type = str(data.get("mediaType") or ("audio" if "audioMessage" in msg_obj else "text"))
+            media_url = data.get("mediaUrl")
+            if not text_content and media_type == "text":
                 return {"status": "ignored_empty"}
 
-            canonical_jid = f"{clean_phone}@lid" if (len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))) else (remote_jid or f"{clean_phone}@s.whatsapp.net")
-            is_lid = len(clean_phone) > 13 or (remote_jid and remote_jid.endswith("@lid"))
+            is_lid = len(raw_lid) > 13 or (remote_jid and remote_jid.endswith("@lid"))
+            canonical_jid = f"{raw_lid}@lid" if is_lid else (remote_jid or f"{clean_phone}@s.whatsapp.net")
 
             contact = db.find_contact_by_phone(clean_phone)
-            if not contact and is_lid:
+            if not contact and (is_lid or raw_lid != clean_phone):
                 for c in db.list_contacts():
                     fields = c.custom_fields or {}
                     if (
-                        fields.get("whatsapp_lid") == clean_phone
-                        or (fields.get("whatsapp_jid") and clean_phone in str(fields.get("whatsapp_jid")))
-                        or c.phone == f"+{clean_phone}"
+                        fields.get("whatsapp_lid") in (raw_lid, clean_phone)
+                        or (fields.get("whatsapp_jid") and raw_lid in str(fields.get("whatsapp_jid")))
+                        or c.phone in (f"+{raw_lid}", f"+{clean_phone}")
                     ):
                         contact = c
                         break
@@ -2195,10 +2211,13 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         name=push_name,
                         phone=f"+{clean_phone}",
                         channel="whatsapp",
+                        ai_enabled=False if (from_me and not is_self) else True,
+                        attendance_status="human" if (from_me and not is_self) else "bot",
+                        assignee="Atendimento Loja" if (from_me and not is_self) else "Agente IA",
                         tags=["whatsapp-teste"] if is_self else ["whatsapp-real"],
                         custom_fields={
                             "whatsapp_jid": canonical_jid,
-                            "whatsapp_lid": clean_phone if is_lid else None,
+                            "whatsapp_lid": raw_lid if is_lid else None,
                             "is_lid": is_lid,
                         },
                     ),
@@ -2210,9 +2229,12 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 if fields.get("whatsapp_jid") != canonical_jid:
                     fields["whatsapp_jid"] = canonical_jid
                     needs_update = True
-                if is_lid and fields.get("whatsapp_lid") != clean_phone:
+                if is_lid and fields.get("whatsapp_lid") != raw_lid:
                     fields["is_lid"] = True
-                    fields["whatsapp_lid"] = clean_phone
+                    fields["whatsapp_lid"] = raw_lid
+                    needs_update = True
+                if len(clean_phone) <= 13 and contact.phone != f"+{clean_phone}":
+                    contact.phone = f"+{clean_phone}"
                     needs_update = True
                 if contact.name.startswith("WhatsApp (") and push_name and not push_name.startswith("WhatsApp ("):
                     contact.name = push_name
@@ -2238,6 +2260,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         content=text_content or "🎙️ [Áudio do Histórico WhatsApp]",
                         channel="whatsapp",
                         media_type=media_type,
+                        media_url=media_url,
                         external_id=msg_id or None,
                         **({"timestamp": msg_timestamp} if msg_timestamp else {}),
                     )
@@ -2251,6 +2274,8 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                     content=text_content or "Áudio recebido via WhatsApp",
                     channel="whatsapp",
                     media_type=media_type,
+                    media_url=media_url,
+                    external_id=msg_id or None,
                 )
                 await ws_manager.broadcast_event("message_processed", result)
                 await ws_manager.broadcast_event("new_message", {"contact_id": contact.id})
@@ -2263,6 +2288,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 for rm in reversed(recent_msgs[-3:] if len(recent_msgs) >= 3 else recent_msgs):
                     if (
                         rm.sender in ("human", "agent")
+                        and not rm.external_id
                         and rm.content.strip() == (text_content or "").strip()
                     ):
                         is_echo_duplicate = True
@@ -2273,7 +2299,15 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                     return {"status": "echo_acknowledged", "contact_id": contact.id}
 
                 # 2. Se não for eco, foi enviada diretamente pelo celular físico da loja!
-                # Mantém a posse estrita do vendedor e espelha no chat em tempo real
+                # Pausa o bot de IA se estiver ligado (vendedor humano está conversando pelo aparelho)
+                if contact.ai_enabled and not is_self:
+                    db.set_contact_handoff(
+                        contact_id=contact.id,
+                        ai_enabled=False,
+                        attendance_status="human",
+                        assignee=contact.assignee if contact.assignee != "Agente IA" else "Atendimento Loja",
+                    )
+
                 sent_msg = db.create_message(
                     Message(
                         contact_id=contact.id,
@@ -2281,6 +2315,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                         content=text_content or "Áudio enviado via WhatsApp pelo celular",
                         channel="whatsapp",
                         media_type=media_type,
+                        media_url=media_url,
                         external_id=msg_id or None,
                     )
                 )

@@ -7,6 +7,8 @@ import {
   makeCacheableSignalKeyStore,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  downloadMediaMessage,
+  normalizeMessageContent,
 } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -133,11 +135,29 @@ function isSelfJid(jid) {
 // Cache em memória de mensagens enviadas para permitir retry de criptografia Signal (evita Bad MAC)
 const sentMessagesCache = new Map();
 
+// Cache rápido de retry Signal: inicia contagem em 1 para forçar envio imediato de PreKey (<keys>) na 1ª tentativa
+// e pular o delay bloqueante de 5000ms do requestPlaceholderResend no Baileys
+const rawRetryMap = new Map();
+const fastRetryCounterCache = {
+  get: (k) => rawRetryMap.get(k) ?? 1,
+  set: (k, v) => rawRetryMap.set(k, v),
+  del: (k) => rawRetryMap.delete(k),
+  flushAll: () => rawRetryMap.clear(),
+};
+const noOpPlaceholderCache = {
+  get: () => true,
+  set: () => {},
+  del: () => {},
+  flushAll: () => {},
+};
+
 function unwrapMessageContent(m) {
   if (!m) return null;
-  let curr = m;
-  for (let i = 0; i < 6; i++) {
-    if (curr.ephemeralMessage?.message) {
+  let curr = normalizeMessageContent(m) || m;
+  for (let i = 0; i < 8; i++) {
+    if (curr.deviceSentMessage?.message) {
+      curr = curr.deviceSentMessage.message;
+    } else if (curr.ephemeralMessage?.message) {
       curr = curr.ephemeralMessage.message;
     } else if (curr.viewOnceMessage?.message) {
       curr = curr.viewOnceMessage.message;
@@ -147,6 +167,8 @@ function unwrapMessageContent(m) {
       curr = curr.viewOnceMessageV2Extension.message;
     } else if (curr.documentWithCaptionMessage?.message) {
       curr = curr.documentWithCaptionMessage.message;
+    } else if (curr.associatedChildMessage?.message) {
+      curr = curr.associatedChildMessage.message;
     } else if (curr.editedMessage?.message?.protocolMessage?.editedMessage) {
       curr = curr.editedMessage.message.protocolMessage.editedMessage;
     } else if (curr.editedMessage?.message) {
@@ -158,6 +180,20 @@ function unwrapMessageContent(m) {
   return curr;
 }
 
+function bufferToBase64DataUri(rawBuf, mime = 'image/jpeg') {
+  if (!rawBuf) return null;
+  try {
+    if (typeof rawBuf === 'string') {
+      return rawBuf.startsWith('data:') ? rawBuf : `data:${mime};base64,${rawBuf}`;
+    }
+    const buf = Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
+    if (buf.length === 0) return null;
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
 function extractMessageItem(msg, isHistory = false) {
   if (!msg || !msg.message) return null;
 
@@ -165,7 +201,7 @@ function extractMessageItem(msg, isHistory = false) {
   if (!remoteJid) return null;
 
   // Ignora grupos e stories
-  if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) {
+  if (remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast') || remoteJid.includes('@newsletter')) {
     return null;
   }
 
@@ -180,6 +216,25 @@ function extractMessageItem(msg, isHistory = false) {
     ? unwrapMessageContent(inner.protocolMessage.editedMessage)
     : inner;
   if (!contentObj) return null;
+
+  // Identifica com precisão se a mensagem partiu da loja/aparelho próprio (fromMe) ou do cliente (!fromMe)
+  const participantClean = (
+    msg.key?.participant ||
+    msg.participant ||
+    msg.key?.senderLid ||
+    msg.key?.senderPn ||
+    ''
+  )
+    .split('@')[0]
+    .split(':')[0];
+
+  const fromMe = Boolean(
+    msg.key?.fromMe ||
+      msg.message?.deviceSentMessage ||
+      (participantClean &&
+        ((myPhoneNumber && participantClean === myPhoneNumber) ||
+          (myLid && participantClean === myLid)))
+  );
 
   const rawId = remoteJid.split('@')[0].split(':')[0];
   const isLid = remoteJid.endsWith('@lid') || rawId.length > 13;
@@ -197,21 +252,28 @@ function extractMessageItem(msg, isHistory = false) {
     msg.participantPn ||
     msg.key?.remoteJidAlt;
   if (senderPn && senderPn.includes('@s.whatsapp.net')) {
-    realPhone = senderPn.split('@')[0].split(':')[0];
-    recordMapping(senderPn, remoteJid, msg.pushName);
+    const candidatePn = senderPn.split('@')[0].split(':')[0];
+    if (!myPhoneNumber || candidatePn !== myPhoneNumber) {
+      realPhone = candidatePn;
+      recordMapping(senderPn, remoteJid, !fromMe ? msg.pushName : undefined);
+    }
   } else {
     const altJid = msg.key?.participant || msg.participant;
     if (altJid && altJid.includes('@s.whatsapp.net')) {
-      realPhone = altJid.split('@')[0].split(':')[0];
-      recordMapping(altJid, remoteJid, msg.pushName);
+      const candidatePn = altJid.split('@')[0].split(':')[0];
+      if (!myPhoneNumber || candidatePn !== myPhoneNumber) {
+        realPhone = candidatePn;
+        recordMapping(altJid, remoteJid, !fromMe ? msg.pushName : undefined);
+      }
     }
   }
 
+  const videoObj = contentObj.videoMessage || contentObj.ptvMessage;
   let text =
     contentObj.conversation ||
     contentObj.extendedTextMessage?.text ||
     contentObj.imageMessage?.caption ||
-    contentObj.videoMessage?.caption ||
+    videoObj?.caption ||
     contentObj.documentMessage?.caption ||
     contentObj.documentMessage?.title ||
     contentObj.documentMessage?.fileName ||
@@ -223,17 +285,50 @@ function extractMessageItem(msg, isHistory = false) {
     '';
 
   const isAudio = Boolean(contentObj.audioMessage || contentObj.pttMessage);
-  if (!text && !isAudio) {
-    if (contentObj.imageMessage) text = '📷 [Imagem enviada pelo cliente]';
-    else if (contentObj.videoMessage) text = '🎥 [Vídeo enviado pelo cliente]';
-    else if (contentObj.stickerMessage) text = '🏷️ [Figurinha]';
-    else if (contentObj.documentMessage) text = '📄 [Documento anexado]';
-    else if (contentObj.locationMessage || contentObj.liveLocationMessage) text = '📍 [Localização compartilhada]';
-    else if (contentObj.contactMessage || contentObj.contactsArrayMessage) text = '👤 [Contato compartilhado]';
-    else return null;
+  let mediaType = 'text';
+  let mediaUrl = null;
+
+  if (contentObj.imageMessage) {
+    mediaType = 'image';
+    mediaUrl = bufferToBase64DataUri(contentObj.imageMessage.jpegThumbnail, 'image/jpeg');
+    if (!text) {
+      text = fromMe ? '📷 [Imagem enviada]' : '📷 [Imagem recebida]';
+    }
+  } else if (videoObj) {
+    const thumbUri = bufferToBase64DataUri(videoObj.jpegThumbnail, 'image/jpeg');
+    mediaType = thumbUri ? 'image' : 'text';
+    mediaUrl = thumbUri;
+    if (!text) {
+      text = fromMe ? '🎥 [Vídeo enviado]' : '🎥 [Vídeo recebido]';
+    }
+  } else if (isAudio) {
+    mediaType = 'audio';
+    if (!text) {
+      text = fromMe ? '🎙️ [Áudio enviado]' : '🎙️ [Áudio recebido]';
+    }
+  } else if (contentObj.documentMessage) {
+    mediaType = 'document';
+    const docName =
+      contentObj.documentMessage.fileName ||
+      contentObj.documentMessage.title ||
+      'Arquivo';
+    if (!text) {
+      text = fromMe
+        ? `📄 [Documento enviado: ${docName}]`
+        : `📄 [Documento recebido: ${docName}]`;
+    }
+  } else if (!text) {
+    if (contentObj.stickerMessage) {
+      text = fromMe ? '🏷️ [Figurinha enviada]' : '🏷️ [Figurinha recebida]';
+    } else if (contentObj.locationMessage || contentObj.liveLocationMessage) {
+      text = fromMe ? '📍 [Localização enviada]' : '📍 [Localização compartilhada]';
+    } else if (contentObj.contactMessage || contentObj.contactsArrayMessage) {
+      text = fromMe ? '👤 [Contato enviado]' : '👤 [Contato compartilhado]';
+    } else {
+      return null;
+    }
   }
 
-  const fromMe = Boolean(msg.key?.fromMe);
   const isSelf = isSelfJid(remoteJid);
 
   let clientName;
@@ -243,7 +338,7 @@ function extractMessageItem(msg, isHistory = false) {
   } else {
     clientName = contactsMap.get(realPhone) || contactsMap.get(rawId) || contactsMap.get(remoteJid);
     if (!clientName) {
-      if (!fromMe && msg.pushName) {
+      if (!fromMe && msg.pushName && msg.pushName !== myName) {
         clientName = msg.pushName;
         contactsMap.set(realPhone, clientName);
         contactsMap.set(rawId, clientName);
@@ -272,21 +367,63 @@ function extractMessageItem(msg, isHistory = false) {
     isSelf: isSelf,
     isHistory: Boolean(isHistory),
     timestamp: isoTimestamp,
+    mediaType: mediaType,
+    mediaUrl: mediaUrl,
+    _hasRawImage: Boolean(contentObj.imageMessage),
+    _hasRawAudio: isAudio,
+    _imageMime: contentObj.imageMessage?.mimetype || 'image/jpeg',
+    _audioMime: (contentObj.audioMessage || contentObj.pttMessage)?.mimetype || 'audio/ogg; codecs=opus',
     message: {
       conversation: text,
-      ...(isAudio ? { audioMessage: { caption: text || 'Áudio gravado' } } : {}),
+      ...(isAudio ? { audioMessage: { caption: text } } : {}),
     },
   };
+}
+
+async function downloadMediaWithTimeout(msg, timeoutMs = 2800) {
+  try {
+    const downloadPromise = downloadMediaMessage(
+      msg,
+      'buffer',
+      {},
+      {
+        logger,
+        reuploadRequest: sock?.updateMediaMessage,
+      }
+    );
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('media_timeout')), timeoutMs)
+    );
+    return await Promise.race([downloadPromise, timeoutPromise]);
+  } catch {
+    return null;
+  }
 }
 
 async function processAndForwardMessage(msg, isHistory = false) {
   const item = extractMessageItem(msg, isHistory);
   if (!item) return;
 
+  // Em mensagens ao vivo (tempo real), baixa a imagem ou áudio completo do WhatsApp
+  if (!isHistory && (item._hasRawImage || item._hasRawAudio)) {
+    const fullBuffer = await downloadMediaWithTimeout(msg, 2800);
+    if (fullBuffer && fullBuffer.length > 0) {
+      const mime = item._hasRawImage
+        ? (item._imageMime || 'image/jpeg').split(';')[0]
+        : (item._audioMime || 'audio/ogg').split(';')[0];
+      item.mediaUrl = `data:${mime};base64,${fullBuffer.toString('base64')}`;
+    }
+  }
+
+  delete item._hasRawImage;
+  delete item._hasRawAudio;
+  delete item._imageMime;
+  delete item._audioMime;
+
   if (!isHistory) {
     console.log(
-      `📩 [WhatsApp ${item.key.fromMe ? 'Enviada' : 'Recebida'} (${item.phone})]: ${
-        item.message.conversation || '[Áudio]'
+      `📩 [WhatsApp ${item.key.fromMe ? 'Enviada pela Loja' : 'Recebida do Cliente'} (${item.phone})]: ${
+        item.message.conversation || '[Mídia]'
       }`
     );
   }
@@ -311,14 +448,18 @@ async function processAndForwardHistoryBatch(rawMessages) {
   for (const msg of sorted) {
     const extracted = extractMessageItem(msg, true);
     if (extracted) {
+      delete extracted._hasRawImage;
+      delete extracted._hasRawAudio;
+      delete extracted._imageMime;
+      delete extracted._audioMime;
       items.push(extracted);
     }
   }
 
   if (items.length === 0) return;
 
-  // Envia em blocos grandes de até 250 mensagens de uma só vez (instantâneo igual WhatsApp Web)
-  const CHUNK_SIZE = 250;
+  // Envia em blocos de até 150 mensagens sem travar o loop de eventos do Baileys
+  const CHUNK_SIZE = 150;
   for (let i = 0; i < items.length; i += CHUNK_SIZE) {
     const chunk = items.slice(i, i + CHUNK_SIZE);
     await notifyWebhook({
@@ -353,6 +494,17 @@ async function startWhatsAppSocket() {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
+    // Carrega imediatamente o número e o LID da loja já salvos nas credenciais antes mesmo do 1º pacote
+    if (state.creds?.me?.id) {
+      myPhoneNumber = state.creds.me.id.split(':')[0].split('@')[0];
+    }
+    if (state.creds?.me?.lid) {
+      myLid = state.creds.me.lid.split(':')[0].split('@')[0];
+    }
+    if (state.creds?.me?.name) {
+      myName = state.creds.me.name;
+    }
+
     sock = makeWASocket({
       version,
       auth: {
@@ -361,12 +513,15 @@ async function startWhatsAppSocket() {
       },
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
-      syncFullHistory: true,
-      shouldSyncHistoryMessage: () => true, // Sincroniza todo o histórico disponível enviado pelo aparelho
+      syncFullHistory: false, // Evita download massivo de 22.000 mensagens antigas que travam a sessão Signal
+      shouldSyncHistoryMessage: (msg) =>
+        msg.syncType === 0 || msg.syncType === 1 || msg.syncType === 3,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
-      retryRequestDelayMs: 250,
-      maxMsgRetryCount: 5,
+      retryRequestDelayMs: 150,
+      maxMsgRetryCount: 6,
+      msgRetryCounterCache: fastRetryCounterCache,
+      placeholderResendCache: noOpPlaceholderCache,
       getMessage: async (key) => {
         if (key?.id && sentMessagesCache.has(key.id)) {
           return sentMessagesCache.get(key.id);
@@ -378,7 +533,18 @@ async function startWhatsAppSocket() {
       defaultQueryTimeoutMs: 60000,
     });
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', async (update) => {
+      if (update?.me?.id || state.creds?.me?.id) {
+        myPhoneNumber = (update?.me?.id || state.creds?.me?.id).split(':')[0].split('@')[0];
+      }
+      if (update?.me?.lid || state.creds?.me?.lid) {
+        myLid = (update?.me?.lid || state.creds?.me?.lid).split(':')[0].split('@')[0];
+      }
+      if (update?.me?.name || state.creds?.me?.name) {
+        myName = update?.me?.name || state.creds?.me?.name;
+      }
+      await saveCreds();
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -404,9 +570,9 @@ async function startWhatsAppSocket() {
       if (connection === 'open') {
         connectionState = 'open';
         currentQR = null;
-        myPhoneNumber = sock.user?.id ? sock.user.id.split(':')[0] : null;
-        myLid = sock.user?.lid ? sock.user.lid.split(':')[0] : null;
-        myName = sock.user?.name || 'Regen Flow';
+        myPhoneNumber = (sock.user?.id ? sock.user.id.split(':')[0].split('@')[0] : null) || myPhoneNumber;
+        myLid = (sock.user?.lid ? sock.user.lid.split(':')[0].split('@')[0] : null) || myLid;
+        myName = sock.user?.name || myName || 'Regen Flow';
 
         console.log(`✅ [Baileys] WhatsApp Conectado com sucesso!`);
         console.log(`   Número: ${myPhoneNumber} | LID: ${myLid} | Nome: ${myName}`);
@@ -456,29 +622,21 @@ async function startWhatsAppSocket() {
 
     // Mensagens em tempo real ou lotes de histórico (type === 'append')
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      console.log(`⚡ [messages.upsert] Evento (${type}): ${messages?.length || 0} mensagens.`);
       if (!messages || !Array.isArray(messages)) return;
       for (const m of messages) {
         if (m?.key?.id && m?.message) {
           sentMessagesCache.set(m.key.id, m.message);
-        } else if (m?.messageStubType === 2 && m?.key?.id && !m?.key?.fromMe) {
-          // StubType 2 = CIPHERTEXT (Bad MAC na sessão Signal): solicita reenvio imediato da mensagem ao aparelho principal (PDO)
-          try {
-            if (typeof sock?.requestPlaceholderResend === 'function') {
-              sock.requestPlaceholderResend(m.key).catch(() => {});
-            }
-          } catch (e) {}
         }
       }
-      // Se for uma mensagem recente (últimos 90 segundos), trata como tempo real mesmo se vier como 'append'
+      // Se for uma mensagem recente (últimos 120 segundos), trata como tempo real mesmo se vier como 'append'
       const nowSec = Math.floor(Date.now() / 1000);
       const isRecentSingle =
         messages.length === 1 &&
-        Math.abs(nowSec - Number(messages[0]?.messageTimestamp?.low || messages[0]?.messageTimestamp || nowSec)) <= 90;
+        Math.abs(nowSec - Number(messages[0]?.messageTimestamp?.low || messages[0]?.messageTimestamp || nowSec)) <= 120;
 
       const isHistoryBatch = type !== 'notify' && !isRecentSingle;
       if (isHistoryBatch && messages.length > 1) {
-        await processAndForwardHistoryBatch(messages);
+        processAndForwardHistoryBatch(messages.slice(-150)).catch(() => {});
         return;
       }
       for (const msg of messages) {
@@ -553,7 +711,7 @@ async function startWhatsAppSocket() {
       }
     });
 
-    // Sincronização completa de histórico do WhatsApp (messaging-history.set)
+    // Sincronização inicial de histórico do WhatsApp (messaging-history.set)
     sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
       console.log(`📥 [Baileys] Sincronização de histórico: ${chats?.length || 0} chats, ${contacts?.length || 0} contatos, ${messages?.length || 0} mensagens.`);
       for (const ch of chats || []) {
@@ -563,7 +721,8 @@ async function startWhatsAppSocket() {
         recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
       }
       if (messages && Array.isArray(messages) && messages.length > 0) {
-        await processAndForwardHistoryBatch(messages.slice(-800));
+        // Importa de forma assíncrona apenas as 150 mensagens mais recentes para não travar a sessão Signal
+        processAndForwardHistoryBatch(messages.slice(-150)).catch(() => {});
       }
     });
   } catch (err) {
@@ -664,6 +823,60 @@ app.post('/message/sendText/:instance', async (req, res) => {
   }
 });
 
+app.post('/message/sendMedia/:instance', async (req, res) => {
+  try {
+    const { number, media, mediaType = 'image', caption = '', fileName = 'arquivo' } = req.body;
+    if (!sock || connectionState !== 'open') {
+      return res.status(400).json({ error: 'WhatsApp não está conectado.' });
+    }
+    if (!media) {
+      return res.status(400).json({ error: 'Conteúdo de mídia ausente.' });
+    }
+
+    const targetJid = getTargetJid(number);
+    let mime = 'image/jpeg';
+    let rawBase64 = media;
+    const match = String(media).match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      mime = match[1];
+      rawBase64 = match[2];
+    }
+    const mediaBuffer = Buffer.from(rawBase64, 'base64');
+
+    let payloadMsg;
+    if (mediaType === 'image' || mime.startsWith('image/')) {
+      payloadMsg = {
+        image: mediaBuffer,
+        mimetype: mime,
+        caption: caption || undefined,
+      };
+    } else if (mediaType === 'video' || mime.startsWith('video/')) {
+      payloadMsg = {
+        video: mediaBuffer,
+        mimetype: mime,
+        caption: caption || undefined,
+      };
+    } else {
+      payloadMsg = {
+        document: mediaBuffer,
+        mimetype: mime || 'application/octet-stream',
+        fileName: fileName || 'documento',
+        caption: caption || undefined,
+      };
+    }
+
+    console.log(`🚀 [Baileys] Enviando mídia (${mediaType}) para ${targetJid}`);
+    const sent = await sock.sendMessage(targetJid, payloadMsg);
+    if (sent?.key?.id && sent?.message) {
+      sentMessagesCache.set(sent.key.id, sent.message);
+    }
+    res.json({ success: true, messageId: sent?.key?.id, jid: targetJid });
+  } catch (err) {
+    console.error('Erro ao enviar mídia:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/message/sendWhatsAppAudio/:instance', async (req, res) => {
   try {
     const { number, audio } = req.body;
@@ -673,13 +886,15 @@ app.post('/message/sendWhatsAppAudio/:instance', async (req, res) => {
 
     const targetJid = getTargetJid(number);
     console.log(`🚀 [Baileys] Enviando áudio PTT para ${targetJid}`);
-    const audioBuffer = Buffer.from(audio.replace(/^data:audio\/\w+;base64,/, ''), 'base64');
+    const audioBuffer = Buffer.from(audio.replace(/^data:audio\/[^;]+;base64,/, ''), 'base64');
     const sent = await sock.sendMessage(targetJid, {
       audio: audioBuffer,
       mimetype: 'audio/mp4',
       ptt: true,
     });
-
+    if (sent?.key?.id && sent?.message) {
+      sentMessagesCache.set(sent.key.id, sent.message);
+    }
     res.json({ success: true, messageId: sent.key.id, jid: targetJid });
   } catch (err) {
     console.error('Erro ao enviar áudio:', err);

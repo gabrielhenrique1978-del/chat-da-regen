@@ -227,6 +227,7 @@ class ConversationalAgent:
         persist_user_message: bool = True,
         media_type: str = "text",
         media_url: Optional[str] = None,
+        external_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Fluxo completo de processamento de mensagem do cliente:
@@ -254,6 +255,7 @@ class ConversationalAgent:
                     content=content,
                     media_type=media_type,
                     media_url=media_url,
+                    external_id=external_id,
                 )
             )
 

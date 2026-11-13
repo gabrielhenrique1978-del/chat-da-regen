@@ -165,8 +165,10 @@ class WhatsAppService:
         if status.get("connected"):
             return {
                 "success": True,
+                "instance": self.instance_name,
                 "state": "open",
                 "connected": True,
+                "phone": self._phone_number,
                 "message": "WhatsApp já está conectado!",
             }
 
@@ -279,6 +281,42 @@ class WhatsAppService:
             "success": False,
             "fallback": True,
             "message": "Áudio salvo no CRM como nota de voz.",
+        }
+
+    async def send_media_message(
+        self,
+        phone: str,
+        media_base64: str,
+        media_type: str = "image",
+        caption: str = "",
+        file_name: str = "arquivo",
+    ) -> Dict[str, Any]:
+        """Envia imagem, vídeo ou documento para o WhatsApp real via Baileys Bridge."""
+        clean_phone = phone if "@" in phone else "".join(ch for ch in phone if ch.isdigit())
+        if not clean_phone:
+            return {"success": False, "error": "Número de telefone inválido."}
+
+        url = f"{self.base_url}/message/sendMedia/{self.instance_name}"
+        payload = {
+            "number": clean_phone,
+            "media": media_base64,
+            "mediaType": media_type,
+            "caption": caption,
+            "fileName": file_name,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                res = await client.post(url, headers=self.headers, json=payload)
+                if res.status_code in (200, 201):
+                    return {"success": True, "result": res.json()}
+        except Exception as exc:
+            logger.warning(f"Falha ao enviar mídia via WhatsApp Bridge: {exc}")
+
+        return {
+            "success": False,
+            "fallback": True,
+            "message": "Mídia salva no CRM.",
         }
 
     async def request_phone_number(self, phone_or_jid: str) -> Dict[str, Any]:

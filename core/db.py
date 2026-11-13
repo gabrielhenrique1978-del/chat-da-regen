@@ -298,6 +298,18 @@ class Database:
         self._pg_depth = 0
         self._memory_conn: Optional[sqlite3.Connection] = None
 
+        # Cache Write-Through em Memória para latência sub-milissegundo (<1ms)
+        self._cache_lock = threading.RLock()
+        self._contacts_cache: Optional[List[Contact]] = None
+        self._pipelines_cache: Optional[List[Pipeline]] = None
+        self._stages_cache: Optional[List[Stage]] = None
+        self._deals_cache: Optional[List[Deal]] = None
+        self._sellers_cache: Optional[List[Seller]] = None
+        self._kb_cache: Optional[List[KnowledgeItem]] = None
+        self._rules_cache: Optional[List[WorkflowRule]] = None
+        self._qr_cache: Optional[List[QuickReply]] = None
+        self._messages_cache: Dict[str, List[Message]] = {}
+
         if self.is_postgres:
             self.database_url = self._ensure_sslmode_require(resolved_target)
             self.db_path = self.database_url
@@ -656,9 +668,19 @@ class Database:
         Garante que 100% dos dados pré-existentes passem a ter proteção criptográfica AES-256.
         """
         updated = 0
+        prefix_like = f"{CIPHER_PREFIX}%"
         with self.connection() as conn:
-            # 1. Contatos (PII + Blind Index HMAC-SHA256)
-            rows = conn.execute("SELECT id, phone, phone_hash, email, custom_fields FROM contacts").fetchall()
+            # 1. Contatos (PII + Blind Index HMAC-SHA256) - filtra apenas registros pendentes via SQL
+            rows = conn.execute(
+                """
+                SELECT id, phone, phone_hash, email, custom_fields FROM contacts
+                WHERE (phone IS NOT NULL AND phone != '' AND phone NOT LIKE ?)
+                   OR (phone IS NOT NULL AND phone != '' AND phone_hash IS NULL)
+                   OR (email IS NOT NULL AND email != '' AND email NOT LIKE ?)
+                   OR (custom_fields IS NOT NULL AND custom_fields != '' AND custom_fields NOT LIKE ?)
+                """,
+                (prefix_like, prefix_like, prefix_like),
+            ).fetchall()
             for r in rows:
                 p = r["phone"]
                 ph = r["phone_hash"] if "phone_hash" in r.keys() else None
@@ -697,8 +719,11 @@ class Database:
                     )
                     updated += 1
 
-            # 2. Mensagens (Conversas privadas)
-            msg_rows = conn.execute("SELECT id, content FROM messages").fetchall()
+            # 2. Mensagens (Conversas privadas) - filtra apenas texto plano
+            msg_rows = conn.execute(
+                "SELECT id, content FROM messages WHERE content IS NOT NULL AND content != '' AND content NOT LIKE ?",
+                (prefix_like,),
+            ).fetchall()
             for m in msg_rows:
                 c = m["content"]
                 if c and not str(c).startswith(CIPHER_PREFIX):
@@ -707,7 +732,10 @@ class Database:
                     updated += 1
 
             # 3. Agendamentos
-            appt_rows = conn.execute("SELECT id, notes FROM appointments").fetchall()
+            appt_rows = conn.execute(
+                "SELECT id, notes FROM appointments WHERE notes IS NOT NULL AND notes != '' AND notes NOT LIKE ?",
+                (prefix_like,),
+            ).fetchall()
             for a in appt_rows:
                 n = a["notes"]
                 if n and not str(n).startswith(CIPHER_PREFIX):
@@ -1096,6 +1124,12 @@ class Database:
                 ),
             )
 
+        if self._contacts_cache is not None:
+            with self._cache_lock:
+                if self._contacts_cache is not None:
+                    self._contacts_cache = [c for c in self._contacts_cache if c.id != contact.id]
+                    self._contacts_cache.insert(0, contact.model_copy(deep=True))
+
         if create_default_deal:
             pipelines = self.list_pipelines()
             if pipelines:
@@ -1120,7 +1154,14 @@ class Database:
             conn.execute("DELETE FROM deals WHERE contact_id = ?", (contact_id,))
             conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
             cur = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
-            return cur.rowcount > 0
+            deleted = cur.rowcount > 0
+        with self._cache_lock:
+            if self._contacts_cache is not None:
+                self._contacts_cache = [c for c in self._contacts_cache if c.id != contact_id]
+            if self._deals_cache is not None:
+                self._deals_cache = [d for d in self._deals_cache if d.contact_id != contact_id]
+            self._messages_cache.pop(contact_id, None)
+        return deleted
 
     def clear_demo_contacts(self) -> int:
         """Remove os contatos demonstrativos gerados pelo seed (Marina, Roberto, Carlos)."""
@@ -1139,39 +1180,47 @@ class Database:
         return deleted_count
 
     def get_contact(self, contact_id: str) -> Optional[Contact]:
-        with self.connection() as conn:
-            row = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
-            return self._row_to_contact(row) if row else None
+        if not contact_id:
+            return None
+        contacts = self.list_contacts()
+        for c in contacts:
+            if c.id == contact_id:
+                return c
+        return None
 
     def find_contact_by_phone(self, phone: str) -> Optional[Contact]:
         if not phone:
             return None
+        contacts = self.list_contacts()
         ph = self._compute_phone_hash(phone)
         if ph:
-            with self.connection() as conn:
-                row = conn.execute("SELECT * FROM contacts WHERE phone_hash = ? LIMIT 1", (ph,)).fetchone()
-                if row:
-                    return self._row_to_contact(row)
+            for c in contacts:
+                if c.phone_hash == ph:
+                    return c
 
         clean = "".join(ch for ch in (phone or "") if ch.isdigit())
         if not clean:
             return None
-        for c in self.list_contacts():
+        for c in contacts:
             c_clean = "".join(ch for ch in (c.phone or "") if ch.isdigit())
-            if c_clean and (c_clean == clean or c_clean.endswith(clean[-8:])):
+            if c_clean and (c_clean == clean or (len(clean) >= 8 and c_clean.endswith(clean[-8:]))):
                 return c
         return None
 
     def list_contacts(self, tenant_id: Optional[str] = None) -> List[Contact]:
-        with self.connection() as conn:
+        with self._cache_lock:
+            if self._contacts_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM contacts ORDER BY updated_at DESC").fetchall()
+                    self._contacts_cache = [self._row_to_contact(r) for r in rows]
+            all_contacts = self._contacts_cache
             if tenant_id and tenant_id != "master":
-                rows = conn.execute(
-                    "SELECT * FROM contacts WHERE tenant_id = ? OR tenant_id = 'master' ORDER BY updated_at DESC",
-                    (tenant_id,),
-                ).fetchall()
-            else:
-                rows = conn.execute("SELECT * FROM contacts ORDER BY updated_at DESC").fetchall()
-            return [self._row_to_contact(r) for r in rows]
+                return [
+                    c.model_copy(deep=True)
+                    for c in all_contacts
+                    if c.tenant_id == tenant_id or c.tenant_id == "master"
+                ]
+            return [c.model_copy(deep=True) for c in all_contacts]
 
     def update_contact(self, contact: Contact) -> Contact:
         contact.updated_at = utc_now_iso()
@@ -1205,6 +1254,10 @@ class Database:
                     contact.id,
                 ),
             )
+        with self._cache_lock:
+            if self._contacts_cache is not None:
+                self._contacts_cache = [c for c in self._contacts_cache if c.id != contact.id]
+                self._contacts_cache.insert(0, contact.model_copy(deep=True))
         return contact
 
     def set_contact_handoff(
@@ -1287,6 +1340,12 @@ class Database:
         """Zera o contador de mensagens não lidas quando o atendente abre a conversa."""
         with self.connection() as conn:
             conn.execute("UPDATE contacts SET unread_count = 0 WHERE id = ?", (contact_id,))
+        with self._cache_lock:
+            if self._contacts_cache is not None:
+                for c in self._contacts_cache:
+                    if c.id == contact_id:
+                        c.unread_count = 0
+                        break
 
     def set_contact_consent(self, contact_id: str, consent_status: str, actor: str = "Sistema") -> Optional[Contact]:
         """Atualiza o status de consentimento LGPD (opted_in / opted_out) do titular."""
@@ -1395,6 +1454,9 @@ class Database:
             if delete_messages:
                 conn.execute("DELETE FROM messages WHERE contact_id = ?", (contact_id,))
             conn.execute("DELETE FROM appointments WHERE contact_id = ?", (contact_id,))
+        if delete_messages:
+            with self._cache_lock:
+                self._messages_cache.pop(contact_id, None)
 
         self.create_message(
             Message(
@@ -1426,11 +1488,11 @@ class Database:
             return None
         only_sellers = [s for s in active_sellers if s.role == "seller"] or active_sellers
 
-        with self.connection() as conn:
-            rows = conn.execute(
-                "SELECT assignee, COUNT(*) as cnt FROM contacts WHERE attendance_status = 'human' GROUP BY assignee"
-            ).fetchall()
-            load_map = {str(r["assignee"] or "").lower(): int(r["cnt"]) for r in rows}
+        load_map: Dict[str, int] = {}
+        for c in self.list_contacts(tenant_id=tenant_id):
+            if c.attendance_status == "human":
+                key = str(c.assignee or "").lower()
+                load_map[key] = load_map.get(key, 0) + 1
 
         only_sellers.sort(key=lambda s: (load_map.get(s.name.lower(), 0), s.name))
         return only_sellers[0]
@@ -1571,6 +1633,26 @@ class Database:
                     "UPDATE contacts SET updated_at = ? WHERE id = ?",
                     (message.timestamp, message.contact_id),
                 )
+
+        with self._cache_lock:
+            if message.contact_id in self._messages_cache:
+                self._messages_cache[message.contact_id].append(message.model_copy(deep=True))
+            if self._contacts_cache is not None:
+                target_contact = None
+                remaining = []
+                for c in self._contacts_cache:
+                    if c.id == message.contact_id:
+                        target_contact = c
+                    else:
+                        remaining.append(c)
+                if target_contact is not None:
+                    target_contact.updated_at = message.timestamp
+                    if message.sender == "contact":
+                        target_contact.unread_count = (target_contact.unread_count or 0) + 1
+                    elif message.sender == "human" and not message.is_internal:
+                        target_contact.unread_count = 0
+                    remaining.insert(0, target_contact)
+                    self._contacts_cache = remaining
         return message
 
     add_message = create_message
@@ -1581,38 +1663,50 @@ class Database:
         include_internal: bool = True,
         limit: Optional[int] = None,
     ) -> List[Message]:
-        with self.connection() as conn:
-            if contact_id:
-                if limit and limit > 0:
-                    if include_internal:
-                        rows = conn.execute(
-                            "SELECT * FROM (SELECT * FROM messages WHERE contact_id = ? ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
-                            (contact_id, int(limit)),
-                        ).fetchall()
-                    else:
-                        rows = conn.execute(
-                            "SELECT * FROM (SELECT * FROM messages WHERE contact_id = ? AND is_internal = 0 ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
-                            (contact_id, int(limit)),
-                        ).fetchall()
-                else:
-                    if include_internal:
+        if contact_id:
+            with self._cache_lock:
+                cached = self._messages_cache.get(contact_id)
+                if cached is None:
+                    with self.connection() as conn:
                         rows = conn.execute(
                             "SELECT * FROM messages WHERE contact_id = ? ORDER BY timestamp ASC",
                             (contact_id,),
                         ).fetchall()
-                    else:
-                        rows = conn.execute(
-                            "SELECT * FROM messages WHERE contact_id = ? AND is_internal = 0 ORDER BY timestamp ASC",
-                            (contact_id,),
-                        ).fetchall()
-            else:
+                        cached = [
+                            Message(
+                                id=r["id"],
+                                contact_id=r["contact_id"],
+                                sender=r["sender"],
+                                channel=r["channel"],
+                                content=decrypt_field(r["content"]) or "",
+                                is_internal=bool(r["is_internal"]) if "is_internal" in r.keys() else False,
+                                media_type=r["media_type"] if "media_type" in r.keys() else "text",
+                                media_url=r["media_url"] if "media_url" in r.keys() else None,
+                                external_id=r["external_id"] if "external_id" in r.keys() else None,
+                                delivery_status=(
+                                    r["delivery_status"]
+                                    if "delivery_status" in r.keys() and r["delivery_status"]
+                                    else "sent"
+                                ),
+                                timestamp=r["timestamp"],
+                            )
+                            for r in rows
+                        ]
+                        self._messages_cache[contact_id] = cached
+
+                items = cached if include_internal else [m for m in cached if not m.is_internal]
                 if limit and limit > 0:
-                    rows = conn.execute(
-                        "SELECT * FROM (SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
-                        (int(limit),),
-                    ).fetchall()
-                else:
-                    rows = conn.execute("SELECT * FROM messages ORDER BY timestamp ASC").fetchall()
+                    items = items[-int(limit) :]
+                return [m.model_copy(deep=True) for m in items]
+
+        with self.connection() as conn:
+            if limit and limit > 0:
+                rows = conn.execute(
+                    "SELECT * FROM (SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?) sub ORDER BY timestamp ASC",
+                    (int(limit),),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM messages ORDER BY timestamp ASC").fetchall()
 
             return [
                 Message(
@@ -1834,6 +1928,7 @@ class Database:
                 content=text_content,
                 is_internal=False,
                 media_type=media_type,
+                media_url=it.get("media_url"),
                 external_id=ext_id,
                 delivery_status="sent",
                 timestamp=msg_ts,
@@ -1847,7 +1942,7 @@ class Database:
                     encrypt_field(msg_obj.content),
                     0,
                     msg_obj.media_type,
-                    None,
+                    msg_obj.media_url,
                     msg_obj.external_id,
                     "sent",
                     msg_obj.timestamp,
@@ -1903,6 +1998,13 @@ class Database:
                         (last_ts, cid, last_ts),
                     )
 
+        with self._cache_lock:
+            self._contacts_cache = None
+            if new_deals_params:
+                self._deals_cache = None
+            for cid in contact_last_ts.keys():
+                self._messages_cache.pop(cid, None)
+
         return {
             "imported_messages": len(messages_params),
             "new_contacts": len(new_contacts_params),
@@ -1927,7 +2029,7 @@ class Database:
                 (delivery_status, row["id"]),
             )
             updated = conn.execute("SELECT * FROM messages WHERE id = ?", (row["id"],)).fetchone()
-            return Message(
+            msg = Message(
                 id=updated["id"],
                 contact_id=updated["contact_id"],
                 sender=updated["sender"],
@@ -1940,6 +2042,14 @@ class Database:
                 delivery_status=updated["delivery_status"] or "sent",
                 timestamp=updated["timestamp"],
             )
+        with self._cache_lock:
+            cached_list = self._messages_cache.get(msg.contact_id)
+            if cached_list is not None:
+                for m in cached_list:
+                    if m.id == msg.id:
+                        m.delivery_status = msg.delivery_status
+                        break
+        return msg
 
     # -----------------------------------------------------------------
     # Operações de Funil Kanban (Pipelines, Stages, Deals)
@@ -1951,12 +2061,19 @@ class Database:
                 "INSERT INTO pipelines (id, name, description) VALUES (?, ?, ?)",
                 (pipeline.id, pipeline.name, pipeline.description),
             )
+        with self._cache_lock:
+            self._pipelines_cache = None
         return pipeline
 
     def list_pipelines(self) -> List[Pipeline]:
-        with self.connection() as conn:
-            rows = conn.execute("SELECT * FROM pipelines").fetchall()
-            return [Pipeline(id=r["id"], name=r["name"], description=r["description"]) for r in rows]
+        with self._cache_lock:
+            if self._pipelines_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM pipelines").fetchall()
+                    self._pipelines_cache = [
+                        Pipeline(id=r["id"], name=r["name"], description=r["description"]) for r in rows
+                    ]
+            return [p.model_copy(deep=True) for p in self._pipelines_cache]
 
     def create_stage(self, stage: Stage) -> Stage:
         with self.connection() as conn:
@@ -1974,23 +2091,25 @@ class Database:
                     1 if stage.is_lost else 0,
                 ),
             )
+        with self._cache_lock:
+            self._stages_cache = None
         return stage
 
     def list_stages(self, pipeline_id: Optional[str] = None) -> List[Stage]:
-        with self.connection() as conn:
+        with self._cache_lock:
+            if self._stages_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM stages ORDER BY stage_order ASC").fetchall()
+                    self._stages_cache = [self._row_to_stage(r) for r in rows]
             if pipeline_id:
-                rows = conn.execute(
-                    "SELECT * FROM stages WHERE pipeline_id = ? ORDER BY stage_order ASC",
-                    (pipeline_id,),
-                ).fetchall()
-            else:
-                rows = conn.execute("SELECT * FROM stages ORDER BY stage_order ASC").fetchall()
-            return [self._row_to_stage(r) for r in rows]
+                return [s.model_copy(deep=True) for s in self._stages_cache if s.pipeline_id == pipeline_id]
+            return [s.model_copy(deep=True) for s in self._stages_cache]
 
     def get_stage(self, stage_id: str) -> Optional[Stage]:
-        with self.connection() as conn:
-            row = conn.execute("SELECT * FROM stages WHERE id = ?", (stage_id,)).fetchone()
-            return self._row_to_stage(row) if row else None
+        for s in self.list_stages():
+            if s.id == stage_id:
+                return s
+        return None
 
     def get_stage_by_name(self, name: str, pipeline_id: Optional[str] = None) -> Optional[Stage]:
         stages = self.list_stages(pipeline_id)
@@ -2035,47 +2154,45 @@ class Database:
                     deal.updated_at,
                 ),
             )
+        with self._cache_lock:
+            if self._deals_cache is not None:
+                self._deals_cache = [d for d in self._deals_cache if d.id != deal.id]
+                self._deals_cache.insert(0, deal.model_copy(deep=True))
         return deal
 
     def get_deal(self, deal_id: str) -> Optional[Deal]:
-        with self.connection() as conn:
-            row = conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone()
-            return self._row_to_deal(row) if row else None
+        for d in self.list_deals():
+            if d.id == deal_id:
+                return d
+        return None
 
     def get_contact_active_deal(self, contact_id: str, pipeline_id: Optional[str] = None) -> Optional[Deal]:
-        with self.connection() as conn:
-            if pipeline_id:
-                row = conn.execute(
-                    "SELECT * FROM deals WHERE contact_id = ? AND pipeline_id = ? ORDER BY updated_at DESC LIMIT 1",
-                    (contact_id, pipeline_id),
-                ).fetchone()
-            else:
-                pipelines = self.list_pipelines()
-                first_pid = pipelines[0].id if pipelines else None
-                if first_pid:
-                    row = conn.execute(
-                        "SELECT * FROM deals WHERE contact_id = ? AND pipeline_id = ? ORDER BY updated_at DESC LIMIT 1",
-                        (contact_id, first_pid),
-                    ).fetchone()
-                else:
-                    row = None
-                if not row:
-                    row = conn.execute(
-                        "SELECT * FROM deals WHERE contact_id = ? ORDER BY updated_at DESC LIMIT 1",
-                        (contact_id,),
-                    ).fetchone()
-            return self._row_to_deal(row) if row else None
+        deals = self.list_deals()
+        if pipeline_id:
+            for d in deals:
+                if d.contact_id == contact_id and d.pipeline_id == pipeline_id:
+                    return d
+            return None
+        pipelines = self.list_pipelines()
+        first_pid = pipelines[0].id if pipelines else None
+        if first_pid:
+            for d in deals:
+                if d.contact_id == contact_id and d.pipeline_id == first_pid:
+                    return d
+        for d in deals:
+            if d.contact_id == contact_id:
+                return d
+        return None
 
     def list_deals(self, pipeline_id: Optional[str] = None) -> List[Deal]:
-        with self.connection() as conn:
+        with self._cache_lock:
+            if self._deals_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM deals ORDER BY updated_at DESC").fetchall()
+                    self._deals_cache = [self._row_to_deal(r) for r in rows]
             if pipeline_id:
-                rows = conn.execute(
-                    "SELECT * FROM deals WHERE pipeline_id = ? ORDER BY updated_at DESC",
-                    (pipeline_id,),
-                ).fetchall()
-            else:
-                rows = conn.execute("SELECT * FROM deals ORDER BY updated_at DESC").fetchall()
-            return [self._row_to_deal(r) for r in rows]
+                return [d.model_copy(deep=True) for d in self._deals_cache if d.pipeline_id == pipeline_id]
+            return [d.model_copy(deep=True) for d in self._deals_cache]
 
     def move_deal_stage(self, deal_id: str, new_stage_id_or_name: str, value: Optional[float] = None) -> Optional[Deal]:
         deal = self.get_deal(deal_id)
@@ -2108,6 +2225,10 @@ class Database:
                 "UPDATE deals SET stage_id = ?, status = ?, value = ?, updated_at = ? WHERE id = ?",
                 (deal.stage_id, deal.status, deal.value, deal.updated_at, deal.id),
             )
+        with self._cache_lock:
+            if self._deals_cache is not None:
+                self._deals_cache = [d for d in self._deals_cache if d.id != deal.id]
+                self._deals_cache.insert(0, deal.model_copy(deep=True))
         return deal
 
     def _row_to_deal(self, row: sqlite3.Row) -> Deal:
@@ -2142,26 +2263,34 @@ class Database:
                     json.dumps(item.tags, ensure_ascii=False),
                 ),
             )
+        with self._cache_lock:
+            self._kb_cache = None
         return item
 
     def list_knowledge_items(self) -> List[KnowledgeItem]:
-        with self.connection() as conn:
-            rows = conn.execute("SELECT * FROM knowledge_items").fetchall()
-            return [
-                KnowledgeItem(
-                    id=r["id"],
-                    question=r["question"],
-                    answer=r["answer"],
-                    category=r["category"],
-                    tags=json.loads(r["tags"] or "[]"),
-                )
-                for r in rows
-            ]
+        with self._cache_lock:
+            if self._kb_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM knowledge_items").fetchall()
+                    self._kb_cache = [
+                        KnowledgeItem(
+                            id=r["id"],
+                            question=r["question"],
+                            answer=r["answer"],
+                            category=r["category"],
+                            tags=json.loads(r["tags"] or "[]"),
+                        )
+                        for r in rows
+                    ]
+            return [k.model_copy(deep=True) for k in self._kb_cache]
 
     def delete_knowledge_item(self, item_id: str) -> bool:
         with self.connection() as conn:
             cur = conn.execute("DELETE FROM knowledge_items WHERE id = ?", (item_id,))
-            return cur.rowcount > 0
+            deleted = cur.rowcount > 0
+        with self._cache_lock:
+            self._kb_cache = None
+        return deleted
 
     # -----------------------------------------------------------------
     # Regras de Automação (Workflows)
@@ -2183,23 +2312,29 @@ class Database:
                     1 if rule.active else 0,
                 ),
             )
+        with self._cache_lock:
+            self._rules_cache = None
         return rule
 
     def list_workflow_rules(self, only_active: bool = False) -> List[WorkflowRule]:
-        with self.connection() as conn:
-            query = "SELECT * FROM workflow_rules WHERE active = 1" if only_active else "SELECT * FROM workflow_rules"
-            rows = conn.execute(query).fetchall()
-            return [
-                WorkflowRule(
-                    id=r["id"],
-                    name=r["name"],
-                    trigger_type=r["trigger_type"],
-                    trigger_value=r["trigger_value"],
-                    actions=json.loads(r["actions"] or "[]"),
-                    active=bool(r["active"]),
-                )
-                for r in rows
-            ]
+        with self._cache_lock:
+            if self._rules_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM workflow_rules").fetchall()
+                    self._rules_cache = [
+                        WorkflowRule(
+                            id=r["id"],
+                            name=r["name"],
+                            trigger_type=r["trigger_type"],
+                            trigger_value=r["trigger_value"],
+                            actions=json.loads(r["actions"] or "[]"),
+                            active=bool(r["active"]),
+                        )
+                        for r in rows
+                    ]
+            if only_active:
+                return [r.model_copy(deep=True) for r in self._rules_cache if r.active]
+            return [r.model_copy(deep=True) for r in self._rules_cache]
 
     def toggle_workflow_rule(self, rule_id: str) -> Optional[WorkflowRule]:
         with self.connection() as conn:
@@ -2209,7 +2344,7 @@ class Database:
             new_active = 0 if row["active"] else 1
             conn.execute("UPDATE workflow_rules SET active = ? WHERE id = ?", (new_active, rule_id))
             row = conn.execute("SELECT * FROM workflow_rules WHERE id = ?", (rule_id,)).fetchone()
-            return WorkflowRule(
+            rule = WorkflowRule(
                 id=row["id"],
                 name=row["name"],
                 trigger_type=row["trigger_type"],
@@ -2217,6 +2352,9 @@ class Database:
                 actions=json.loads(row["actions"] or "[]"),
                 active=bool(row["active"]),
             )
+        with self._cache_lock:
+            self._rules_cache = None
+        return rule
 
     # -----------------------------------------------------------------
     # Respostas Rápidas (Quick Replies / Atalhos)
@@ -2230,26 +2368,34 @@ class Database:
                 "INSERT INTO quick_replies (id, shortcut, title, content, category) VALUES (?, ?, ?, ?, ?)",
                 (qr.id, qr.shortcut, qr.title, qr.content, qr.category),
             )
+        with self._cache_lock:
+            self._qr_cache = None
         return qr
 
     def list_quick_replies(self) -> List[QuickReply]:
-        with self.connection() as conn:
-            rows = conn.execute("SELECT * FROM quick_replies ORDER BY shortcut ASC").fetchall()
-            return [
-                QuickReply(
-                    id=r["id"],
-                    shortcut=r["shortcut"],
-                    title=r["title"],
-                    content=r["content"],
-                    category=r["category"],
-                )
-                for r in rows
-            ]
+        with self._cache_lock:
+            if self._qr_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM quick_replies ORDER BY shortcut ASC").fetchall()
+                    self._qr_cache = [
+                        QuickReply(
+                            id=r["id"],
+                            shortcut=r["shortcut"],
+                            title=r["title"],
+                            content=r["content"],
+                            category=r["category"],
+                        )
+                        for r in rows
+                    ]
+            return [q.model_copy(deep=True) for q in self._qr_cache]
 
     def delete_quick_reply(self, qr_id: str) -> bool:
         with self.connection() as conn:
             cur = conn.execute("DELETE FROM quick_replies WHERE id = ?", (qr_id,))
-            return cur.rowcount > 0
+            deleted = cur.rowcount > 0
+        with self._cache_lock:
+            self._qr_cache = None
+        return deleted
 
     # -----------------------------------------------------------------
     # Agendamento de Reuniões (Appointments)
@@ -2690,25 +2836,26 @@ class Database:
         Por padrão retorna apenas vendedores ativos (active = True).
         Se include_inactive = True, inclui também os vendedores desativados (soft delete).
         """
-        with self.connection() as conn:
+        with self._cache_lock:
+            if self._sellers_cache is None:
+                with self.connection() as conn:
+                    rows = conn.execute("SELECT * FROM sellers ORDER BY name ASC").fetchall()
+                    self._sellers_cache = [
+                        Seller(
+                            id=row["id"],
+                            name=row["name"],
+                            email=row["email"],
+                            phone=row["phone"],
+                            pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
+                            role=row["role"] if "role" in row.keys() and row["role"] else ("supervisor" if "gabriel" in (row["name"] or "").lower() or "otavio" in (row["name"] or "").lower() else "seller"),
+                            active=bool(row["active"]),
+                            created_at=row["created_at"],
+                        )
+                        for row in rows
+                    ]
             if include_inactive:
-                rows = conn.execute("SELECT * FROM sellers ORDER BY name ASC").fetchall()
-            else:
-                rows = conn.execute("SELECT * FROM sellers WHERE active = 1 ORDER BY name ASC").fetchall()
-
-            return [
-                Seller(
-                    id=row["id"],
-                    name=row["name"],
-                    email=row["email"],
-                    phone=row["phone"],
-                    pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
-                    role=row["role"] if "role" in row.keys() and row["role"] else ("supervisor" if "gabriel" in (row["name"] or "").lower() or "otavio" in (row["name"] or "").lower() else "seller"),
-                    active=bool(row["active"]),
-                    created_at=row["created_at"],
-                )
-                for row in rows
-            ]
+                return [s.model_copy(deep=True) for s in self._sellers_cache]
+            return [s.model_copy(deep=True) for s in self._sellers_cache if s.active]
 
     def delete_seller(self, seller_id: str) -> bool:
         """Exclui permanentemente um vendedor e desvincula conversas atribuídas a ele."""
@@ -2721,41 +2868,26 @@ class Database:
                 (seller_id, seller.name),
             )
             cur = conn.execute("DELETE FROM sellers WHERE id = ?", (seller_id,))
-            return cur.rowcount > 0
+            deleted = cur.rowcount > 0
+        with self._cache_lock:
+            self._sellers_cache = None
+            self._contacts_cache = None
+        return deleted
 
     def get_seller(self, seller_id: str) -> Optional[Seller]:
         """Busca vendedor por ID."""
-        with self.connection() as conn:
-            row = conn.execute("SELECT * FROM sellers WHERE id = ?", (seller_id,)).fetchone()
-            if not row:
-                return None
-            return Seller(
-                id=row["id"],
-                name=row["name"],
-                email=row["email"],
-                phone=row["phone"],
-                pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
-                role=row["role"] if "role" in row.keys() and row["role"] else "seller",
-                active=bool(row["active"]),
-                created_at=row["created_at"],
-            )
+        for s in self.list_sellers(include_inactive=True):
+            if s.id == seller_id:
+                return s
+        return None
 
     def get_seller_by_name(self, name: str) -> Optional[Seller]:
         """Busca vendedor por nome."""
-        with self.connection() as conn:
-            row = conn.execute("SELECT * FROM sellers WHERE lower(name) = lower(?)", (name.strip(),)).fetchone()
-            if not row:
-                return None
-            return Seller(
-                id=row["id"],
-                name=row["name"],
-                email=row["email"],
-                phone=row["phone"],
-                pin=(decrypt_field(row["pin"]) or "1234") if "pin" in row.keys() and row["pin"] else "1234",
-                role=row["role"] if "role" in row.keys() and row["role"] else "seller",
-                active=bool(row["active"]),
-                created_at=row["created_at"],
-            )
+        clean = (name or "").strip().lower()
+        for s in self.list_sellers(include_inactive=True):
+            if s.name.strip().lower() == clean:
+                return s
+        return None
 
     def create_seller(
         self,
@@ -2802,6 +2934,8 @@ class Database:
                     seller.created_at,
                 ),
             )
+        with self._cache_lock:
+            self._sellers_cache = None
         return seller
 
     def update_seller(
@@ -2857,6 +2991,8 @@ class Database:
                     seller_id,
                 ),
             )
+        with self._cache_lock:
+            self._sellers_cache = None
         return self.get_seller(seller_id)
 
     def verify_seller_pin(self, seller_id: str, pin: str) -> Optional[Seller]:

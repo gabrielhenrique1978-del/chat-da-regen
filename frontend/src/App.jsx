@@ -176,22 +176,31 @@ export default function App() {
       return;
     }
     if (!background && contactDetailCacheRef.current[contactId]) {
-      setContactDetail(contactDetailCacheRef.current[contactId]);
+      const cached = contactDetailCacheRef.current[contactId];
+      setContactDetail(cached);
+      if (cached.window_info) {
+        setWindowInfo(cached.window_info);
+      }
     }
     try {
       const detail = await api.getContactDetail(contactId);
       contactDetailCacheRef.current[contactId] = detail;
       if (selectedContactIdRef.current === contactId) {
         setContactDetail(detail);
+        if (detail.window_info) {
+          setWindowInfo(detail.window_info);
+        }
       }
-      api
-        .getContact24hWindow(contactId)
-        .then((win) => {
-          if (selectedContactIdRef.current === contactId) {
-            setWindowInfo(win);
-          }
-        })
-        .catch(() => {});
+      if (!detail.window_info) {
+        api
+          .getContact24hWindow(contactId)
+          .then((win) => {
+            if (selectedContactIdRef.current === contactId) {
+              setWindowInfo(win);
+            }
+          })
+          .catch(() => {});
+      }
     } catch (err) {
       if (err.status === 403) setSuspendedDetail(err.detail);
       console.error('Erro ao carregar detalhes do contato:', err);
@@ -391,6 +400,7 @@ export default function App() {
       content: payload.content,
       is_internal: Boolean(payload.is_internal),
       media_type: payload.media_type || 'text',
+      media_url: payload.media_url || null,
       delivery_status: 'sent',
       timestamp: new Date().toISOString(),
     };
