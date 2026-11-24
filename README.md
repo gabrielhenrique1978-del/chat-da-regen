@@ -92,6 +92,8 @@ cool-lovelace/
 │   ├── agent.py                     # Agente conversacional e qualificação de leads
 │   ├── debouncer.py                 # Anti-fragmentação temporal de mensagens
 │   └── mcp.py                       # Servidor Model Context Protocol
+├── docs/
+│   └── adr/                         # Architecture Decision Records (ADRs 0001 a 0006 e regras do sistema)
 ├── main.py                          # Inicializador unificado (inicia Baileys e FastAPI juntos)
 ├── requirements.txt                 # Dependências Python
 └── README.md                        # Documentação técnica da plataforma

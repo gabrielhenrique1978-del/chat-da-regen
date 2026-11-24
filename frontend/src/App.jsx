@@ -214,9 +214,17 @@ export default function App() {
     loadAuxiliary();
   }, [loadSellers, loadContacts, loadAuxiliary]);
 
-  // Select first contact automatically when contacts load if none selected
+  // Select first contact automatically when contacts load if none selected or if selected contact was deleted
   useEffect(() => {
-    if (!selectedContactId && contacts.length > 0) {
+    if (contacts.length === 0) {
+      if (selectedContactId) {
+        setSelectedContactId(null);
+        setContactDetail(null);
+      }
+      return;
+    }
+    const stillExists = selectedContactId && contacts.some((c) => c.id === selectedContactId);
+    if (!stillExists) {
       setSelectedContactId(contacts[0].id);
     }
   }, [contacts, selectedContactId]);
@@ -270,6 +278,10 @@ export default function App() {
           });
         }
 
+        if (payload.data?.history_batch) {
+          contactDetailCacheRef.current = {};
+        }
+
         // Coalesce/debounce de recarregamento para evitar tempestade de requisições durante sincronização de histórico
         if (wsRefreshTimerRef.current) {
           clearTimeout(wsRefreshTimerRef.current);
@@ -289,10 +301,25 @@ export default function App() {
         loadSellers();
         loadContacts();
       }
+      if (
+        ev === 'whatsapp_disconnected' ||
+        (ev === 'whatsapp_status_updated' && payload.data?.cleared)
+      ) {
+        contactDetailCacheRef.current = {};
+        setContacts([]);
+        setSelectedContactId(null);
+        setContactDetail(null);
+        loadContacts();
+        loadAuxiliary();
+        showToast('WhatsApp desconectado: todas as conversas e memória foram excluídas.', 'info');
+        return;
+      }
       if (ev === 'whatsapp_status_updated') {
         if (payload.data?.state === 'open') {
+          contactDetailCacheRef.current = {};
           showToast(`WhatsApp Conectado (${payload.data.phone || 'Sessão ativa'})`, 'success');
           loadContacts();
+          loadAuxiliary();
         }
       }
     });
@@ -301,7 +328,7 @@ export default function App() {
         cleanupSocket();
       }
     };
-  }, [loadContacts, loadContactDetail, loadSellers]);
+  }, [loadContacts, loadContactDetail, loadSellers, loadAuxiliary, showToast]);
 
   // Supervisor: Impersonate Seller ("Entrar na Conta do Vendedor")
   const handleImpersonateSeller = useCallback(

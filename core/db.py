@@ -1179,6 +1179,40 @@ class Database:
                     deleted_count += 1
         return deleted_count
 
+    def clear_whatsapp_data(self) -> Dict[str, int]:
+        """
+        Exclui automaticamente todas as conversas, mensagens, negócios e contatos do WhatsApp
+        do banco de dados e limpa integralmente os caches em memória ao desconectar o aparelho.
+        """
+        with self.connection() as conn:
+            cur_msgs = conn.execute(
+                "DELETE FROM messages WHERE channel = 'whatsapp' OR contact_id IN (SELECT id FROM contacts WHERE channel = 'whatsapp')"
+            )
+            deleted_messages = cur_msgs.rowcount if cur_msgs.rowcount and cur_msgs.rowcount > 0 else 0
+
+            cur_deals = conn.execute(
+                "DELETE FROM deals WHERE contact_id IN (SELECT id FROM contacts WHERE channel = 'whatsapp')"
+            )
+            deleted_deals = cur_deals.rowcount if cur_deals.rowcount and cur_deals.rowcount > 0 else 0
+
+            conn.execute(
+                "DELETE FROM appointments WHERE contact_id IN (SELECT id FROM contacts WHERE channel = 'whatsapp')"
+            )
+
+            cur_contacts = conn.execute("DELETE FROM contacts WHERE channel = 'whatsapp'")
+            deleted_contacts = cur_contacts.rowcount if cur_contacts.rowcount and cur_contacts.rowcount > 0 else 0
+
+        with self._cache_lock:
+            self._contacts_cache = None
+            self._messages_cache.clear()
+            self._deals_cache = None
+
+        return {
+            "deleted_contacts": deleted_contacts,
+            "deleted_messages": deleted_messages,
+            "deleted_deals": deleted_deals,
+        }
+
     def get_contact(self, contact_id: str) -> Optional[Contact]:
         if not contact_id:
             return None
@@ -1797,11 +1831,13 @@ class Database:
                 default_stage_id = stages[0].id
 
         now = utc_now_iso()
-        new_contacts_params = []
+        new_contacts_map: Dict[str, Contact] = {}
+        new_Deals_list: List[Deal] = []
         new_deals_params = []
         updated_contacts_map: Dict[str, Contact] = {}
         new_contact_ids = set()
         messages_params = []
+        messages_by_contact: Dict[str, List[Message]] = {}
         contact_last_ts: Dict[str, str] = {}
 
         for it in filtered_items:
@@ -1849,6 +1885,7 @@ class Database:
                     updated_at=msg_ts,
                 )
                 new_contact_ids.add(contact.id)
+                new_contacts_map[contact.id] = contact
                 if contact.phone_hash:
                     by_phone_hash[contact.phone_hash] = contact
                 c_digits = "".join(ch for ch in clean_phone if ch.isdigit())
@@ -1857,29 +1894,6 @@ class Database:
                 if is_lid:
                     by_lid[clean_phone] = contact
 
-                new_contacts_params.append(
-                    (
-                        contact.id,
-                        contact.tenant_id or "master",
-                        contact.name,
-                        encrypt_field(contact.phone),
-                        contact.phone_hash,
-                        encrypt_field(contact.email),
-                        contact.channel,
-                        contact.seller_id,
-                        contact.assignee,
-                        1 if contact.ai_enabled else 0,
-                        contact.attendance_status,
-                        contact.temperature,
-                        contact.lead_score,
-                        contact.consent_status or "opted_in",
-                        0,
-                        json.dumps(contact.tags, ensure_ascii=False),
-                        encrypt_dict(contact.custom_fields),
-                        contact.created_at,
-                        contact.updated_at,
-                    )
-                )
                 if default_pipeline_id and default_stage_id:
                     deal = Deal(
                         contact_id=contact.id,
@@ -1891,6 +1905,7 @@ class Database:
                         created_at=now,
                         updated_at=now,
                     )
+                    new_Deals_list.append(deal)
                     new_deals_params.append(
                         (
                             deal.id,
@@ -1917,9 +1932,10 @@ class Database:
                 if contact.name.startswith("WhatsApp (") and push_name and not push_name.startswith("WhatsApp ("):
                     contact.name = push_name
                     needs_cf_update = True
-                if needs_cf_update and contact.id not in new_contact_ids:
+                if needs_cf_update:
                     contact.custom_fields = fields
-                    updated_contacts_map[contact.id] = contact
+                    if contact.id not in new_contact_ids:
+                        updated_contacts_map[contact.id] = contact
 
             msg_obj = Message(
                 contact_id=contact.id,
@@ -1930,9 +1946,10 @@ class Database:
                 media_type=media_type,
                 media_url=it.get("media_url"),
                 external_id=ext_id,
-                delivery_status="sent",
+                delivery_status="delivered" if from_me else "sent",
                 timestamp=msg_ts,
             )
+            messages_by_contact.setdefault(contact.id, []).append(msg_obj)
             messages_params.append(
                 (
                     msg_obj.id,
@@ -1944,13 +1961,41 @@ class Database:
                     msg_obj.media_type,
                     msg_obj.media_url,
                     msg_obj.external_id,
-                    "sent",
+                    msg_obj.delivery_status,
                     msg_obj.timestamp,
                 )
             )
             prev_ts = contact_last_ts.get(contact.id)
             if not prev_ts or msg_ts > prev_ts:
                 contact_last_ts[contact.id] = msg_ts
+                contact.updated_at = msg_ts
+
+        new_contacts_params = []
+        for cid, contact in new_contacts_map.items():
+            contact.updated_at = contact_last_ts.get(cid, contact.updated_at)
+            new_contacts_params.append(
+                (
+                    contact.id,
+                    contact.tenant_id or "master",
+                    contact.name,
+                    encrypt_field(contact.phone),
+                    contact.phone_hash,
+                    encrypt_field(contact.email),
+                    contact.channel,
+                    contact.seller_id,
+                    contact.assignee,
+                    1 if contact.ai_enabled else 0,
+                    contact.attendance_status,
+                    contact.temperature,
+                    contact.lead_score,
+                    contact.consent_status or "opted_in",
+                    0,
+                    json.dumps(contact.tags, ensure_ascii=False),
+                    encrypt_dict(contact.custom_fields),
+                    contact.created_at,
+                    contact.updated_at,
+                )
+            )
 
         # 3. Persiste tudo em uma única transação no banco (1 commit total)
         with self.connection() as conn:
@@ -1987,6 +2032,7 @@ class Database:
                 )
             for cid, c_obj in updated_contacts_map.items():
                 last_ts = contact_last_ts.get(cid, c_obj.updated_at)
+                c_obj.updated_at = last_ts
                 conn.execute(
                     "UPDATE contacts SET name = ?, custom_fields = ?, updated_at = ? WHERE id = ?",
                     (c_obj.name, encrypt_dict(c_obj.custom_fields), last_ts, cid),
@@ -1998,12 +2044,33 @@ class Database:
                         (last_ts, cid, last_ts),
                     )
 
+        # 4. Atualiza os caches em memória diretamente (Write-Through O(1)) para leitura instantânea
         with self._cache_lock:
-            self._contacts_cache = None
-            if new_deals_params:
-                self._deals_cache = None
-            for cid in contact_last_ts.keys():
-                self._messages_cache.pop(cid, None)
+            if self._contacts_cache is not None:
+                existing_by_id = {c.id: c for c in self._contacts_cache}
+                for cid, new_c in new_contacts_map.items():
+                    existing_by_id[cid] = new_c.model_copy(deep=True)
+                for cid, upd_c in updated_contacts_map.items():
+                    existing_by_id[cid] = upd_c.model_copy(deep=True)
+                for cid, last_ts in contact_last_ts.items():
+                    if cid in existing_by_id and existing_by_id[cid].updated_at < last_ts:
+                        existing_by_id[cid].updated_at = last_ts
+                merged_contacts = list(existing_by_id.values())
+                merged_contacts.sort(key=lambda c: c.updated_at or "", reverse=True)
+                self._contacts_cache = merged_contacts
+
+            if self._deals_cache is not None and new_Deals_list:
+                self._deals_cache = [d.model_copy(deep=True) for d in new_Deals_list] + self._deals_cache
+
+            for cid, new_msgs in messages_by_contact.items():
+                if cid in self._messages_cache:
+                    combined = self._messages_cache[cid] + [m.model_copy(deep=True) for m in new_msgs]
+                    combined.sort(key=lambda m: m.timestamp or "")
+                    self._messages_cache[cid] = combined
+                elif cid in new_contact_ids:
+                    sorted_msgs = [m.model_copy(deep=True) for m in new_msgs]
+                    sorted_msgs.sort(key=lambda m: m.timestamp or "")
+                    self._messages_cache[cid] = sorted_msgs
 
         return {
             "imported_messages": len(messages_params),

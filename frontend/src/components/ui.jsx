@@ -280,10 +280,27 @@ export function Modal({
   as: Tag = 'div',
   onSubmit,
 }) {
+  React.useEffect(() => {
+    if (!onClose) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const width =
     size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-lg' : size === 'xl' ? 'max-w-5xl' : 'max-w-md';
   return (
-    <div className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-canvas/80 p-4 backdrop-blur-[2px]">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && onClose) onClose();
+      }}
+      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-canvas/80 p-4 backdrop-blur-[2px]"
+    >
       <Tag
         onSubmit={onSubmit}
         className={cn(
@@ -317,7 +334,7 @@ export function Modal({
   );
 }
 
-export function EmptyState({ icon: Icon, title, description, className }) {
+export function EmptyState({ icon: Icon, title, description, action, className }) {
   return (
     <div
       className={cn(
@@ -336,6 +353,7 @@ export function EmptyState({ icon: Icon, title, description, className }) {
           {description}
         </p>
       )}
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }

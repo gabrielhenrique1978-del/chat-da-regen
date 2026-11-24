@@ -69,6 +69,12 @@ export default function ContactDrawer({
   const [requestingPhone, setRequestingPhone] = useState(false);
   const [phoneRequested, setPhoneRequested] = useState(false);
 
+  React.useEffect(() => {
+    setIsEditingPhone(false);
+    setConfirmErase(false);
+    setPhoneInput(contact?.phone || '');
+  }, [contact?.id, contact?.phone]);
+
   const handleRequestPhone = async () => {
     setRequestingPhone(true);
     try {
@@ -160,7 +166,7 @@ export default function ContactDrawer({
                   type="button"
                   onClick={handleSavePhone}
                   disabled={phoneSaving}
-                  className="rounded p-1 text-primary hover:bg-surface-hover"
+                  className="rounded p-1 text-primary hover:bg-elevated"
                   title="Salvar"
                 >
                   <Check size={13} />
@@ -168,7 +174,7 @@ export default function ContactDrawer({
                 <button
                   type="button"
                   onClick={() => setIsEditingPhone(false)}
-                  className="rounded p-1 text-muted hover:bg-surface-hover"
+                  className="rounded p-1 text-muted hover:bg-elevated"
                   title="Cancelar"
                 >
                   <X size={13} />
@@ -185,17 +191,17 @@ export default function ContactDrawer({
                 </span>
                 {contact.phone && contact.phone.replace(/\D/g, '').length > 13 && (
                   <>
-                    <span className="rounded bg-primary/10 px-1 py-0.5 text-3xs text-primary font-medium" title={`Meta LID: ${contact.phone}`}>
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-2xs text-primary font-medium" title={`Meta LID: ${contact.phone}`}>
                       Meta LID
                     </span>
                     <button
                       type="button"
                       onClick={handleRequestPhone}
                       disabled={requestingPhone}
-                      className="rounded bg-secondary/15 hover:bg-secondary/25 text-secondary text-3xs px-1.5 py-0.5 transition-colors font-medium flex items-center gap-1"
+                      className="rounded bg-secondary/15 hover:bg-secondary/25 text-secondary text-2xs px-1.5 py-0.5 transition-colors font-medium flex items-center gap-1"
                       title="Solicitar compartilhamento oficial de telefone no WhatsApp"
                     >
-                      {phoneRequested ? 'Solicitado ✓' : 'Solicitar'}
+                      {phoneRequested ? 'Solicitado' : 'Solicitar'}
                     </button>
                   </>
                 )}

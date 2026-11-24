@@ -223,6 +223,8 @@ class WhatsAppService:
         self._connected = False
         self._last_qrcode = None
         self._phone_number = None
+        self._lid = None
+        self._name = None
         return {"success": True, "state": "disconnected"}
 
     async def send_text_message(self, phone: str, text: str) -> Dict[str, Any]:
@@ -242,7 +244,8 @@ class WhatsAppService:
             async with httpx.AsyncClient(timeout=6.0) as client:
                 res = await client.post(url, headers=self.headers, json=payload)
                 if res.status_code in (200, 201):
-                    return {"success": True, "result": res.json()}
+                    body = res.json()
+                    return {"success": True, "messageId": body.get("messageId"), "result": body}
         except Exception as exc:
             logger.warning(f"Falha ao enviar mensagem WhatsApp via Evolution API: {exc}")
 
@@ -273,7 +276,8 @@ class WhatsAppService:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 res = await client.post(url, headers=self.headers, json=payload)
                 if res.status_code in (200, 201):
-                    return {"success": True, "result": res.json()}
+                    body = res.json()
+                    return {"success": True, "messageId": body.get("messageId"), "result": body}
         except Exception as exc:
             logger.warning(f"Falha ao enviar áudio PTT via Evolution API: {exc}")
 
@@ -309,7 +313,8 @@ class WhatsAppService:
             async with httpx.AsyncClient(timeout=12.0) as client:
                 res = await client.post(url, headers=self.headers, json=payload)
                 if res.status_code in (200, 201):
-                    return {"success": True, "result": res.json()}
+                    body = res.json()
+                    return {"success": True, "messageId": body.get("messageId"), "result": body}
         except Exception as exc:
             logger.warning(f"Falha ao enviar mídia via WhatsApp Bridge: {exc}")
 

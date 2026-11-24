@@ -31,6 +31,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
   const [saving, setSaving] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [loadingWa, setLoadingWa] = useState(false);
+  const [waFeedback, setWaFeedback] = useState(null);
 
   const loadAll = async () => {
     try {
@@ -55,7 +56,7 @@ export default function ConnectionsView({ onWebhookSimulated }) {
     loadAll();
   }, []);
 
-  // Polling automático para atualizar o QR Code e detectar pareamento do WhatsApp
+  // Polling automático rápido para atualizar o QR Code e detectar pareamento instantaneamente
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -67,6 +68,9 @@ export default function ConnectionsView({ onWebhookSimulated }) {
             prev.qrcode !== wa.qrcode ||
             prev.phone_number !== wa.phone_number
           ) {
+            if (wa.state === 'open' && prev.state !== 'open') {
+              onWebhookSimulated?.();
+            }
             return wa;
           }
           return prev;
@@ -74,9 +78,9 @@ export default function ConnectionsView({ onWebhookSimulated }) {
       } catch (err) {
         // silencioso durante inicialização
       }
-    }, 4000);
+    }, 1500);
     return () => clearInterval(interval);
-  }, []);
+  }, [onWebhookSimulated]);
 
   const handleConnectWa = async () => {
     setLoadingWa(true);
@@ -304,9 +308,10 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 onClick={async () => {
                   try {
                     const res = await api.clearDemoContacts();
-                    alert(res.message || 'Contatos fictícios removidos com sucesso!');
+                    setWaFeedback(res.message || 'Contatos demonstrativos removidos com sucesso.');
+                    onWebhookSimulated?.();
                   } catch (err) {
-                    console.error(err);
+                    setWaFeedback(err.message);
                   }
                 }}
               >
@@ -322,6 +327,8 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                   onClick={async () => {
                     const res = await api.disconnectWhatsApp();
                     setWaStatus(res);
+                    setWaFeedback('WhatsApp desconectado e conversas excluídas automaticamente.');
+                    onWebhookSimulated?.();
                   }}
                 >
                   <LogOut size={13} />
@@ -329,6 +336,22 @@ export default function ConnectionsView({ onWebhookSimulated }) {
                 </Button>
               )}
             </div>
+
+            {waFeedback && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-line bg-canvas px-3 py-2 text-2xs text-fg">
+                <span className="flex items-center gap-2">
+                  <StatusDot tone="primary" />
+                  {waFeedback}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWaFeedback(null)}
+                  className="text-muted hover:text-fg"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </section>
 
           {/* Card 2: Meta Oficial Cloud API */}

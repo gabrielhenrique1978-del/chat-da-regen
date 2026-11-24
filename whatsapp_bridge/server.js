@@ -44,7 +44,9 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: 'Acesso não autorizado ao motor WhatsApp Bridge.' });
 });
 
-const logger = pino({ level: 'silent' });
+const logger = process.env.WA_DEBUG_LOG
+  ? pino({ level: 'debug' }, pino.destination(process.env.WA_DEBUG_LOG))
+  : pino({ level: 'silent' });
 
 let sock = null;
 let currentQR = null;
@@ -436,31 +438,60 @@ async function processAndForwardMessage(msg, isHistory = false) {
   });
 }
 
+function clearBridgeMemoryAndAuth() {
+  currentQR = null;
+  myPhoneNumber = null;
+  myLid = null;
+  myName = null;
+  contactsMap.clear();
+  lidToPhoneMap.clear();
+  phoneToLidMap.clear();
+  jidMap.clear();
+  sentMessagesCache.clear();
+  rawRetryMap.clear();
+  if (fs.existsSync(AUTH_DIR)) {
+    try {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    } catch (e) {}
+  }
+}
+
 async function processAndForwardHistoryBatch(rawMessages) {
   if (!rawMessages || !Array.isArray(rawMessages) || rawMessages.length === 0) return;
 
-  const sorted = [...rawMessages].sort((a, b) => {
-    const ta = Number(a.messageTimestamp?.low || a.messageTimestamp || 0);
-    const tb = Number(b.messageTimestamp?.low || b.messageTimestamp || 0);
-    return ta - tb;
-  });
-
-  const items = [];
-  for (const msg of sorted) {
+  // Agrupa mensagens por conversa (remoteJid/phone) para que TODAS as conversas ativas
+  // sejam importadas instantaneamente ao conectar (mantendo as 35 mensagens mais recentes de cada chat)
+  const byChat = new Map();
+  for (const msg of rawMessages) {
     const extracted = extractMessageItem(msg, true);
-    if (extracted) {
-      delete extracted._hasRawImage;
-      delete extracted._hasRawAudio;
-      delete extracted._imageMime;
-      delete extracted._audioMime;
-      items.push(extracted);
+    if (!extracted) continue;
+    delete extracted._hasRawImage;
+    delete extracted._hasRawAudio;
+    delete extracted._imageMime;
+    delete extracted._audioMime;
+
+    const chatKey = extracted.whatsappJid || extracted.phone;
+    if (!chatKey) continue;
+    if (!byChat.has(chatKey)) {
+      byChat.set(chatKey, []);
     }
+    byChat.get(chatKey).push(extracted);
   }
 
-  if (items.length === 0) return;
+  if (byChat.size === 0) return;
 
-  // Envia em blocos de até 150 mensagens sem travar o loop de eventos do Baileys
-  const CHUNK_SIZE = 150;
+  const MAX_PER_CHAT = 35;
+  const items = [];
+  for (const [, chatItems] of byChat.entries()) {
+    chatItems.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const recentChatItems = chatItems.slice(-MAX_PER_CHAT);
+    items.push(...recentChatItems);
+  }
+
+  items.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  // Envia em blocos rápidos de 200 mensagens para inserção transacional em lote no PostgreSQL
+  const CHUNK_SIZE = 200;
   for (let i = 0; i < items.length; i += CHUNK_SIZE) {
     const chunk = items.slice(i, i + CHUNK_SIZE);
     await notifyWebhook({
@@ -514,20 +545,13 @@ async function startWhatsAppSocket() {
       },
       logger,
       browser: ['Regen Flow CRM', 'Chrome', '124.0.0'],
-      syncFullHistory: false, // Evita download massivo de 22.000 mensagens antigas que travam a sessão Signal
-      shouldSyncHistoryMessage: (msg) =>
-        msg.syncType === 0 || msg.syncType === 1 || msg.syncType === 3,
+      syncFullHistory: false, // Recebe bootstrap inicial e conversas recentes instantaneamente
+      shouldSyncHistoryMessage: () => true,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
-      retryRequestDelayMs: 150,
-      maxMsgRetryCount: 6,
+      // Baileys 7: suporte nativo a LID, cache interno de mensagens recentes para retry Signal
+      enableRecentMessageCache: true,
       msgRetryCounterCache: fastRetryCounterCache,
-      placeholderResendCache: noOpPlaceholderCache,
-      cacheSentMessage: (id, msg) => {
-        if (id && msg) {
-          sentMessagesCache.set(id, msg);
-        }
-      },
       getMessage: async (key) => {
         if (key?.id && sentMessagesCache.has(key.id)) {
           return sentMessagesCache.get(key.id);
@@ -605,16 +629,11 @@ async function startWhatsAppSocket() {
         sock = null;
 
         if (statusCode === DisconnectReason.loggedOut) {
-          currentQR = null;
-          myPhoneNumber = null;
-          myLid = null;
-          if (fs.existsSync(AUTH_DIR)) {
-            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-          }
+          clearBridgeMemoryAndAuth();
           await notifyWebhook({
             event: 'connection.update',
             instance: 'regenflow',
-            data: { state: 'close' },
+            data: { state: 'close', loggedOut: true },
           });
         } else {
           const delay = statusCode === DisconnectReason.restartRequired ? 500 : 2500;
@@ -642,7 +661,7 @@ async function startWhatsAppSocket() {
 
       const isHistoryBatch = type !== 'notify' && !isRecentSingle;
       if (isHistoryBatch && messages.length > 1) {
-        processAndForwardHistoryBatch(messages.slice(-150)).catch(() => {});
+        processAndForwardHistoryBatch(messages).catch(() => {});
         return;
       }
       for (const msg of messages) {
@@ -686,31 +705,59 @@ async function startWhatsAppSocket() {
       }
     });
 
+    // Baileys 7: mapeamento oficial LID <-> telefone
+    sock.ev.on('lid-mapping.update', (mappings) => {
+      const list = Array.isArray(mappings) ? mappings : [mappings];
+      for (const m of list) {
+        if (m?.lid && m?.pn) recordMapping(m.pn, m.lid);
+      }
+    });
+
     // Sincronização de contatos
     sock.ev.on('contacts.upsert', async (contacts) => {
       for (const c of contacts || []) {
-        recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
+        recordMapping(c.phoneNumber || c.id, c.lid || c.lidJid || (c.id?.endsWith('@lid') ? c.id : undefined), c.name || c.notify || c.verifiedName);
       }
     });
 
     sock.ev.on('contacts.set', async ({ contacts }) => {
       console.log(`📇 [Baileys] Agenda recebida: ${contacts?.length || 0} contatos.`);
       for (const c of contacts || []) {
-        recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
+        recordMapping(c.phoneNumber || c.id, c.lid || c.lidJid || (c.id?.endsWith('@lid') ? c.id : undefined), c.name || c.notify || c.verifiedName);
       }
     });
 
     // Sincronização de conversas (chats)
     sock.ev.on('chats.set', async ({ chats }) => {
       console.log(`💬 [Baileys] Lista de conversas recebida: ${chats?.length || 0} chats.`);
+      const embeddedMsgs = [];
       for (const ch of chats || []) {
         recordMapping(ch.id, ch.lidJid, ch.name);
+        if (Array.isArray(ch.messages)) {
+          for (const mWrap of ch.messages) {
+            const m = mWrap?.message || mWrap;
+            if (m?.key && m?.message) embeddedMsgs.push(m);
+          }
+        }
+      }
+      if (embeddedMsgs.length > 0) {
+        processAndForwardHistoryBatch(embeddedMsgs).catch(() => {});
       }
     });
 
     sock.ev.on('chats.upsert', async (chats) => {
+      const embeddedMsgs = [];
       for (const ch of chats || []) {
         recordMapping(ch.id, ch.lidJid, ch.name);
+        if (Array.isArray(ch.messages)) {
+          for (const mWrap of ch.messages) {
+            const m = mWrap?.message || mWrap;
+            if (m?.key && m?.message) embeddedMsgs.push(m);
+          }
+        }
+      }
+      if (embeddedMsgs.length > 0) {
+        processAndForwardHistoryBatch(embeddedMsgs).catch(() => {});
       }
     });
 
@@ -735,17 +782,28 @@ async function startWhatsAppSocket() {
     });
 
     // Sincronização inicial de histórico do WhatsApp (messaging-history.set)
-    sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
+    sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, lidPnMappings }) => {
       console.log(`📥 [Baileys] Sincronização de histórico: ${chats?.length || 0} chats, ${contacts?.length || 0} contatos, ${messages?.length || 0} mensagens.`);
+      for (const m of lidPnMappings || []) {
+        if (m?.lid && m?.pn) {
+          recordMapping(m.pn, m.lid);
+        }
+      }
+      const combinedMessages = Array.isArray(messages) ? [...messages] : [];
       for (const ch of chats || []) {
         recordMapping(ch.id, ch.lidJid, ch.name);
+        if (Array.isArray(ch.messages)) {
+          for (const mWrap of ch.messages) {
+            const m = mWrap?.message || mWrap;
+            if (m?.key && m?.message) combinedMessages.push(m);
+          }
+        }
       }
       for (const c of contacts || []) {
-        recordMapping(c.id, c.lid || c.lidJid, c.name || c.notify || c.verifiedName);
+        recordMapping(c.phoneNumber || c.id, c.lid || c.lidJid || (c.id?.endsWith('@lid') ? c.id : undefined), c.name || c.notify || c.verifiedName);
       }
-      if (messages && Array.isArray(messages) && messages.length > 0) {
-        // Importa de forma assíncrona apenas as 150 mensagens mais recentes para não travar a sessão Signal
-        processAndForwardHistoryBatch(messages.slice(-150)).catch(() => {});
+      if (combinedMessages.length > 0) {
+        processAndForwardHistoryBatch(combinedMessages).catch(() => {});
       }
     });
   } catch (err) {
@@ -807,22 +865,13 @@ app.delete('/instance/logout/:instance', async (req, res) => {
     }
   } catch (err) {}
   connectionState = 'close';
-  currentQR = null;
-  myPhoneNumber = null;
-  myLid = null;
-  contactsMap.clear();
-  lidToPhoneMap.clear();
-  phoneToLidMap.clear();
-  jidMap.clear();
   if (sock) {
     try {
       sock.ev.removeAllListeners();
     } catch (e) {}
     sock = null;
   }
-  if (fs.existsSync(AUTH_DIR)) {
-    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-  }
+  clearBridgeMemoryAndAuth();
   res.json({ success: true, state: 'disconnected' });
 });
 
@@ -949,5 +998,12 @@ app.listen(PORT, BRIDGE_HOST, () => {
   if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) {
     console.log('🔄 [Baileys] Sessão salva detectada em disco. Reconectando automaticamente...');
     startWhatsAppSocket().catch(console.error);
+  } else {
+    // Sem sessão ativa em disco: notifica o backend para garantir que nenhuma conversa antiga fique retida
+    notifyWebhook({
+      event: 'connection.update',
+      instance: 'regenflow',
+      data: { state: 'close', loggedOut: true },
+    }).catch(() => {});
   }
 });

@@ -99,14 +99,15 @@ export default function OmnichannelInbox({
   const [supervisorIntervention, setSupervisorIntervention] = useState(false);
   const [showIgCommentModal, setShowIgCommentModal] = useState(false);
   const [igPublicReply, setIgPublicReply] = useState(
-    'Olá! Respondemos você no Direct com todos os detalhes! 🚀📩'
+    'Olá! Respondemos você no Direct com todos os detalhes.'
   );
   const [igPrivateDm, setIgPrivateDm] = useState(
-    'Olá! Vi seu comentário na nossa publicação do Instagram 😊 Como posso te ajudar hoje?'
+    'Olá! Vi seu comentário na nossa publicação do Instagram. Como posso te ajudar hoje?'
   );
   const [igSending, setIgSending] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const feedEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -425,7 +426,7 @@ export default function OmnichannelInbox({
 
         {/* Busca e Filtros */}
         <div className="p-3 border-b border-line space-y-2.5 shrink-0 bg-canvas/40">
-          {/* Campo de busca */}
+          {/* Campo de busca com botão de limpeza rápida */}
           <div className="relative">
             <Search
               size={13}
@@ -436,8 +437,18 @@ export default function OmnichannelInbox({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar cliente, telefone ou tag..."
-              className={cn(fieldClass, 'pl-8')}
+              className={cn(fieldClass, 'pl-8 pr-7')}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Limpar busca"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-2 rounded p-0.5 text-muted hover:bg-elevated hover:text-fg transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
 
           {/* Filtro do Supervisor: Carteira + Roleta */}
@@ -673,7 +684,7 @@ export default function OmnichannelInbox({
                         {currentContact.phone}
                       </span>
                     ) : (
-                      <span className="text-3xs text-muted/80 bg-surface-elevated px-1.5 py-0.5 rounded border border-line" title="Conta com ID de privacidade Meta">
+                      <span className="text-2xs text-muted/80 bg-elevated px-1.5 py-0.5 rounded border border-line" title="Conta com ID de privacidade Meta">
                         Meta ID Protegido
                       </span>
                     )}
@@ -933,11 +944,19 @@ export default function OmnichannelInbox({
 
                       {m.media_type === 'image' && m.media_url && (
                         <div className="mt-2">
-                          <img
-                            src={m.media_url}
-                            alt="Anexo"
-                            className="max-h-56 rounded border border-line object-cover"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage(m.media_url)}
+                            className="group relative block overflow-hidden rounded-md border border-line focus:outline-none"
+                            title="Ampliar imagem"
+                          >
+                            <img
+                              src={m.media_url}
+                              alt="Anexo da conversa"
+                              loading="lazy"
+                              className="max-h-56 object-cover transition-transform duration-150 group-hover:scale-[1.01]"
+                            />
+                          </button>
                         </div>
                       )}
 
@@ -1078,7 +1097,20 @@ export default function OmnichannelInbox({
                   type="text"
                   disabled={isInputBlocked}
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setMessageText(val);
+                    if (val === '/') {
+                      setShowQuickReplies(true);
+                    } else if (!val.startsWith('/') && showQuickReplies) {
+                      setShowQuickReplies(false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && showQuickReplies) {
+                      setShowQuickReplies(false);
+                    }
+                  }}
                   placeholder={
                     isInputBlocked
                       ? `Chat em modo leitura — operador responsável: ${currentContact.assignee}`
@@ -1087,8 +1119,8 @@ export default function OmnichannelInbox({
                       : chatSubTab === 'simulator'
                       ? 'Simular mensagem enviada pelo cliente...'
                       : impersonatedSeller
-                      ? `Respondendo como ${impersonatedSeller.name}...`
-                      : `Responder como ${activeSellerName}...`
+                      ? `Respondendo como ${impersonatedSeller.name} (digite / para atalhos)...`
+                      : `Responder como ${activeSellerName} (digite / para atalhos)...`
                   }
                   className={cn(fieldClass, 'h-9 px-3 text-xs')}
                 />
@@ -1392,6 +1424,25 @@ export default function OmnichannelInbox({
                 className={textareaClass}
               />
             </Field>
+          </div>
+        </Modal>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL: VISUALIZAÇÃO AMPLIADA DE IMAGEM                              */}
+      {/* =================================================================== */}
+      {previewImage && (
+        <Modal
+          title="Visualização de mídia"
+          onClose={() => setPreviewImage(null)}
+          size="lg"
+        >
+          <div className="flex items-center justify-center bg-canvas p-2 rounded-lg border border-line">
+            <img
+              src={previewImage}
+              alt="Visualização ampliada"
+              className="max-h-[70vh] w-auto rounded object-contain"
+            />
           </div>
         </Modal>
       )}

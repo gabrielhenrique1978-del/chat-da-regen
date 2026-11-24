@@ -2032,16 +2032,24 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
     @router.post("/whatsapp/connect")
     async def connect_whatsapp():
         """Inicia a criação/conexão da instância e gera o QR Code para leitura."""
+        current_st = await whatsapp_service.get_connection_status()
+        if not current_st.get("connected"):
+            cleared = db.clear_whatsapp_data()
+            if cleared.get("deleted_contacts", 0) > 0:
+                await ws_manager.broadcast_event("whatsapp_disconnected", {"state": "connecting", "cleared": True, **cleared})
         res = await whatsapp_service.create_or_connect()
         await ws_manager.broadcast_event("whatsapp_qr_updated", res)
         return res
 
     @router.post("/whatsapp/disconnect")
     async def disconnect_whatsapp():
-        """Desconecta a sessão do WhatsApp."""
+        """Desconecta a sessão do WhatsApp e exclui automaticamente todas as conversas e caches."""
         res = await whatsapp_service.disconnect()
-        await ws_manager.broadcast_event("whatsapp_status_updated", res)
-        return res
+        cleared = db.clear_whatsapp_data()
+        payload = {**res, "cleared": True, **cleared}
+        await ws_manager.broadcast_event("whatsapp_disconnected", payload)
+        await ws_manager.broadcast_event("whatsapp_status_updated", payload)
+        return payload
 
     @router.post("/whatsapp/simulate-scan")
     async def simulate_whatsapp_scan():
@@ -2431,6 +2439,7 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
             phone = data.get("phone")
             lid = data.get("lid")
             name = data.get("name")
+            logged_out = bool(data.get("loggedOut", False))
             whatsapp_service.set_connection_state_from_webhook(state, phone=phone, lid=lid, name=name)
 
             if state.lower() == "open":
@@ -2438,9 +2447,17 @@ def create_app(db_path: Optional[str] = None, seed_demo: bool = True) -> FastAPI
                 deleted = db.clear_demo_contacts()
                 if deleted > 0:
                     logger.info(f"Removidos {deleted} contatos de demonstração após sincronização real.")
-
-            await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state, "phone": phone})
-            await ws_manager.broadcast_event("new_message", {"type": "whatsapp_status_sync"})
+                await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state, "phone": phone})
+                await ws_manager.broadcast_event("new_message", {"type": "whatsapp_status_sync"})
+            elif state.lower() in ("close", "disconnected") and logged_out:
+                cleared = db.clear_whatsapp_data()
+                logger.info(f"WhatsApp desconectado: conversas e caches excluídos automaticamente ({cleared}).")
+                payload = {"state": "disconnected", "cleared": True, **cleared}
+                await ws_manager.broadcast_event("whatsapp_disconnected", payload)
+                await ws_manager.broadcast_event("whatsapp_status_updated", payload)
+            else:
+                await ws_manager.broadcast_event("whatsapp_status_updated", {"state": state, "phone": phone})
+                await ws_manager.broadcast_event("new_message", {"type": "whatsapp_status_sync"})
 
         elif "QRCODE" in event:
             qrcode = data.get("qrcode", {}).get("base64") or data.get("base64")

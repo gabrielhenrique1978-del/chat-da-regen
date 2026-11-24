@@ -35,6 +35,7 @@ export default function SellersView({
   const [pin, setPin] = useState('1234');
   const [role, setRole] = useState('seller');
   const [feedback, setFeedback] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const fetchAllSellers = async () => {
     setLoading(true);
@@ -386,13 +387,35 @@ export default function SellersView({
                                 >
                                   {s.active ? <UserX size={13} /> : <UserCheck size={13} />}
                                 </IconButton>
-                                <IconButton
-                                  label={`Excluir ${s.name}`}
-                                  size="sm"
-                                  onClick={() => handleDeleteSeller(s)}
-                                >
-                                  <Trash2 size={13} />
-                                </IconButton>
+                                {confirmDeleteId === s.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      onClick={() => {
+                                        setConfirmDeleteId(null);
+                                        handleDeleteSeller(s);
+                                      }}
+                                    >
+                                      Confirmar
+                                    </Button>
+                                    <IconButton
+                                      label="Cancelar exclusão"
+                                      size="sm"
+                                      onClick={() => setConfirmDeleteId(null)}
+                                    >
+                                      <X size={12} />
+                                    </IconButton>
+                                  </div>
+                                ) : (
+                                  <IconButton
+                                    label={`Excluir ${s.name}`}
+                                    size="sm"
+                                    onClick={() => setConfirmDeleteId(s.id)}
+                                  >
+                                    <Trash2 size={13} />
+                                  </IconButton>
+                                )}
                               </>
                             )}
                           </div>
